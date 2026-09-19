@@ -1,1 +1,2 @@
 - [SQLite runtime choice](sqlite-runtime.md) — the demo uses Node 24's built-in SQLite runtime to stay portable without native npm drivers.
+- [Telegram polling deployment](telegram-polling.md) — the bot polls from the server; use one always-on API process and keep the token server-side.

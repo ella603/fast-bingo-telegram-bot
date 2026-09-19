@@ -27,6 +27,7 @@ Fast Bingo is a Telegram-style 75-ball bingo demo with quick rooms, host-control
 - `artifacts/fast-bingo/src/App.tsx` — responsive game console, play room, wallet and admin routes
 - `artifacts/fast-bingo/src/index.css` — Fast Bingo visual theme and responsive layout rules
 - `artifacts/api-server/src/lib/bingo-store.ts` — SQLite schema, card seed, game engine and demo wallet store
+- `artifacts/api-server/src/lib/telegram-bot.ts` — server-only Telegram polling, localized menus, room flow, host controls, wallet demo actions, and automatic calls
 - `artifacts/api-server/src/routes/bingo.ts` — bingo API routes
 - `lib/api-spec/openapi.yaml` — source of truth for bingo API contracts
 
@@ -35,6 +36,7 @@ Fast Bingo is a Telegram-style 75-ball bingo demo with quick rooms, host-control
 - The first release is intentionally demo-only: payment methods are presentation options and wallet operations only change local demo credit.
 - The game store uses SQLite directly in the API server to keep the demo portable and easy to run while matching the requested persistence model.
 - The API is contract-first through OpenAPI and generated clients; the frontend does not hardcode game payload shapes.
+- Telegram uses long polling from the API server, so only the server reads `BOT_TOKEN`; it is never sent to the browser.
 
 ## Product
 
@@ -51,6 +53,7 @@ Fast Bingo is a Telegram-style 75-ball bingo demo with quick rooms, host-control
 
 - Node 24 emits an experimental warning for `node:sqlite`; this is expected for the demo runtime.
 - Re-run `pnpm --filter @workspace/api-spec run codegen` after changing the OpenAPI contract.
+- Keep one API server instance running for Telegram long polling; publish as a Reserved VM for an always-on bot.
 
 ## Pointers
 

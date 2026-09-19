@@ -106,6 +106,44 @@ database.exec(`
     time TEXT NOT NULL,
     tone TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS telegram_users (
+    telegram_id TEXT PRIMARY KEY,
+    username TEXT,
+    first_name TEXT NOT NULL,
+    language TEXT NOT NULL DEFAULT 'en',
+    category TEXT NOT NULL DEFAULT 'normal',
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS telegram_sessions (
+    telegram_id TEXT PRIMARY KEY,
+    state TEXT NOT NULL DEFAULT 'menu',
+    game_id TEXT,
+    updated_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS telegram_wallets (
+    telegram_id TEXT PRIMARY KEY,
+    balance REAL NOT NULL DEFAULT 2500,
+    currency TEXT NOT NULL DEFAULT 'ETB'
+  );
+  CREATE TABLE IF NOT EXISTS telegram_wallet_entries (
+    id TEXT PRIMARY KEY,
+    telegram_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    amount REAL NOT NULL,
+    method TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS game_hosts (
+    game_id TEXT PRIMARY KEY,
+    telegram_id TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS game_player_links (
+    game_id TEXT NOT NULL,
+    telegram_id TEXT NOT NULL,
+    player_id TEXT NOT NULL,
+    PRIMARY KEY (game_id, telegram_id)
+  );
 `);
 
 const now = () => new Date().toISOString();
@@ -216,10 +254,11 @@ function readGame(row: Record<string, unknown>): BingoGame {
 function writeGame(game: BingoGame): void {
   database
     .prepare(
-      "UPDATE games SET status = ?, players = ?, called_numbers = ?, current_number = ?, next_call_in = ?, winner_count = ? WHERE id = ?",
+      "UPDATE games SET status = ?, host_name = ?, players = ?, called_numbers = ?, current_number = ?, next_call_in = ?, winner_count = ? WHERE id = ?",
     )
     .run(
       game.status,
+      game.hostName,
       JSON.stringify(game.players),
       JSON.stringify(game.calledNumbers),
       game.currentNumber,
@@ -362,6 +401,220 @@ export function createGame(name: string, category: BingoCategory): BingoGame {
       game.startedAt,
     );
   return game;
+}
+
+export function createTelegramGame(
+  name: string,
+  category: BingoCategory,
+  telegramId: string,
+  hostName: string,
+): BingoGame {
+  const game = createGame(name, category);
+  game.hostName = hostName;
+  game.players[0].name = hostName;
+  game.players[0].initials = hostName.slice(0, 2).toUpperCase();
+  writeGame(game);
+  database
+    .prepare("INSERT OR REPLACE INTO game_hosts (game_id, telegram_id) VALUES (?, ?)")
+    .run(game.id, telegramId);
+  database
+    .prepare(
+      "INSERT OR REPLACE INTO game_player_links (game_id, telegram_id, player_id) VALUES (?, ?, ?)",
+    )
+    .run(game.id, telegramId, game.players[0].id);
+  return game;
+}
+
+export function joinTelegramGame(
+  gameId: string,
+  telegramId: string,
+  playerName: string,
+  category: BingoCategory,
+): BingoGame | undefined {
+  const game = getGame(gameId);
+  if (!game || game.status === "completed") return undefined;
+  const existing = database
+    .prepare("SELECT player_id FROM game_player_links WHERE game_id = ? AND telegram_id = ?")
+    .get(gameId, telegramId);
+  if (existing) return game;
+  const card = getCards(category, 1)[0] ?? getCards("normal", 1)[0];
+  const player: BingoPlayer = {
+    id: randomId("player"),
+    name: playerName,
+    initials: playerName.slice(0, 2).toUpperCase(),
+    category,
+    cardLabel: card.label,
+    joinedAt: now(),
+  };
+  game.players.push(player);
+  writeGame(game);
+  database
+    .prepare("UPDATE cards SET status = ? WHERE label = ?")
+    .run(game.status === "live" ? "in-play" : "reserved", card.label);
+  database
+    .prepare(
+      "INSERT OR REPLACE INTO game_player_links (game_id, telegram_id, player_id) VALUES (?, ?, ?)",
+    )
+    .run(gameId, telegramId, player.id);
+  return game;
+}
+
+export function getTelegramParticipants(gameId: string): string[] {
+  return database
+    .prepare("SELECT telegram_id FROM game_player_links WHERE game_id = ?")
+    .all(gameId)
+    .map((row) => String((row as Record<string, unknown>).telegram_id));
+}
+
+export function getTelegramHost(gameId: string): string | undefined {
+  const row = database.prepare("SELECT telegram_id FROM game_hosts WHERE game_id = ?").get(gameId);
+  return row ? String((row as Record<string, unknown>).telegram_id) : undefined;
+}
+
+export function getTelegramGame(telegramId: string): BingoGame | undefined {
+  const row = database
+    .prepare(
+      `SELECT g.* FROM games g
+       INNER JOIN game_player_links l ON l.game_id = g.id
+       WHERE l.telegram_id = ? AND g.status != 'completed'
+       ORDER BY g.started_at DESC LIMIT 1`,
+    )
+    .get(telegramId);
+  return row ? readGame(row as Record<string, unknown>) : undefined;
+}
+
+export function getGameByShareCode(shareCode: string): BingoGame | undefined {
+  const row = database
+    .prepare("SELECT * FROM games WHERE UPPER(share_code) = UPPER(?)")
+    .get(shareCode.trim());
+  return row ? readGame(row as Record<string, unknown>) : undefined;
+}
+
+export function getTelegramCard(gameId: string, telegramId: string): BingoCard | undefined {
+  const link = database
+    .prepare("SELECT player_id FROM game_player_links WHERE game_id = ? AND telegram_id = ?")
+    .get(gameId, telegramId) as Record<string, unknown> | undefined;
+  if (!link) return undefined;
+  const game = getGame(gameId);
+  const player = game?.players.find((item) => item.id === String(link.player_id));
+  if (!player) return undefined;
+  const row = database.prepare("SELECT * FROM cards WHERE label = ?").get(player.cardLabel);
+  return row ? readCard(row as Record<string, unknown>) : undefined;
+}
+
+export function upsertTelegramUser(
+  telegramId: string,
+  firstName: string,
+  username?: string,
+): void {
+  database
+    .prepare(
+      `INSERT INTO telegram_users (telegram_id, first_name, username, created_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(telegram_id) DO UPDATE SET first_name = excluded.first_name, username = excluded.username`,
+    )
+    .run(telegramId, firstName, username ?? null, now());
+  database
+    .prepare("INSERT OR IGNORE INTO telegram_wallets (telegram_id, balance, currency) VALUES (?, 2500, 'ETB')")
+    .run(telegramId);
+  database
+    .prepare(
+      "INSERT OR IGNORE INTO telegram_sessions (telegram_id, state, updated_at) VALUES (?, 'menu', ?)",
+    )
+    .run(telegramId, now());
+}
+
+export function hasTelegramUser(telegramId: string): boolean {
+  const row = database
+    .prepare("SELECT telegram_id FROM telegram_users WHERE telegram_id = ?")
+    .get(telegramId);
+  return Boolean(row);
+}
+
+export function setTelegramLanguage(telegramId: string, language: "en" | "am"): void {
+  database.prepare("UPDATE telegram_users SET language = ? WHERE telegram_id = ?").run(language, telegramId);
+}
+
+export function getTelegramLanguage(telegramId: string): "en" | "am" {
+  const row = database.prepare("SELECT language FROM telegram_users WHERE telegram_id = ?").get(telegramId);
+  return row && (row as Record<string, unknown>).language === "am" ? "am" : "en";
+}
+
+export type TelegramSessionState = "menu" | "create_name" | "create_category" | "join_code" | "join_category";
+
+export function setTelegramSession(
+  telegramId: string,
+  state: TelegramSessionState,
+  gameId?: string,
+): void {
+  database
+    .prepare(
+      `INSERT INTO telegram_sessions (telegram_id, state, game_id, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(telegram_id) DO UPDATE SET state = excluded.state, game_id = excluded.game_id, updated_at = excluded.updated_at`,
+    )
+    .run(telegramId, state, gameId ?? null, now());
+}
+
+export function getTelegramSession(telegramId: string): {
+  state: TelegramSessionState;
+  gameId?: string;
+} {
+  const row = database
+    .prepare("SELECT state, game_id FROM telegram_sessions WHERE telegram_id = ?")
+    .get(telegramId) as Record<string, unknown> | undefined;
+  return {
+    state: (row?.state as TelegramSessionState | undefined) ?? "menu",
+    gameId: row?.game_id ? String(row.game_id) : undefined,
+  };
+}
+
+export function getTelegramWallet(telegramId: string): BingoWallet {
+  const wallet = database
+    .prepare("SELECT balance, currency FROM telegram_wallets WHERE telegram_id = ?")
+    .get(telegramId) as Record<string, unknown> | undefined;
+  const entries = database
+    .prepare(
+      "SELECT id, type, amount, method, status, created_at FROM telegram_wallet_entries WHERE telegram_id = ? ORDER BY created_at DESC",
+    )
+    .all(telegramId)
+    .map((row) => {
+      const entry = row as Record<string, unknown>;
+      return {
+        id: String(entry.id),
+        type: entry.type as "deposit" | "withdrawal",
+        amount: Number(entry.amount),
+        method: entry.method as WalletMethod,
+        status: entry.status as "demo" | "pending",
+        createdAt: String(entry.created_at),
+      };
+    });
+  return {
+    balance: Number(wallet?.balance ?? 2500),
+    currency: String(wallet?.currency ?? "ETB"),
+    entries,
+  };
+}
+
+export function telegramWalletAction(
+  telegramId: string,
+  type: "deposit" | "withdrawal",
+  amount: number,
+  method: WalletMethod,
+): BingoWallet {
+  const wallet = getTelegramWallet(telegramId);
+  const nextBalance = type === "deposit" ? wallet.balance + amount : wallet.balance - amount;
+  if (nextBalance < 0) throw new Error("Demo balance is too low for this withdrawal");
+  database
+    .prepare("INSERT OR IGNORE INTO telegram_wallets (telegram_id, balance, currency) VALUES (?, ?, 'ETB')")
+    .run(telegramId, nextBalance);
+  database.prepare("UPDATE telegram_wallets SET balance = ? WHERE telegram_id = ?").run(nextBalance, telegramId);
+  database
+    .prepare(
+      "INSERT INTO telegram_wallet_entries (id, telegram_id, type, amount, method, status, created_at) VALUES (?, ?, ?, ?, ?, 'demo', ?)",
+    )
+    .run(randomId("wallet"), telegramId, type, amount, method, now());
+  return getTelegramWallet(telegramId);
 }
 
 export function advanceGame(id: string, action: BingoAction): BingoGame | undefined {
