@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Fast Bingo"
+description = "A mobile-first Telegram bingo game console for demo play-money rounds, with English and Amharic support, 75-ball cards, host controls, demo balances, and admin oversight."
+version = "1.0.0"
+id = "artifacts/fast-bingo"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23440
+
+[services.development]
+run = "pnpm --filter @workspace/fast-bingo run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/fast-bingo", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/fast-bingo/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23440"
+BASE_PATH = "/"

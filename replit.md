@@ -1,6 +1,6 @@
-# [Project name]
+# Fast Bingo
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Fast Bingo is a Telegram-style 75-ball bingo demo with quick rooms, host-controlled rounds, 400 cards, demo balances, and English/Amharic support.
 
 ## Run & Operate
 
@@ -19,26 +19,38 @@ _Replace the heading above with the project's name, and this line with one sente
 - Validation: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (from OpenAPI spec)
 - Build: esbuild (CJS bundle)
+- Frontend: React + Vite at the root preview
+- Game state: SQLite via Node 24's built-in `node:sqlite` runtime
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/fast-bingo/src/App.tsx` — responsive game console, play room, wallet and admin routes
+- `artifacts/fast-bingo/src/index.css` — Fast Bingo visual theme and responsive layout rules
+- `artifacts/api-server/src/lib/bingo-store.ts` — SQLite schema, card seed, game engine and demo wallet store
+- `artifacts/api-server/src/routes/bingo.ts` — bingo API routes
+- `lib/api-spec/openapi.yaml` — source of truth for bingo API contracts
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- The first release is intentionally demo-only: payment methods are presentation options and wallet operations only change local demo credit.
+- The game store uses SQLite directly in the API server to keep the demo portable and easy to run while matching the requested persistence model.
+- The API is contract-first through OpenAPI and generated clients; the frontend does not hardcode game payload shapes.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- 75-ball classic bingo with 5×5 cards and automatic winner checking.
+- Quick room creation, share codes, live called-number history, and host actions.
+- Normal, VIP and VVIP categories, 400 seeded cards, a demo wallet, and admin metrics.
+- English and Amharic UI toggle with mobile-friendly Telegram-style navigation.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Keep this a play-money demonstration. Do not add real-money gambling or payment processing without an explicit new request.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Node 24 emits an experimental warning for `node:sqlite`; this is expected for the demo runtime.
+- Re-run `pnpm --filter @workspace/api-spec run codegen` after changing the OpenAPI contract.
 
 ## Pointers
 

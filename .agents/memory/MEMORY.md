@@ -1,0 +1,1 @@
+- [SQLite runtime choice](sqlite-runtime.md) — the demo uses Node 24's built-in SQLite runtime to stay portable without native npm drivers.

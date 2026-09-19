@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: bingo
+    description: Fast Bingo game operations
 paths:
   /healthz:
     get:
@@ -24,7 +26,147 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /bingo/overview:
+    get:
+      operationId: getBingoOverview
+      tags: [bingo]
+      summary: Get the live demo overview
+      responses:
+        "200":
+          description: Current game, wallet and platform overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BingoOverview"
+  /bingo/cards:
+    get:
+      operationId: listBingoCards
+      tags: [bingo]
+      summary: List available bingo cards
+      responses:
+        "200":
+          description: Available cards
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BingoCard"
+  /bingo/games:
+    get:
+      operationId: listBingoGames
+      tags: [bingo]
+      summary: List active and recent games
+      responses:
+        "200":
+          description: Games
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BingoGame"
+    post:
+      operationId: createBingoGame
+      tags: [bingo]
+      summary: Create a quick bingo room
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BingoGameInput"
+      responses:
+        "201":
+          description: Created game
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BingoGame"
+  /bingo/games/{gameId}:
+    get:
+      operationId: getBingoGame
+      tags: [bingo]
+      summary: Get one game
+      parameters:
+        - $ref: "#/components/parameters/GameId"
+      responses:
+        "200":
+          description: Game
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BingoGame"
+        "404":
+          description: Game not found
+    post:
+      operationId: advanceBingoGame
+      tags: [bingo]
+      summary: Advance a host-controlled round
+      parameters:
+        - $ref: "#/components/parameters/GameId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BingoGameAction"
+      responses:
+        "200":
+          description: Updated game
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BingoGame"
+  /bingo/wallet:
+    get:
+      operationId: getBingoWallet
+      tags: [bingo]
+      summary: Get the demo wallet
+      responses:
+        "200":
+          description: Demo wallet and recent entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BingoWallet"
+    post:
+      operationId: submitBingoWalletAction
+      tags: [bingo]
+      summary: Submit a demo deposit or withdrawal request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BingoWalletAction"
+      responses:
+        "200":
+          description: Updated demo wallet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BingoWallet"
+  /bingo/admin:
+    get:
+      operationId: getBingoAdmin
+      tags: [bingo]
+      summary: Get demo admin metrics
+      responses:
+        "200":
+          description: Admin metrics and recent activity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BingoAdmin"
 components:
+  parameters:
+    GameId:
+      name: gameId
+      in: path
+      required: true
+      schema:
+        type: string
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +175,126 @@ components:
           type: string
       required:
         - status
+    BingoCard:
+      type: object
+      required: [id, label, category, status, numbers, marked]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        category: { type: string, enum: [normal, vip, vvip] }
+        status: { type: string, enum: [available, in-play, reserved] }
+        numbers:
+          type: array
+          items: { type: integer }
+        marked:
+          type: array
+          items: { type: integer }
+    BingoPlayer:
+      type: object
+      required: [id, name, initials, category, cardLabel, joinedAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        initials: { type: string }
+        category: { type: string, enum: [normal, vip, vvip] }
+        cardLabel: { type: string }
+        joinedAt: { type: string }
+    BingoGame:
+      type: object
+      required: [id, name, status, hostName, players, calledNumbers, currentNumber, nextCallIn, shareCode, winnerCount, startedAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        status: { type: string, enum: [waiting, live, completed] }
+        hostName: { type: string }
+        players:
+          type: array
+          items: { $ref: "#/components/schemas/BingoPlayer" }
+        calledNumbers:
+          type: array
+          items: { type: integer }
+        currentNumber: { type: integer }
+        nextCallIn: { type: integer }
+        shareCode: { type: string }
+        winnerCount: { type: integer }
+        startedAt: { type: string }
+    BingoGameInput:
+      type: object
+      required: [name, category]
+      properties:
+        name: { type: string, minLength: 1 }
+        category: { type: string, enum: [normal, vip, vvip] }
+    BingoGameAction:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [start, call, pause, reset, claim] }
+    BingoWallet:
+      type: object
+      required: [balance, currency, entries]
+      properties:
+        balance: { type: number }
+        currency: { type: string }
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/BingoWalletEntry" }
+    BingoWalletEntry:
+      type: object
+      required: [id, type, amount, method, status, createdAt]
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [deposit, withdrawal] }
+        amount: { type: number }
+        method: { type: string, enum: [telebirr, ebirr, mpesa] }
+        status: { type: string, enum: [demo, pending] }
+        createdAt: { type: string }
+    BingoWalletAction:
+      type: object
+      required: [type, amount, method]
+      properties:
+        type: { type: string, enum: [deposit, withdrawal] }
+        amount: { type: number, minimum: 1 }
+        method: { type: string, enum: [telebirr, ebirr, mpesa] }
+    BingoOverview:
+      type: object
+      required: [activeGames, playersOnline, cardsAvailable, demoBalance, latestGame, recentActivity]
+      properties:
+        activeGames: { type: integer }
+        playersOnline: { type: integer }
+        cardsAvailable: { type: integer }
+        demoBalance: { type: number }
+        latestGame: { $ref: "#/components/schemas/BingoGame" }
+        recentActivity:
+          type: array
+          items: { $ref: "#/components/schemas/BingoActivity" }
+    BingoActivity:
+      type: object
+      required: [id, title, detail, time, tone]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        detail: { type: string }
+        time: { type: string }
+        tone: { type: string, enum: [success, info, warning, neutral] }
+    BingoAdmin:
+      type: object
+      required: [totalUsers, activeGames, cardsInUse, demoVolume, topCategories, activity]
+      properties:
+        totalUsers: { type: integer }
+        activeGames: { type: integer }
+        cardsInUse: { type: integer }
+        demoVolume: { type: number }
+        topCategories:
+          type: array
+          items: { $ref: "#/components/schemas/BingoCategoryMetric" }
+        activity:
+          type: array
+          items: { $ref: "#/components/schemas/BingoActivity" }
+    BingoCategoryMetric:
+      type: object
+      required: [category, players, share]
+      properties:
+        category: { type: string, enum: [normal, vip, vvip] }
+        players: { type: integer }
+        share: { type: integer }
 
