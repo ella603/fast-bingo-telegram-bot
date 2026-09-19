@@ -81,7 +81,7 @@ const copy: Record<Language, Record<string, string>> = {
   },
   am: {
     welcome: "እንኳን ወደ Fast Bingo በደህና መጡ። ቋንቋዎን ይምረጡ።",
-    menu: "የ Fast Bingo ዋና ምናሌ\n\n75 ኳስ ቢንጎ። የሙከራ ሁኔታ ብቻ፤ እውነተኛ ገንዘብ ወይም ቁማር የለም።",
+    menu: "እንኳን ወደ Fast ቢንጎ በደህና መጡ ❤️\n\nFast ቢንጎ እያዝናና መሸለሙን ቀጥሏል!\n\nእየተዝናኑ ያሸንፉ",
     create: "የክፍሉን ስም ይላኩ፣ ከዚያ የክፍል ምድብ ይምረጡ።",
     join: "እንደ FB-7K2P ያለ የክፍል ኮድ ይላኩ።",
     category: "የካርድ ምድብ ይምረጡ።",
@@ -129,19 +129,34 @@ function categoryButtons(prefix: "create" | "join"): TelegramKeyboard {
 }
 
 function menuKeyboard(language: Language): TelegramKeyboard {
+  if (language === "am") {
+    return {
+      inline_keyboard: [
+        [{ text: "🎮 ይጫወቱ", callback_data: "menu:create" }],
+        [{ text: "💵 ሂሳብ", callback_data: "menu:wallet" }],
+        [{ text: "📤 ገቢ ለማድረግ", callback_data: "menu:wallet" }],
+        [{ text: "📤 ወጪ ለማድረግ", callback_data: "menu:wallet" }],
+        [{ text: "🔗 ጋብዝ & አግኝ", callback_data: "menu:home" }],
+        [{ text: "💎 VIP ክፍል", callback_data: "menu:create" }],
+        [{ text: "📢 Special promoter", callback_data: "menu:home" }],
+        [{ text: "📲 እርዳታ", callback_data: "menu:home" }],
+        [{ text: "⚖️ ደንቦች", callback_data: "menu:home" }],
+      ],
+    };
+  }
   return {
     inline_keyboard: [
       [
-        { text: language === "am" ? "ክፍል ፍጠር" : "Create room", callback_data: "menu:create" },
-        { text: language === "am" ? "ክፍል ተቀላቀል" : "Join room", callback_data: "menu:join" },
+        { text: "Create room", callback_data: "menu:create" },
+        { text: "Join room", callback_data: "menu:join" },
       ],
       [
-        { text: language === "am" ? "የእኔ ካርድ" : "My card", callback_data: "menu:card" },
-        { text: language === "am" ? "የቀጥታ ክፍሎች" : "Live rooms", callback_data: "menu:rooms" },
+        { text: "My card", callback_data: "menu:card" },
+        { text: "Live rooms", callback_data: "menu:rooms" },
       ],
       [
-        { text: language === "am" ? "የሙከራ ቦርሳ" : "Demo wallet", callback_data: "menu:wallet" },
-        { text: language === "am" ? "ቋንቋ" : "Language", callback_data: "menu:language" },
+        { text: "Demo wallet", callback_data: "menu:wallet" },
+        { text: "Language", callback_data: "menu:language" },
       ],
     ],
   };
