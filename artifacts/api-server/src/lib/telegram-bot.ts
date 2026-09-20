@@ -81,7 +81,7 @@ const copy: Record<Language, Record<string, string>> = {
   },
   am: {
     welcome: "እንኳን ወደ Fast Bingo በደህና መጡ። ቋንቋዎን ይምረጡ።",
-    menu: "እንኳን ወደ Fast ቢንጎ በደህና መጡ ❤️\n\nFast ቢንጎ እያዝናና መሸለሙን ቀጥሏል!\n\nእየተዝናኑ ያሸንፉ",
+    menu: "እንኳን ወደ Fast ቢንጎ በደህና መጡ ❤️\n\nFast ቢንጎ እያዝናና መሸለሙን ቀጥሏል!\n\nእየተዝናኑ ያሸንፉ 🎉",
     create: "የክፍሉን ስም ይላኩ፣ ከዚያ የክፍል ምድብ ይምረጡ።",
     join: "እንደ FB-7K2P ያለ የክፍል ኮድ ይላኩ።",
     category: "የካርድ ምድብ ይምረጡ።",
@@ -132,14 +132,22 @@ function menuKeyboard(language: Language): TelegramKeyboard {
   if (language === "am") {
     return {
       inline_keyboard: [
-        [{ text: "🎮 ይጫወቱ", callback_data: "menu:create" }],
-        [{ text: "💵 ሂሳብ", callback_data: "menu:wallet" }],
-        [{ text: "📤 ገቢ ለማድረግ", callback_data: "menu:wallet" }],
-        [{ text: "📤 ወጪ ለማድረግ", callback_data: "menu:wallet" }],
-        [{ text: "🔗 ጋብዝ & አግኝ", callback_data: "menu:home" }],
-        [{ text: "💎 VIP ክፍል", callback_data: "menu:create" }],
-        [{ text: "📢 Special promoter", callback_data: "menu:home" }],
-        [{ text: "📲 እርዳታ", callback_data: "menu:home" }],
+        [
+          { text: "🎮 ይጫወቱ", callback_data: "menu:create" },
+          { text: "💵 ሂሳብ", callback_data: "menu:wallet" },
+        ],
+        [
+          { text: "📤 ገቢ ለማድረግ", callback_data: "menu:wallet" },
+          { text: "📤 ወጪ ለማድረግ", callback_data: "menu:wallet" },
+        ],
+        [
+          { text: "🔗 ጋብዝ & አግኝ", callback_data: "menu:home" },
+          { text: "💎 VIP ክፍል", callback_data: "menu:create" },
+        ],
+        [
+          { text: "📢 Special promoter", callback_data: "menu:home" },
+          { text: "📲 እርዳታ", callback_data: "menu:home" },
+        ],
         [{ text: "⚖️ ደንቦች", callback_data: "menu:home" }],
       ],
     };
