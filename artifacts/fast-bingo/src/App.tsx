@@ -24,8 +24,6 @@ import {
 
 import {
 
-  Link,
-
   Route,
 
   Switch,
@@ -56,7 +54,11 @@ import {
 
   CreditCard,
 
-  LayoutDashboard,
+  Crown,
+
+  Gift,
+
+  HelpCircle,
 
   Pause,
 
@@ -65,6 +67,8 @@ import {
   RefreshCw,
 
   ShieldCheck,
+
+  Sparkles,
 
   Ticket,
 
@@ -104,8 +108,6 @@ import {
 
   useGetBingoWallet,
 
-  useHealthCheck,
-
   useListBingoCards,
 
   useListBingoGames,
@@ -138,8 +140,6 @@ const queryClient = new QueryClient();
 
 type Language = "en" | "am";
 
-type Tone = "coral" | "mint" | "gold" | "ink";
-
 const CARD_PRICE = 10;
 
 const PRIZE_PER_CARD = 8;
@@ -148,7 +148,9 @@ const copy = {
 
   en: {
 
-    play: "Play Bingo",
+    bingo: "BINGO",
+
+    play: "Play",
 
     live: "LIVE",
 
@@ -160,25 +162,25 @@ const copy = {
 
     players: "Players",
 
-    cards: "Cards",
+    card: "Card",
 
-    wallet: "Wallet",
+    cards: "Cards",
 
     balance: "Balance",
 
-    called: "Called numbers",
+    wallet: "Wallet",
 
-    latest: "Latest call",
+    called: "Called",
 
-    next: "NEXT",
+    latest: "Latest",
+
+    next: "Next",
 
     voice: "Voice",
 
     voiceOn: "Voice on",
 
     voiceOff: "Voice off",
-
-    card: "Your card",
 
     chooseCard: "Choose your card",
 
@@ -190,7 +192,7 @@ const copy = {
 
     prizePool: "Prize pool",
 
-    cardPrice: "Card",
+    price: "Price",
 
     winner: "WINNER",
 
@@ -200,7 +202,7 @@ const copy = {
 
     twoLines: "2 lines completed",
 
-    noNumbers: "Waiting for the first number",
+    waitingNumber: "Waiting for the first number",
 
     numbersCalled: "numbers called",
 
@@ -209,8 +211,6 @@ const copy = {
     playAgain: "Play again",
 
     back: "Back",
-
-    walletTitle: "Wallet",
 
     deposit: "Deposit",
 
@@ -232,59 +232,57 @@ const copy = {
 
     gameRules: "Complete any 2 lines to win.",
 
-    autoPlay: "Automatic calling",
+    automatic: "Automatic calling",
 
     room: "Room",
 
-    copy: "Copy",
-
     copied: "Copied",
+
+    copy: "Copy",
 
     refresh: "Refresh",
 
-    loading: "Loading…",
-
-    retry: "Try again",
-
-    noGame: "No active game right now.",
-
-    createGame: "Create game",
+    noGame: "Waiting for the next game",
 
     admin: "Admin",
 
-    normal: "Normal",
+    inventory: "Cards",
 
-    vip: "VIP",
+    users: "Users",
 
-    vvip: "VVIP",
+    activity: "Activity",
 
-    host: "Host",
+    system: "System",
 
-    pause: "Pause",
-
-    reset: "Reset",
+    host: "Host controls",
 
     start: "Start",
 
     call: "Call",
 
-    claim: "Finish",
+    pause: "Pause",
 
-    system: "System",
+    reset: "Reset",
 
-    activity: "Activity",
+    finish: "Finish",
 
-    users: "Users",
+    loading: "Loading…",
 
-    inventory: "Inventory",
+    retry: "Try again",
 
-    game: "Game",
+    normal: "NORMAL",
+
+    vip: "VIP",
+
+    vvip: "VVIP",
 
   },
 
   am: {
 
-    play: "ቢንጎ ተጫወት",
+    bingo: "ቢንጎ",
+
+    play: "ተጫወት",
 
     live: "ቀጥታ",
 
@@ -296,15 +294,17 @@ const copy = {
 
     players: "ተጫዋቾች",
 
-    cards: "ካርዶች",
+    card: "ካርድ",
 
-    wallet: "ቦርሳ",
+    cards: "ካርዶች",
 
     balance: "ቀሪ ሂሳብ",
 
-    called: "የተጠሩ ቁጥሮች",
+    wallet: "ቦርሳ",
 
-    latest: "የመጨረሻ ጥሪ",
+    called: "የተጠሩ",
+
+    latest: "የመጨረሻ",
 
     next: "ቀጣይ",
 
@@ -313,8 +313,6 @@ const copy = {
     voiceOn: "ድምጽ ክፍት",
 
     voiceOff: "ድምጽ ዝግ",
-
-    card: "የእርስዎ ካርድ",
 
     chooseCard: "ካርድዎን ይምረጡ",
 
@@ -326,7 +324,7 @@ const copy = {
 
     prizePool: "የሽልማት ገንዘብ",
 
-    cardPrice: "ካርድ",
+    price: "ዋጋ",
 
     winner: "አሸናፊ",
 
@@ -336,7 +334,7 @@ const copy = {
 
     twoLines: "2 መስመሮች ተሞልተዋል",
 
-    noNumbers: "የመጀመሪያውን ቁጥር በመጠበቅ ላይ",
+    waitingNumber: "የመጀመሪያውን ቁጥር በመጠበቅ ላይ",
 
     numbersCalled: "ቁጥሮች ተጠርተዋል",
 
@@ -345,8 +343,6 @@ const copy = {
     playAgain: "እንደገና ተጫወት",
 
     back: "ተመለስ",
-
-    walletTitle: "ቦርሳ",
 
     deposit: "ገቢ ማድረግ",
 
@@ -358,7 +354,7 @@ const copy = {
 
     submit: "ላክ",
 
-    transactions: "የቅርብ እንቅስቃሴ",
+    transactions: "የእንቅስቃሴ ታሪክ",
 
     noTransactions: "እስካሁን እንቅስቃሴ የለም።",
 
@@ -368,53 +364,49 @@ const copy = {
 
     gameRules: "ለማሸነፍ 2 መስመሮችን ሙላ።",
 
-    autoPlay: "ራስ-ሰር ጥሪ",
+    automatic: "ራስ-ሰር ጥሪ",
 
     room: "ክፍል",
 
-    copy: "ቅዳ",
-
     copied: "ተቀድቷል",
 
+    copy: "ቅዳ",
+
     refresh: "አድስ",
+
+    noGame: "ቀጣዩን ጨዋታ በመጠበቅ ላይ",
+
+    admin: "አስተዳደር",
+
+    inventory: "ካርዶች",
+
+    users: "ተጠቃሚዎች",
+
+    activity: "እንቅስቃሴ",
+
+    system: "ስርዓት",
+
+    host: "የአስተናጋጅ ቁጥጥር",
+
+    start: "ጀምር",
+
+    call: "ጥራ",
+
+    pause: "አቁም",
+
+    reset: "ዳግም ጀምር",
+
+    finish: "ጨርስ",
 
     loading: "በመጫን ላይ…",
 
     retry: "እንደገና ሞክር",
-
-    noGame: "አሁን ቀጥታ ጨዋታ የለም።",
-
-    createGame: "ጨዋታ ፍጠር",
-
-    admin: "አስተዳደር",
 
     normal: "መደበኛ",
 
     vip: "VIP",
 
     vvip: "VVIP",
-
-    host: "አስተናጋጅ",
-
-    pause: "አቁም",
-
-    reset: "ዳግም ጀምር",
-
-    start: "ጀምር",
-
-    call: "ጥራ",
-
-    claim: "ጨርስ",
-
-    system: "ስርዓት",
-
-    activity: "እንቅስቃሴ",
-
-    users: "ተጠቃሚዎች",
-
-    inventory: "ካርድ ክምችት",
-
-    game: "ጨዋታ",
 
   },
 
@@ -448,9 +440,9 @@ function ErrorState({
 
   return (
 
-    <div className="rounded-3xl border border-dashed border-border bg-card p-8 text-center shadow-sm">
+    <div className="mx-3 mt-5 rounded-3xl border border-dashed border-border bg-card p-8 text-center shadow-sm">
 
-      <div className="mx-auto mb-3 flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary">
+      <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
 
         <RefreshCw size={18} />
 
@@ -492,55 +484,13 @@ function LoadingState() {
 
     <div className="space-y-3 p-4">
 
-      <div className="h-20 animate-pulse rounded-3xl bg-muted" />
+      <div className="h-24 animate-pulse rounded-3xl bg-muted" />
 
-      <div className="h-80 animate-pulse rounded-3xl bg-muted" />
+      <div className="h-72 animate-pulse rounded-3xl bg-muted" />
 
-      <div className="h-32 animate-pulse rounded-3xl bg-muted" />
+      <div className="h-28 animate-pulse rounded-3xl bg-muted" />
 
     </div>
-
-  );
-
-}
-
-function Badge({
-
-  children,
-
-  tone = "ink",
-
-}: {
-
-  children: ReactNode;
-
-  tone?: Tone;
-
-}) {
-
-  const styles: Record<Tone, string> = {
-
-    coral: "bg-primary/10 text-primary",
-
-    mint: "bg-secondary text-secondary-foreground",
-
-    gold: "bg-accent text-accent-foreground",
-
-    ink: "bg-foreground/10 text-foreground",
-
-  };
-
-  return (
-
-    <span
-
-      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.12em] ${styles[tone]}`}
-
-    >
-
-      {children}
-
-    </span>
 
   );
 
@@ -562,45 +512,41 @@ function Header({
 
   const t = copy[lang];
 
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
 
   return (
 
-    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/90 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-border/70 bg-background/90 backdrop-blur-xl">
 
-      <div className="mx-auto flex h-[62px] max-w-2xl items-center justify-between px-4">
+      <div className="mx-auto flex h-[60px] max-w-2xl items-center justify-between px-4">
 
-        <Link
+        <button
 
-          href="/"
+          onClick={() => setLocation("/")}
 
           className="flex items-center gap-2.5"
 
         >
 
-          <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+          <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
 
-            <Zap size={17} fill="currentColor" />
+            <Zap size={18} fill="currentColor" />
 
           </div>
 
-          <div>
+          <div className="text-left">
 
-            <div className="text-sm font-black tracking-tight">
-
-              Fast Bingo
-
-            </div>
+            <div className="text-sm font-black">Fast Bingo</div>
 
             <div className="text-[9px] font-bold uppercase tracking-[.18em] text-muted-foreground">
 
-              {location === "/wallet" ? t.wallet : t.play}
+              {location === "/wallet" ? t.wallet : t.bingo}
 
             </div>
 
           </div>
 
-        </Link>
+        </button>
 
         <div className="flex items-center gap-2">
 
@@ -608,21 +554,21 @@ function Header({
 
             onClick={() =>
 
-              setLang(lang === "en" ? "am" : "en")
+              setLang(lang === "am" ? "en" : "am")
 
             }
 
-            className="rounded-xl border border-border bg-card px-2.5 py-1.5 text-[11px] font-black"
+            className="rounded-xl border border-border bg-card px-3 py-1.5 text-[11px] font-black"
 
           >
 
-            {lang === "en" ? "አማ" : "EN"}
+            {lang === "am" ? "EN" : "አማ"}
 
           </button>
 
-          <Link
+          <button
 
-            href="/wallet"
+            onClick={() => setLocation("/wallet")}
 
             className={`flex size-9 items-center justify-center rounded-xl border ${
 
@@ -638,7 +584,7 @@ function Header({
 
             <WalletCards size={17} />
 
-          </Link>
+          </button>
 
         </div>
 
@@ -654,17 +600,17 @@ function BottomNav({ lang }: { lang: Language }) {
 
   const t = copy[lang];
 
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
 
   return (
 
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 px-4 pb-[max(8px,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl">
+    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-card/95 px-4 pb-[max(8px,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl">
 
       <div className="mx-auto flex max-w-2xl items-center justify-around">
 
-        <Link
+        <button
 
-          href="/"
+          onClick={() => setLocation("/")}
 
           className={`flex min-w-16 flex-col items-center gap-1 rounded-xl py-1.5 text-[10px] font-bold ${
 
@@ -682,11 +628,11 @@ function BottomNav({ lang }: { lang: Language }) {
 
           <span>{t.play}</span>
 
-        </Link>
+        </button>
 
-        <Link
+        <button
 
-          href="/wallet"
+          onClick={() => setLocation("/wallet")}
 
           className={`flex min-w-16 flex-col items-center gap-1 rounded-xl py-1.5 text-[10px] font-bold ${
 
@@ -704,7 +650,29 @@ function BottomNav({ lang }: { lang: Language }) {
 
           <span>{t.wallet}</span>
 
-        </Link>
+        </button>
+
+        <button
+
+          onClick={() => setLocation("/rules")}
+
+          className={`flex min-w-16 flex-col items-center gap-1 rounded-xl py-1.5 text-[10px] font-bold ${
+
+            location === "/rules"
+
+              ? "text-primary"
+
+              : "text-muted-foreground"
+
+          }`}
+
+        >
+
+          <HelpCircle size={19} />
+
+          <span>{t.help}</span>
+
+        </button>
 
       </div>
 
@@ -714,7 +682,7 @@ function BottomNav({ lang }: { lang: Language }) {
 
 }
 
-function BingoLetters() {
+function BingoHeader() {
 
   return (
 
@@ -792,7 +760,7 @@ function getCompletedLines(
 
     [0, 6, 12, 18, 24],
 
-    [4, 8, 12, 18, 20],
+    [4, 8, 12, 16, 20],
 
   ];
 
@@ -812,7 +780,7 @@ function BingoCardView({
 
   lang,
 
-  large = false,
+  large = true,
 
 }: {
 
@@ -864,15 +832,15 @@ function BingoCardView({
 
     <div
 
-      className={`overflow-hidden rounded-2xl border border-border bg-border shadow-lg ${
+      className={`overflow-hidden rounded-2xl border-2 border-border bg-border shadow-xl ${
 
-        large ? "mx-auto max-w-[430px]" : ""
+        large ? "w-full" : ""
 
       }`}
 
     >
 
-      <BingoLetters />
+      <BingoHeader />
 
       <div className="grid grid-cols-5 gap-px">
 
@@ -898,7 +866,7 @@ function BingoCardView({
 
                 large
 
-                  ? "text-[clamp(17px,5vw,25px)]"
+                  ? "text-[clamp(18px,6vw,28px)]"
 
                   : "text-sm"
 
@@ -924,15 +892,7 @@ function BingoCardView({
 
               {free ? (
 
-                <span
-
-                  className={`font-black uppercase tracking-wider ${
-
-                    large ? "text-[10px]" : "text-[8px]"
-
-                  }`}
-
-                >
+                <span className="text-[9px] font-black uppercase tracking-wider">
 
                   {t.free}
 
@@ -946,7 +906,7 @@ function BingoCardView({
 
               {marked && !free && (
 
-                <span className="absolute inset-[18%] rounded-full border-2 border-primary/50" />
+                <span className="absolute inset-[17%] rounded-full border-[2px] border-primary/50" />
 
               )}
 
@@ -957,6 +917,46 @@ function BingoCardView({
         })}
 
       </div>
+
+    </div>
+
+  );
+
+}
+
+function NumberBall({
+
+  number,
+
+  active = false,
+
+}: {
+
+  number: number;
+
+  active?: boolean;
+
+}) {
+
+  return (
+
+    <div
+
+      className={`flex size-11 items-center justify-center rounded-full text-[11px] font-black shadow-sm ${
+
+        active
+
+          ? "bg-primary text-primary-foreground"
+
+          : "bg-muted text-foreground"
+
+      }`}
+
+    >
+
+      {bingoColumn(number)}
+
+      {number}
 
     </div>
 
@@ -992,11 +992,11 @@ function CalledNumbers({
 
     <section className="rounded-3xl border border-border bg-card p-4 shadow-sm">
 
-      <div className="mb-4 flex items-center justify-between">
+      <div className="flex items-center justify-between">
 
         <div>
 
-          <div className="text-[10px] font-bold uppercase tracking-[.18em] text-primary">
+          <div className="text-[9px] font-black uppercase tracking-[.18em] text-primary">
 
             {t.called}
 
@@ -1008,7 +1008,7 @@ function CalledNumbers({
 
               ? `${bingoColumn(latest)}${latest}`
 
-              : t.noNumbers}
+              : t.waitingNumber}
 
           </div>
 
@@ -1016,7 +1016,7 @@ function CalledNumbers({
 
         {latest && (
 
-          <div className="flex size-14 items-center justify-center rounded-2xl bg-primary text-xl font-black text-primary-foreground shadow-sm">
+          <div className="relative flex size-16 items-center justify-center rounded-full bg-primary text-2xl font-black text-primary-foreground shadow-lg">
 
             {latest}
 
@@ -1026,53 +1026,29 @@ function CalledNumbers({
 
       </div>
 
-      {numbers.length ? (
+      <div className="mt-4 flex flex-wrap gap-1.5">
 
-        <div className="flex max-h-36 flex-wrap gap-1.5 overflow-y-auto">
+        {numbers
 
-          {numbers
+          .slice()
 
-            .slice()
+          .reverse()
 
-            .reverse()
+          .map((number, index) => (
 
-            .map((number, index) => (
+            <NumberBall
 
-              <div
+              key={`${number}-${index}`}
 
-                key={`${number}-${index}`}
+              number={number}
 
-                className={`flex size-9 items-center justify-center rounded-xl text-[11px] font-black ${
+              active={index === 0}
 
-                  index === 0
+            />
 
-                    ? "bg-primary text-primary-foreground"
+          ))}
 
-                    : "bg-muted text-foreground"
-
-                }`}
-
-              >
-
-                {bingoColumn(number)}
-
-                {number}
-
-              </div>
-
-            ))}
-
-        </div>
-
-      ) : (
-
-        <div className="rounded-xl bg-muted p-4 text-center text-xs text-muted-foreground">
-
-          {t.noNumbers}
-
-        </div>
-
-      )}
+      </div>
 
     </section>
 
@@ -1096,25 +1072,15 @@ function useCountdown(
 
   useEffect(() => {
 
-    if (!active) {
-
-      setSeconds(
-
-        Math.max(0, Math.ceil(value ?? 0)),
-
-      );
-
-      return;
-
-    }
-
     setSeconds(
 
       Math.max(0, Math.ceil(value ?? 0)),
 
     );
 
-    const id = window.setInterval(() => {
+    if (!active) return;
+
+    const timer = window.setInterval(() => {
 
       setSeconds((current) =>
 
@@ -1124,7 +1090,9 @@ function useCountdown(
 
     }, 1000);
 
-    return () => window.clearInterval(id);
+    return () =>
+
+      window.clearInterval(timer);
 
   }, [value, active]);
 
@@ -1162,13 +1130,15 @@ function speakNumber(
 
     );
 
-  utterance.rate = 0.85;
+  utterance.rate = 0.82;
 
   utterance.pitch = 1;
 
   utterance.volume = 1;
 
   if (language === "am") {
+
+    utterance.lang = "am-ET";
 
     const voices =
 
@@ -1190,10 +1160,6 @@ function speakNumber(
 
       utterance.lang = amharic.lang;
 
-    } else {
-
-      utterance.lang = "en-US";
-
     }
 
   } else {
@@ -1203,6 +1169,344 @@ function speakNumber(
   }
 
   window.speechSynthesis.speak(utterance);
+
+}
+
+function GameTopBar({
+
+  lang,
+
+  voiceEnabled,
+
+  setVoiceEnabled,
+
+  shareCode,
+
+}: {
+
+  lang: Language;
+
+  voiceEnabled: boolean;
+
+  setVoiceEnabled: (value: boolean) => void;
+
+  shareCode?: string;
+
+}) {
+
+  const t = copy[lang];
+
+  const [copied, setCopied] =
+
+    useState(false);
+
+  const copyCode = async () => {
+
+    if (!shareCode) return;
+
+    try {
+
+      await navigator.clipboard?.writeText(
+
+        shareCode,
+
+      );
+
+      setCopied(true);
+
+      window.setTimeout(
+
+        () => setCopied(false),
+
+        1500,
+
+      );
+
+    } catch {}
+
+  };
+
+  return (
+
+    <div className="mb-3 flex items-center justify-between">
+
+      <div className="flex items-center gap-2">
+
+        <span className="live-dot size-2.5 rounded-full bg-primary" />
+
+        <span className="text-[10px] font-black uppercase tracking-[.18em]">
+
+          {t.live}
+
+        </span>
+
+      </div>
+
+      <div className="flex items-center gap-2">
+
+        <button
+
+          onClick={() =>
+
+            setVoiceEnabled(!voiceEnabled)
+
+          }
+
+          className={`flex size-9 items-center justify-center rounded-xl border ${
+
+            voiceEnabled
+
+              ? "border-primary bg-primary/10 text-primary"
+
+              : "border-border bg-card"
+
+          }`}
+
+        >
+
+          {voiceEnabled ? (
+
+            <Volume2 size={16} />
+
+          ) : (
+
+            <VolumeX size={16} />
+
+          )}
+
+        </button>
+
+        <button
+
+          onClick={copyCode}
+
+          className="flex size-9 items-center justify-center rounded-xl border border-border bg-card"
+
+        >
+
+          {copied ? (
+
+            <Check size={16} />
+
+          ) : (
+
+            <Copy size={16} />
+
+          )}
+
+        </button>
+
+      </div>
+
+    </div>
+
+  );
+
+}
+
+function GameHero({
+
+  game,
+
+  lang,
+
+  countdown,
+
+}: {
+
+  game: BingoGame;
+
+  lang: Language;
+
+  countdown: number;
+
+}) {
+
+  const t = copy[lang];
+
+  const latest =
+
+    game.calledNumbers?.length
+
+      ? game.calledNumbers[
+
+          game.calledNumbers.length - 1
+
+        ]
+
+      : undefined;
+
+  const waiting =
+
+    game.status === "waiting";
+
+  return (
+
+    <section className="overflow-hidden rounded-[30px] bg-foreground p-5 text-background shadow-xl">
+
+      <div className="flex items-start justify-between gap-3">
+
+        <div className="min-w-0">
+
+          <div className="flex items-center gap-2">
+
+            <span
+
+              className={`size-2 rounded-full ${
+
+                waiting
+
+                  ? "bg-accent"
+
+                  : "bg-primary"
+
+              }`}
+
+            />
+
+            <span className="text-[9px] font-black uppercase tracking-[.18em] text-background/55">
+
+              {waiting
+
+                ? t.lobby
+
+                : t.live}
+
+            </span>
+
+          </div>
+
+          <h1 className="mt-2 truncate text-2xl font-black">
+
+            {game.name}
+
+          </h1>
+
+          <div className="mt-2 flex flex-wrap gap-2">
+
+            {game.shareCode && (
+
+              <span className="rounded-full bg-background/10 px-3 py-1 text-[10px] font-bold">
+
+                {game.shareCode}
+
+              </span>
+
+            )}
+
+            <span className="rounded-full bg-background/10 px-3 py-1 text-[10px] font-bold">
+
+              {game.players.length}{" "}
+
+              {t.players}
+
+            </span>
+
+          </div>
+
+        </div>
+
+        <div className="flex size-[68px] shrink-0 flex-col items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg">
+
+          <div className="text-[8px] font-black uppercase">
+
+            {t.latest}
+
+          </div>
+
+          <div className="mt-0.5 text-2xl font-black">
+
+            {latest ?? "—"}
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <div className="mt-5 grid grid-cols-3 gap-2">
+
+        <div className="rounded-2xl bg-background/10 p-3 text-center">
+
+          <Users
+
+            size={15}
+
+            className="mx-auto text-primary"
+
+          />
+
+          <div className="mt-1 text-lg font-black">
+
+            {game.players.length}
+
+          </div>
+
+          <div className="text-[8px] text-background/45">
+
+            {t.players}
+
+          </div>
+
+        </div>
+
+        <div className="rounded-2xl bg-background/10 p-3 text-center">
+
+          <Ticket
+
+            size={15}
+
+            className="mx-auto text-primary"
+
+          />
+
+          <div className="mt-1 text-lg font-black">
+
+            {game.calledNumbers.length}
+
+          </div>
+
+          <div className="text-[8px] text-background/45">
+
+            {t.called}
+
+          </div>
+
+        </div>
+
+        <div className="rounded-2xl bg-background/10 p-3 text-center">
+
+          <Clock3
+
+            size={15}
+
+            className="mx-auto text-primary"
+
+          />
+
+          <div className="mt-1 text-lg font-black">
+
+            {countdown}s
+
+          </div>
+
+          <div className="text-[8px] text-background/45">
+
+            {waiting
+
+              ? t.startsIn
+
+              : t.next}
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+  );
 
 }
 
@@ -1242,7 +1546,7 @@ function CardSelector({
 
     )
 
-    .slice(0, 40);
+    .slice(0, 24);
 
   if (!available.length) {
 
@@ -1250,7 +1554,7 @@ function CardSelector({
 
       <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
 
-        {t.noNumbers}
+        {t.waitingNumber}
 
       </div>
 
@@ -1274,7 +1578,11 @@ function CardSelector({
 
             key={card.id}
 
-            onClick={() => onSelect(card.id)}
+            onClick={() =>
+
+              onSelect(card.id)
+
+            }
 
             className={`rounded-2xl border p-3 text-left transition-all ${
 
@@ -1282,7 +1590,7 @@ function CardSelector({
 
                 ? "border-primary bg-primary/10 ring-2 ring-primary/20"
 
-                : "border-border bg-card hover:bg-muted"
+                : "border-border bg-card"
 
             }`}
 
@@ -1290,13 +1598,17 @@ function CardSelector({
 
             <div className="flex items-center justify-between">
 
-              <Ticket size={15} />
+              <div className="flex size-8 items-center justify-center rounded-xl bg-muted">
+
+                <Ticket size={15} />
+
+              </div>
 
               {selected && (
 
-                <span className="flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                <span className="flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
 
-                  <Check size={12} />
+                  <Check size={13} />
 
                 </span>
 
@@ -1310,9 +1622,17 @@ function CardSelector({
 
             </div>
 
-            <div className="mt-1 text-[10px] text-muted-foreground">
+            <div className="mt-1 text-[9px] font-bold uppercase text-muted-foreground">
 
-              {selected ? t.selected : t.choose}
+              {card.category === "vvip"
+
+                ? t.vvip
+
+                : card.category === "vip"
+
+                  ? t.vip
+
+                  : t.normal}
 
             </div>
 
@@ -1344,11 +1664,17 @@ function GameScreen({
 
   const t = copy[lang];
 
-  const gameQuery = useGetBingoGame(gameId);
+  const gameQuery =
 
-  const cardsQuery = useListBingoCards();
+    useGetBingoGame(gameId);
 
-  const advance = useAdvanceBingoGame();
+  const cardsQuery =
+
+    useListBingoCards();
+
+  const advance =
+
+    useAdvanceBingoGame();
 
   const client = useQueryClient();
 
@@ -1360,37 +1686,31 @@ function GameScreen({
 
     useState<string>();
 
-  const [copied, setCopied] = useState(false);
-
   const previousCalls =
 
     useRef<number[]>([]);
 
   useEffect(() => {
 
-    const id = window.setInterval(() => {
+    const interval =
 
-      void gameQuery.refetch();
+      window.setInterval(() => {
 
-    }, 1000);
+        void gameQuery.refetch();
 
-    return () => window.clearInterval(id);
+      }, 1000);
+
+    return () =>
+
+      window.clearInterval(interval);
 
   }, [gameQuery.refetch]);
 
   useEffect(() => {
 
-    const called =
+    const current =
 
       gameQuery.data?.calledNumbers ?? [];
-
-    if (!called.length) {
-
-      previousCalls.current = [];
-
-      return;
-
-    }
 
     const previous =
 
@@ -1400,25 +1720,25 @@ function GameScreen({
 
       voiceEnabled &&
 
-      previous.length > 0 &&
+      current.length > previous.length &&
 
-      called.length > previous.length
+      previous.length > 0
 
     ) {
 
-      const newNumber =
+      const latest =
 
-        called[called.length - 1];
+        current[current.length - 1];
 
-      if (!previous.includes(newNumber)) {
+      if (!previous.includes(latest)) {
 
-        speakNumber(newNumber, lang);
+        speakNumber(latest, lang);
 
       }
 
     }
 
-    previousCalls.current = [...called];
+    previousCalls.current = [...current];
 
   }, [
 
@@ -1444,7 +1764,7 @@ function GameScreen({
 
   );
 
-  const card = useMemo(() => {
+  const selectedCard = useMemo(() => {
 
     if (selectedCardId) {
 
@@ -1452,17 +1772,17 @@ function GameScreen({
 
         cards.find(
 
-          (item) =>
+          (card) =>
 
-            item.id === selectedCardId,
+            card.id === selectedCardId,
 
         ) ??
 
         cards.find(
 
-          (item) =>
+          (card) =>
 
-            item.status === "in-play",
+            card.status === "in-play",
 
         ) ??
 
@@ -1476,7 +1796,9 @@ function GameScreen({
 
       cards.find(
 
-        (item) => item.status === "in-play",
+        (card) =>
+
+          card.status === "in-play",
 
       ) ?? cards[0]
 
@@ -1486,7 +1808,7 @@ function GameScreen({
 
   const completedLines = useMemo(() => {
 
-    if (!card?.numbers?.length) {
+    if (!selectedCard?.numbers?.length) {
 
       return [];
 
@@ -1494,7 +1816,7 @@ function GameScreen({
 
     return getCompletedLines(
 
-      card.numbers,
+      selectedCard.numbers,
 
       game?.calledNumbers ?? [],
 
@@ -1502,7 +1824,7 @@ function GameScreen({
 
   }, [
 
-    card,
+    selectedCard,
 
     game?.calledNumbers,
 
@@ -1512,97 +1834,51 @@ function GameScreen({
 
     completedLines.length >= 2;
 
-  const selectedCards =
-
-    game?.players?.length ?? 0;
-
   const prizePool =
 
-    selectedCards * PRIZE_PER_CARD;
+    (game?.players?.length ?? 0) *
 
-  const call = (
+    PRIZE_PER_CARD;
 
-    action: BingoGameActionAction,
-
-  ) => {
+  const refreshAll = () => {
 
     if (!game) return;
 
-    advance.mutate(
+    client.invalidateQueries({
 
-      {
+      queryKey:
 
-        gameId: game.id,
+        getGetBingoGameQueryKey(
 
-        data: { action },
+          game.id,
 
-      },
+        ),
 
-      {
+    });
 
-        onSuccess: () => {
+    client.invalidateQueries({
 
-          client.invalidateQueries({
+      queryKey:
 
-            queryKey:
+        getListBingoGamesQueryKey(),
 
-              getGetBingoGameQueryKey(
+    });
 
-                game.id,
+    client.invalidateQueries({
 
-              ),
+      queryKey:
 
-          });
+        getGetBingoOverviewQueryKey(),
 
-          client.invalidateQueries({
+    });
 
-            queryKey:
+    client.invalidateQueries({
 
-              getListBingoGamesQueryKey(),
+      queryKey:
 
-          });
+        getGetBingoWalletQueryKey(),
 
-          client.invalidateQueries({
-
-            queryKey:
-
-              getGetBingoOverviewQueryKey(),
-
-          });
-
-          client.invalidateQueries({
-
-            queryKey:
-
-              getGetBingoWalletQueryKey(),
-
-          });
-
-        },
-
-      },
-
-    );
-
-  };
-
-  const copyCode = async () => {
-
-    if (!game?.shareCode) return;
-
-    await navigator.clipboard?.writeText(
-
-      game.shareCode,
-
-    );
-
-    setCopied(true);
-
-    window.setTimeout(() => {
-
-      setCopied(false);
-
-    }, 1500);
+    });
 
   };
 
@@ -1628,19 +1904,15 @@ function GameScreen({
 
     return (
 
-      <div className="mx-auto max-w-2xl p-4 pt-8">
+      <ErrorState
 
-        <ErrorState
+        onRetry={() =>
 
-          onRetry={() =>
+          gameQuery.refetch()
 
-            gameQuery.refetch()
+        }
 
-          }
-
-        />
-
-      </div>
+      />
 
     );
 
@@ -1658,215 +1930,51 @@ function GameScreen({
 
     game.status === "completed";
 
-  const latest =
-
-    game.calledNumbers?.length
-
-      ? game.calledNumbers[
-
-          game.calledNumbers.length - 1
-
-        ]
-
-      : undefined;
-
   return (
 
-    <div className="mx-auto max-w-2xl px-3 pb-28 pt-4">
+    <div className="mx-auto max-w-2xl px-3 pb-8 pt-3">
 
-      <div className="mb-4 flex items-center justify-between">
+      <GameTopBar
 
-        <div className="flex items-center gap-2">
+        lang={lang}
 
-          <span
+        voiceEnabled={voiceEnabled}
 
-            className={`size-2.5 rounded-full ${
+        setVoiceEnabled={
 
-              live
+          setVoiceEnabled
 
-                ? "live-dot bg-primary"
+        }
 
-                : waiting
+        shareCode={
 
-                  ? "bg-accent-foreground"
+          game.shareCode
 
-                  : "bg-muted-foreground"
+        }
 
-            }`}
+      />
 
-          />
+      <GameHero
 
-          <span className="text-[10px] font-black uppercase tracking-[.18em]">
+        game={game}
 
-            {live
+        lang={lang}
 
-              ? t.live
+        countdown={countdown}
 
-              : waiting
-
-                ? t.lobby
-
-                : t.roundFinished}
-
-          </span>
-
-        </div>
-
-        <div className="flex items-center gap-2">
-
-          <button
-
-            onClick={() =>
-
-              setVoiceEnabled(
-
-                (value) => !value,
-
-              )
-
-            }
-
-            className={`flex size-9 items-center justify-center rounded-xl border ${
-
-              voiceEnabled
-
-                ? "border-primary bg-primary/10 text-primary"
-
-                : "border-border bg-card"
-
-            }`}
-
-          >
-
-            {voiceEnabled ? (
-
-              <Volume2 size={16} />
-
-            ) : (
-
-              <VolumeX size={16} />
-
-            )}
-
-          </button>
-
-          <button
-
-            onClick={copyCode}
-
-            className="flex size-9 items-center justify-center rounded-xl border border-border bg-card"
-
-          >
-
-            {copied ? (
-
-              <Check size={16} />
-
-            ) : (
-
-              <Copy size={16} />
-
-            )}
-
-          </button>
-
-        </div>
-
-      </div>
-
-      <section className="mb-4 rounded-3xl bg-foreground p-5 text-background shadow-lg">
-
-        <div className="flex items-start justify-between gap-3">
-
-          <div className="min-w-0">
-
-            <div className="text-[10px] font-bold uppercase tracking-[.18em] text-background/45">
-
-              {t.game}
-
-            </div>
-
-            <h1 className="mt-1 truncate text-2xl font-black">
-
-              {game.name}
-
-            </h1>
-
-            <div className="mt-2 flex flex-wrap gap-2">
-
-              <span className="rounded-full bg-background/10 px-2.5 py-1 text-[10px] font-bold">
-
-                {game.shareCode}
-
-              </span>
-
-              <span className="rounded-full bg-background/10 px-2.5 py-1 text-[10px] font-bold">
-
-                {game.players.length}{" "}
-
-                {t.players}
-
-              </span>
-
-            </div>
-
-          </div>
-
-          <div className="flex size-16 shrink-0 flex-col items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-
-            <div className="text-[8px] font-black uppercase">
-
-              {t.latest}
-
-            </div>
-
-            <div className="text-2xl font-black">
-
-              {latest ?? "—"}
-
-            </div>
-
-          </div>
-
-        </div>
-
-        {live && (
-
-          <div className="mt-5 flex items-center justify-between border-t border-background/10 pt-4">
-
-            <span className="text-xs text-background/50">
-
-              {game.calledNumbers.length}{" "}
-
-              {t.numbersCalled}
-
-            </span>
-
-            <span className="flex items-center gap-1.5 text-xs font-bold">
-
-              <Clock3 size={14} />
-
-              {countdown}s
-
-            </span>
-
-          </div>
-
-        )}
-
-      </section>
+      />
 
       {waiting && (
 
-        <section className="mb-4 overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
+        <section className="mt-4 overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
 
           <div className="bg-primary p-5 text-primary-foreground">
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
 
               <div>
 
-                <div className="text-[10px] font-bold uppercase tracking-[.18em] opacity-70">
+                <div className="text-[9px] font-black uppercase tracking-[.18em] opacity-70">
 
                   {t.lobby}
 
@@ -1878,19 +1986,21 @@ function GameScreen({
 
                 </div>
 
+                <div className="mt-1 text-xs opacity-70">
+
+                  {t.startsIn}{" "}
+
+                  {countdown}s
+
+                </div>
+
               </div>
 
-              <div className="flex size-16 items-center justify-center rounded-2xl bg-primary-foreground/15 text-3xl font-black">
+              <div className="flex size-[68px] items-center justify-center rounded-2xl bg-primary-foreground/15 text-3xl font-black">
 
                 {countdown}
 
               </div>
-
-            </div>
-
-            <div className="mt-2 text-xs opacity-70">
-
-              {t.startsIn} {countdown}s
 
             </div>
 
@@ -1900,7 +2010,7 @@ function GameScreen({
 
             <div className="p-4 text-center">
 
-              <div className="text-[10px] text-muted-foreground">
+              <div className="text-[9px] text-muted-foreground">
 
                 {t.players}
 
@@ -1916,9 +2026,9 @@ function GameScreen({
 
             <div className="p-4 text-center">
 
-              <div className="text-[10px] text-muted-foreground">
+              <div className="text-[9px] text-muted-foreground">
 
-                {t.cardPrice}
+                {t.price}
 
               </div>
 
@@ -1938,7 +2048,7 @@ function GameScreen({
 
             <div className="p-4 text-center">
 
-              <div className="text-[10px] text-muted-foreground">
+              <div className="text-[9px] text-muted-foreground">
 
                 {t.prizePool}
 
@@ -1966,13 +2076,13 @@ function GameScreen({
 
       {waiting && (
 
-        <section className="mb-4 rounded-3xl border border-border bg-card p-4 shadow-sm">
+        <section className="mt-4 rounded-3xl border border-border bg-card p-4 shadow-sm">
 
           <div className="mb-4 flex items-center justify-between">
 
             <div>
 
-              <div className="text-[10px] font-bold uppercase tracking-[.18em] text-primary">
+              <div className="text-[9px] font-black uppercase tracking-[.18em] text-primary">
 
                 {t.cards}
 
@@ -1986,13 +2096,11 @@ function GameScreen({
 
             </div>
 
-            <Ticket
+            <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
 
-              size={20}
+              <Ticket size={19} />
 
-              className="text-primary"
-
-            />
+            </div>
 
           </div>
 
@@ -2006,17 +2114,29 @@ function GameScreen({
 
             }
 
-            onSelect={setSelectedCardId}
+            onSelect={
+
+              setSelectedCardId
+
+            }
 
             lang={lang}
 
           />
 
-          <div className="mt-3 rounded-xl bg-muted p-3 text-center text-[11px] text-muted-foreground">
+          <div className="mt-3 flex items-center justify-between rounded-2xl bg-muted p-3">
 
-            {CARD_PRICE} ETB ·{" "}
+            <span className="text-[10px] font-bold text-muted-foreground">
 
-            {t.gameRules}
+              {t.price}
+
+            </span>
+
+            <span className="text-sm font-black">
+
+              {CARD_PRICE} ETB
+
+            </span>
 
           </div>
 
@@ -2026,75 +2146,45 @@ function GameScreen({
 
       {live && (
 
-        <div className="mb-4 grid grid-cols-3 gap-2">
+        <div className="mt-4 rounded-3xl border border-primary/20 bg-primary/5 p-4">
 
-          <div className="rounded-2xl border border-border bg-card p-3 text-center shadow-sm">
+          <div className="flex items-center gap-3">
 
-            <Users
+            <div className="flex size-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
 
-              size={16}
-
-              className="mx-auto text-primary"
-
-            />
-
-            <div className="mt-1 text-lg font-black">
-
-              {game.players.length}
+              <Sparkles size={20} />
 
             </div>
 
-            <div className="text-[9px] text-muted-foreground">
+            <div className="min-w-0 flex-1">
 
-              {t.players}
+              <div className="text-[9px] font-black uppercase tracking-[.18em] text-primary">
 
-            </div>
+                {t.automatic}
 
-          </div>
+              </div>
 
-          <div className="rounded-2xl border border-border bg-card p-3 text-center shadow-sm">
+              <div className="mt-1 text-sm font-black">
 
-            <CircleDollarSign
+                {t.called}
 
-              size={16}
-
-              className="mx-auto text-primary"
-
-            />
-
-            <div className="mt-1 text-lg font-black">
-
-              {prizePool}
+              </div>
 
             </div>
 
-            <div className="text-[9px] text-muted-foreground">
+            <div className="text-right">
 
-              ETB
+              <div className="text-2xl font-black">
 
-            </div>
+                {countdown}s
 
-          </div>
+              </div>
 
-          <div className="rounded-2xl border border-border bg-card p-3 text-center shadow-sm">
+              <div className="text-[8px] text-muted-foreground">
 
-            <Zap
+                {t.next}
 
-              size={16}
-
-              className="mx-auto text-primary"
-
-            />
-
-            <div className="mt-1 text-lg font-black">
-
-              {game.calledNumbers.length}
-
-            </div>
-
-            <div className="text-[9px] text-muted-foreground">
-
-              {t.called}
+              </div>
 
             </div>
 
@@ -2104,49 +2194,35 @@ function GameScreen({
 
       )}
 
-      <section className="mb-4">
+      <section className="mt-4">
 
-        <div className="mb-3 flex items-center justify-between px-1">
+        <div className="mb-3 flex items-end justify-between px-1">
 
           <div>
 
-            <div className="text-[10px] font-bold uppercase tracking-[.18em] text-primary">
+            <div className="text-[9px] font-black uppercase tracking-[.18em] text-primary">
 
               {t.card}
 
             </div>
 
-            <h2 className="text-xl font-black">
+            <h2 className="mt-1 text-xl font-black">
 
-              {card?.label ?? "Bingo Card"}
+              {selectedCard?.label ??
+
+                "Bingo Card"}
 
             </h2>
 
           </div>
 
-          {card && (
+          {selectedCard && (
 
-            <Badge
+            <span className="rounded-full bg-muted px-3 py-1 text-[9px] font-black uppercase">
 
-              tone={
+              {selectedCard.category}
 
-                card.category === "vvip"
-
-                  ? "gold"
-
-                  : card.category === "vip"
-
-                    ? "mint"
-
-                    : "ink"
-
-              }
-
-            >
-
-              {card.category}
-
-            </Badge>
+            </span>
 
           )}
 
@@ -2154,7 +2230,7 @@ function GameScreen({
 
         <BingoCardView
 
-          card={card}
+          card={selectedCard}
 
           called={
 
@@ -2164,23 +2240,25 @@ function GameScreen({
 
           lang={lang}
 
-          large
-
         />
 
       </section>
 
-      <CalledNumbers
+      <div className="mt-4">
 
-        numbers={
+        <CalledNumbers
 
-          game.calledNumbers
+          numbers={
 
-        }
+            game.calledNumbers
 
-        lang={lang}
+          }
 
-      />
+          lang={lang}
+
+        />
+
+      </div>
 
       {completedLines.length > 0 && (
 
@@ -2208,13 +2286,13 @@ function GameScreen({
 
             <div>
 
-              <div className="text-[10px] font-black uppercase tracking-[.18em] text-primary">
+              <div className="text-[9px] font-black uppercase tracking-[.18em] text-primary">
 
                 {hasWon
 
                   ? t.winner
 
-                  : "BINGO"}
+                  : t.bingo}
 
               </div>
 
@@ -2236,7 +2314,7 @@ function GameScreen({
 
             <div className="mt-4 rounded-2xl bg-card p-4">
 
-              <div className="text-xs text-muted-foreground">
+              <div className="text-[10px] text-muted-foreground">
 
                 {t.prizePool}
 
@@ -2264,7 +2342,7 @@ function GameScreen({
 
             <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
 
-              <Trophy size={23} />
+              <Trophy size={22} />
 
             </div>
 
@@ -2288,6 +2366,28 @@ function GameScreen({
 
           </div>
 
+          <button
+
+            onClick={() => {
+
+              refreshAll();
+
+              window.location.href =
+
+                "/";
+
+            }}
+
+            className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-black text-primary-foreground"
+
+          >
+
+            <RefreshCw size={16} />
+
+            {t.playAgain}
+
+          </button>
+
         </section>
 
       )}
@@ -2296,19 +2396,29 @@ function GameScreen({
 
         <section className="mt-4 rounded-3xl bg-foreground p-5 text-background">
 
-          <div className="mb-4 flex items-center gap-2">
+          <div className="mb-4 flex items-center justify-between">
 
-            <Users
+            <div className="flex items-center gap-2">
 
-              size={17}
+              <Users
 
-              className="text-primary"
+                size={17}
 
-            />
+                className="text-primary"
 
-            <span className="text-[10px] font-bold uppercase tracking-[.18em] text-background/55">
+              />
 
-              {t.players}
+              <span className="text-[9px] font-black uppercase tracking-[.18em] text-background/50">
+
+                {t.players}
+
+              </span>
+
+            </div>
+
+            <span className="rounded-full bg-background/10 px-2.5 py-1 text-[9px] font-black">
+
+              {game.players.length}
 
             </span>
 
@@ -2318,7 +2428,7 @@ function GameScreen({
 
             {game.players
 
-              .slice(0, 10)
+              .slice(0, 12)
 
               .map((player) => (
 
@@ -2326,23 +2436,23 @@ function GameScreen({
 
                   key={player.id}
 
-                  className="flex items-center gap-3"
+                  className="flex items-center gap-3 rounded-2xl bg-background/5 p-2.5"
 
                 >
 
-                  <div className="flex size-8 items-center justify-center rounded-full bg-background/10 text-[10px] font-black">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-background/10 text-[9px] font-black">
 
                     {player.initials}
 
                   </div>
 
-                  <div className="min-w-0 flex-1 truncate text-sm font-semibold">
+                  <div className="min-w-0 flex-1 truncate text-xs font-semibold">
 
                     {player.name}
 
                   </div>
 
-                  <div className="text-[9px] text-background/40">
+                  <div className="rounded-full bg-background/10 px-2 py-1 text-[8px] text-background/50">
 
                     {player.cardLabel}
 
@@ -2368,21 +2478,31 @@ function GameLobby() {
 
   const games = useListBingoGames();
 
-  const [, setLocation] = useLocation();
+  const [, setLocation] =
+
+    useLocation();
+
+  const [checking, setChecking] =
+
+    useState(true);
 
   useEffect(() => {
 
-    const id = window.setInterval(() => {
+    const interval =
 
-      void games.refetch();
+      window.setInterval(() => {
 
-    }, 2000);
+        void games.refetch();
 
-    return () => window.clearInterval(id);
+      }, 1500);
+
+    return () =>
+
+      window.clearInterval(interval);
 
   }, [games.refetch]);
 
-  const liveGame = useMemo(() => {
+  const activeGame = useMemo(() => {
 
     const list = games.data ?? [];
 
@@ -2404,33 +2524,67 @@ function GameLobby() {
 
       ) ??
 
-      list[0]
+      null
 
     );
 
   }, [games.data]);
 
-  if (games.isLoading) {
+  useEffect(() => {
 
-    return <LoadingState />;
+    if (activeGame) {
 
-  }
+      setChecking(false);
 
-  if (games.isError) {
+      setLocation(
+
+        `/play/${activeGame.id}`,
+
+      );
+
+    }
+
+  }, [activeGame, setLocation]);
+
+  if (
+
+    games.isLoading ||
+
+    checking
+
+  ) {
 
     return (
 
-      <div className="mx-auto max-w-2xl p-4 pt-8">
+      <div className="mx-auto max-w-2xl px-4 pb-28 pt-6">
 
-        <ErrorState
+        <div className="rounded-[32px] bg-foreground p-7 text-background shadow-xl">
 
-          onRetry={() =>
+          <div className="flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
 
-            games.refetch()
+            <Ticket size={28} />
 
-          }
+          </div>
 
-        />
+          <h1 className="mt-6 text-3xl font-black">
+
+            Fast Bingo
+
+          </h1>
+
+          <p className="mt-2 text-sm text-background/50">
+
+            Loading…
+
+          </p>
+
+          <div className="mt-7 h-2 overflow-hidden rounded-full bg-background/10">
+
+            <div className="h-full w-1/2 animate-pulse rounded-full bg-primary" />
+
+          </div>
+
+        </div>
 
       </div>
 
@@ -2438,41 +2592,61 @@ function GameLobby() {
 
   }
 
-  if (liveGame) {
+  if (games.isError) {
 
-    setLocation(`/play/${liveGame.id}`);
+    return (
 
-    return <LoadingState />;
+      <ErrorState
+
+        onRetry={() =>
+
+          games.refetch()
+
+        }
+
+      />
+
+    );
 
   }
 
   return (
 
-    <div className="mx-auto max-w-2xl px-4 pb-28 pt-8">
+    <div className="mx-auto max-w-2xl px-4 pb-28 pt-6">
 
-      <div className="rounded-[32px] bg-foreground p-7 text-background shadow-xl">
+      <section className="overflow-hidden rounded-[32px] bg-foreground p-6 text-background shadow-xl">
 
-        <div className="flex size-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+        <div className="flex items-center justify-between">
 
-          <Ticket size={30} />
+          <div className="flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+
+            <Ticket size={27} />
+
+          </div>
+
+          <span className="rounded-full bg-background/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-wider">
+
+            LIVE
+
+          </span>
 
         </div>
 
-        <h1 className="mt-6 text-3xl font-black">
+        <h1 className="mt-7 text-3xl font-black">
 
           Fast Bingo
 
         </h1>
 
-        <p className="mt-2 text-sm text-background/55">
+        <p className="mt-2 text-sm text-background/50">
 
           75-ball Bingo
 
         </p>
 
-        <div className="mt-8 grid grid-cols-3 gap-2">
+        <div className="mt-7 grid grid-cols-5 gap-2">
 
-          {["B", "I", "N"].map(
+          {["B", "I", "N", "G", "O"].map(
 
             (letter) => (
 
@@ -2480,7 +2654,7 @@ function GameLobby() {
 
                 key={letter}
 
-                className="rounded-2xl bg-background/10 p-4 text-center text-2xl font-black"
+                className="flex aspect-square items-center justify-center rounded-2xl bg-background/10 text-xl font-black"
 
               >
 
@@ -2494,13 +2668,25 @@ function GameLobby() {
 
         </div>
 
-        <div className="mt-5 rounded-2xl bg-background/10 p-4 text-sm">
+        <div className="mt-5 flex items-center gap-3 rounded-2xl bg-background/10 p-4">
 
-          Waiting for the next game…
+          <RefreshCw
+
+            size={17}
+
+            className="animate-spin text-primary"
+
+          />
+
+          <span className="text-sm font-semibold">
+
+            Waiting for the next game…
+
+          </span>
 
         </div>
 
-      </div>
+      </section>
 
     </div>
 
@@ -2508,7 +2694,15 @@ function GameLobby() {
 
 }
 
-function HomePage({ lang }: { lang: Language }) {
+function HomePage({
+
+  lang,
+
+}: {
+
+  lang: Language;
+
+}) {
 
   const t = copy[lang];
 
@@ -2519,6 +2713,10 @@ function HomePage({ lang }: { lang: Language }) {
   const wallet =
 
     useGetBingoWallet();
+
+  const [, setLocation] =
+
+    useLocation();
 
   if (
 
@@ -2542,21 +2740,17 @@ function HomePage({ lang }: { lang: Language }) {
 
     return (
 
-      <div className="mx-auto max-w-2xl p-4 pt-8">
+      <ErrorState
 
-        <ErrorState
+        onRetry={() => {
 
-          onRetry={() => {
+          overview.refetch();
 
-            overview.refetch();
+          wallet.refetch();
 
-            wallet.refetch();
+        }}
 
-          }}
-
-        />
-
-      </div>
+      />
 
     );
 
@@ -2580,7 +2774,9 @@ function HomePage({ lang }: { lang: Language }) {
 
           <div>
 
-            <div className="text-[10px] font-black uppercase tracking-[.2em] opacity-70">
+            <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[.2em] opacity-75">
+
+              <span className="live-dot size-2 rounded-full bg-current" />
 
               {t.live}
 
@@ -2594,7 +2790,7 @@ function HomePage({ lang }: { lang: Language }) {
 
             <p className="mt-1 text-sm opacity-70">
 
-              {t.play}
+              75-ball Bingo
 
             </p>
 
@@ -2602,7 +2798,13 @@ function HomePage({ lang }: { lang: Language }) {
 
           <div className="flex size-12 items-center justify-center rounded-2xl bg-primary-foreground/15">
 
-            <Zap size={22} fill="currentColor" />
+            <Zap
+
+              size={22}
+
+              fill="currentColor"
+
+            />
 
           </div>
 
@@ -2632,13 +2834,37 @@ function HomePage({ lang }: { lang: Language }) {
 
         </div>
 
+        <button
+
+          onClick={() =>
+
+            setLocation("/play")
+
+          }
+
+          className="mt-5 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary-foreground text-sm font-black text-primary shadow-sm"
+
+        >
+
+          <Play
+
+            size={18}
+
+            fill="currentColor"
+
+          />
+
+          {t.play}
+
+        </button>
+
       </section>
 
       <div className="mt-4 grid grid-cols-2 gap-3">
 
         <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
 
-          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
 
             <WalletCards size={14} />
 
@@ -2662,7 +2888,7 @@ function HomePage({ lang }: { lang: Language }) {
 
         <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
 
-          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
 
             <Users size={14} />
 
@@ -2688,15 +2914,15 @@ function HomePage({ lang }: { lang: Language }) {
 
           <div>
 
-            <div className="text-[10px] font-bold uppercase tracking-[.18em] text-primary">
+            <div className="text-[9px] font-black uppercase tracking-[.18em] text-primary">
 
-              {t.game}
+              {t.rules}
 
             </div>
 
             <h2 className="mt-1 text-xl font-black">
 
-              {t.play}
+              {t.gameRules}
 
             </h2>
 
@@ -2704,63 +2930,89 @@ function HomePage({ lang }: { lang: Language }) {
 
           <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
 
-            <Ticket size={21} />
+            <Trophy size={21} />
 
           </div>
 
         </div>
 
-        <p className="mt-2 text-sm text-muted-foreground">
+        <div className="mt-4 grid grid-cols-3 gap-2">
 
-          {t.gameRules}
+          <div className="rounded-2xl bg-muted p-3 text-center">
 
-        </p>
+            <div className="text-lg font-black">
 
-        <Link
+              {CARD_PRICE}
 
-          href="/play"
+            </div>
 
-          className="mt-5 flex h-12 items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-black text-primary-foreground shadow-sm"
+            <div className="text-[8px] text-muted-foreground">
 
-        >
+              ETB / CARD
 
-          <Play size={17} fill="currentColor" />
+            </div>
 
-          {t.play}
+          </div>
 
-        </Link>
+          <div className="rounded-2xl bg-muted p-3 text-center">
+
+            <div className="text-lg font-black">
+
+              75
+
+            </div>
+
+            <div className="text-[8px] text-muted-foreground">
+
+              NUMBERS
+
+            </div>
+
+          </div>
+
+          <div className="rounded-2xl bg-muted p-3 text-center">
+
+            <div className="text-lg font-black">
+
+              2
+
+            </div>
+
+            <div className="text-[8px] text-muted-foreground">
+
+              LINES
+
+            </div>
+
+          </div>
+
+        </div>
 
       </section>
 
-      <section className="mt-4 grid grid-cols-2 gap-3">
+      <section className="mt-4 rounded-3xl border border-border bg-card p-5">
 
-        <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="flex items-center gap-3">
 
-          <div className="text-xs text-muted-foreground">
+          <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
 
-            {t.cardPrice}
-
-          </div>
-
-          <div className="mt-1 text-xl font-black">
-
-            {CARD_PRICE} ETB
+            <Sparkles size={20} />
 
           </div>
 
-        </div>
+          <div>
 
-        <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="font-black">
 
-          <div className="text-xs text-muted-foreground">
+              {t.automatic}
 
-            {t.prizePool}
+            </div>
 
-          </div>
+            <div className="text-xs text-muted-foreground">
 
-          <div className="mt-1 text-xl font-black text-primary">
+              3.5 second calling interval
 
-            {PRIZE_PER_CARD} ETB
+            </div>
 
           </div>
 
@@ -2798,11 +3050,11 @@ function WalletPage({
 
   const [type, setType] =
 
-    useState<"deposit" | "withdrawal">(
+    useState<
 
-      "deposit",
+      "deposit" | "withdrawal"
 
-    );
+    >("deposit");
 
   const [method, setMethod] =
 
@@ -2832,19 +3084,15 @@ function WalletPage({
 
     return (
 
-      <div className="mx-auto max-w-2xl p-4 pt-8">
+      <ErrorState
 
-        <ErrorState
+        onRetry={() =>
 
-          onRetry={() =>
+          wallet.refetch()
 
-            wallet.refetch()
+        }
 
-          }
-
-        />
-
-      </div>
+      />
 
     );
 
@@ -2856,11 +3104,7 @@ function WalletPage({
 
     const value = Number(amount);
 
-    if (!value || value < 1) {
-
-      return;
-
-    }
+    if (!value || value < 1) return;
 
     action.mutate(
 
@@ -2908,7 +3152,7 @@ function WalletPage({
 
           <div>
 
-            <div className="text-[10px] font-bold uppercase tracking-[.18em] text-background/45">
+            <div className="text-[9px] font-black uppercase tracking-[.18em] text-background/45">
 
               {t.wallet}
 
@@ -3238,27 +3482,23 @@ function WalletPage({
 
                 </div>
 
-                <div className="text-right">
+                <div className="text-right text-sm font-black">
 
-                  <div className="text-sm font-black">
+                  {entry.type ===
 
-                    {entry.type ===
+                  "deposit"
 
-                    "deposit"
+                    ? "+"
 
-                      ? "+"
+                    : "-"}
 
-                      : "-"}
+                  {money(
 
-                    {money(
+                    entry.amount,
 
-                      entry.amount,
+                    data.currency,
 
-                      data.currency,
-
-                    )}
-
-                  </div>
+                  )}
 
                 </div>
 
@@ -3279,6 +3519,154 @@ function WalletPage({
         )}
 
       </section>
+
+    </div>
+
+  );
+
+}
+
+function RulesPage({
+
+  lang,
+
+}: {
+
+  lang: Language;
+
+}) {
+
+  const t = copy[lang];
+
+  return (
+
+    <div className="mx-auto max-w-2xl px-4 pb-28 pt-5">
+
+      <section className="rounded-[32px] bg-foreground p-6 text-background shadow-xl">
+
+        <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+
+          <HelpCircle size={23} />
+
+        </div>
+
+        <h1 className="mt-5 text-2xl font-black">
+
+          {t.rules}
+
+        </h1>
+
+        <p className="mt-2 text-sm text-background/50">
+
+          {t.gameRules}
+
+        </p>
+
+      </section>
+
+      <div className="mt-4 space-y-3">
+
+        {[
+
+          [
+
+            "B",
+
+            "1 – 15",
+
+          ],
+
+          [
+
+            "I",
+
+            "16 – 30",
+
+          ],
+
+          [
+
+            "N",
+
+            "31 – 45",
+
+          ],
+
+          [
+
+            "G",
+
+            "46 – 60",
+
+          ],
+
+          [
+
+            "O",
+
+            "61 – 75",
+
+          ],
+
+        ].map(([letter, range]) => (
+
+          <div
+
+            key={letter}
+
+            className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4"
+
+          >
+
+            <div className="flex size-11 items-center justify-center rounded-xl bg-primary text-lg font-black text-primary-foreground">
+
+              {letter}
+
+            </div>
+
+            <div className="text-sm font-bold">
+
+              {range}
+
+            </div>
+
+          </div>
+
+        ))}
+
+        <div className="rounded-3xl border border-primary/20 bg-primary/5 p-5">
+
+          <div className="flex items-center gap-3">
+
+            <Trophy
+
+              size={20}
+
+              className="text-primary"
+
+            />
+
+            <div className="font-black">
+
+              {t.gameRules}
+
+            </div>
+
+          </div>
+
+          <p className="mt-3 text-xs leading-6 text-muted-foreground">
+
+            Complete any two horizontal,
+
+            vertical or diagonal lines.
+
+            The center N space is FREE.
+
+          </p>
+
+        </div>
+
+      </div>
 
     </div>
 
@@ -3338,23 +3726,19 @@ function AdminPage({
 
     return (
 
-      <div className="mx-auto max-w-2xl p-4 pt-8">
+      <ErrorState
 
-        <ErrorState
+        onRetry={() => {
 
-          onRetry={() => {
+          admin.refetch();
 
-            admin.refetch();
+          cards.refetch();
 
-            cards.refetch();
+          games.refetch();
 
-            games.refetch();
+        }}
 
-          }}
-
-        />
-
-      </div>
+      />
 
     );
 
@@ -3406,7 +3790,7 @@ function AdminPage({
 
           icon={Zap}
 
-          label={t.game}
+          label={t.live}
 
           value={data.activeGames}
 
@@ -3418,7 +3802,11 @@ function AdminPage({
 
           label={t.inventory}
 
-          value={cards.data?.length ?? 0}
+          value={
+
+            cards.data?.length ?? 0
+
+          }
 
         />
 
@@ -3428,7 +3816,11 @@ function AdminPage({
 
           label={t.activity}
 
-          value={games.data?.length ?? 0}
+          value={
+
+            games.data?.length ?? 0
+
+          }
 
         />
 
@@ -3436,27 +3828,17 @@ function AdminPage({
 
       <section className="mt-4 rounded-3xl border border-border bg-card p-5 shadow-sm">
 
-        <div className="mb-4 flex items-center justify-between">
+        <h2 className="font-black">
 
-          <h2 className="font-black">
+          {t.inventory}
 
-            {t.inventory}
+        </h2>
 
-          </h2>
-
-          <Badge tone="mint">
-
-            {cards.data?.length ?? 0}
-
-          </Badge>
-
-        </div>
-
-        <div className="space-y-2">
+        <div className="mt-4 space-y-2">
 
           {(cards.data ?? [])
 
-            .slice(0, 20)
+            .slice(0, 30)
 
             .map((card) => (
 
@@ -3478,7 +3860,7 @@ function AdminPage({
 
                   </div>
 
-                  <div className="text-[10px] text-muted-foreground">
+                  <div className="text-[9px] uppercase text-muted-foreground">
 
                     {card.category}
 
@@ -3486,25 +3868,11 @@ function AdminPage({
 
                 </div>
 
-                <Badge
-
-                  tone={
-
-                    card.status ===
-
-                    "in-play"
-
-                      ? "coral"
-
-                      : "mint"
-
-                  }
-
-                >
+                <span className="rounded-full bg-background px-2 py-1 text-[8px] font-black">
 
                   {card.status}
 
-                </Badge>
+                </span>
 
               </div>
 
@@ -3622,6 +3990,14 @@ function HostControls({
 
           });
 
+          client.invalidateQueries({
+
+            queryKey:
+
+              getListBingoGamesQueryKey(),
+
+          });
+
         },
 
       },
@@ -3654,7 +4030,9 @@ function HostControls({
 
       <div className="grid grid-cols-2 gap-2">
 
-        {game.status === "waiting" && (
+        {game.status ===
+
+          "waiting" && (
 
           <button
 
@@ -3760,7 +4138,7 @@ function HostControls({
 
               <Check size={14} />
 
-              {t.claim}
+              {t.finish}
 
             </button>
 
@@ -3801,132 +4179,6 @@ function HostControls({
       </div>
 
     </section>
-
-  );
-
-}
-
-function Router({
-
-  lang,
-
-  setLang,
-
-}: {
-
-  lang: Language;
-
-  setLang: (lang: Language) => void;
-
-}) {
-
-  const [location] = useLocation();
-
-  const isGame =
-
-    location.startsWith("/play/");
-
-  return (
-
-    <ErrorBoundary
-
-      resetKey={location}
-
-    >
-
-      <div className="noise min-h-[100dvh] bg-background">
-
-        {!isGame && (
-
-          <Header
-
-            lang={lang}
-
-            setLang={setLang}
-
-          />
-
-        )}
-
-        <Switch>
-
-          <Route
-
-            path="/"
-
-            component={() => (
-
-              <HomePage lang={lang} />
-
-            )}
-
-          />
-
-          <Route
-
-            path="/play"
-
-            component={() => (
-
-              <GameLobby />
-
-            )}
-
-          />
-
-          <Route
-
-            path="/play/:gameId"
-
-            component={() => (
-
-              <GameRoute lang={lang} />
-
-            )}
-
-          />
-
-          <Route
-
-            path="/wallet"
-
-            component={() => (
-
-              <WalletPage lang={lang} />
-
-            )}
-
-          />
-
-          <Route
-
-            path="/admin"
-
-            component={() => (
-
-              <AdminPage lang={lang} />
-
-            )}
-
-          />
-
-          <Route
-
-            component={NotFound}
-
-          />
-
-        </Switch>
-
-        {!isGame && (
-
-          <BottomNav lang={lang} />
-
-        )}
-
-      </div>
-
-    </ErrorBoundary>
 
   );
 
@@ -4026,11 +4278,209 @@ function HostRoute({
 
 }
 
+function Router({
+
+  lang,
+
+  setLang,
+
+}: {
+
+  lang: Language;
+
+  setLang: (lang: Language) => void;
+
+}) {
+
+  const [location] =
+
+    useLocation();
+
+  const isGame =
+
+    location.startsWith("/play/");
+
+  return (
+
+    <ErrorBoundary
+
+      resetKey={location}
+
+    >
+
+      <div className="noise min-h-[100dvh] bg-background">
+
+        {!isGame && (
+
+          <Header
+
+            lang={lang}
+
+            setLang={setLang}
+
+          />
+
+        )}
+
+        <Switch>
+
+          <Route
+
+            path="/"
+
+            component={() => (
+
+              <HomePage lang={lang} />
+
+            )}
+
+          />
+
+          <Route
+
+            path="/play"
+
+            component={GameLobby}
+
+          />
+
+          <Route
+
+            path="/play/:gameId"
+
+            component={() => (
+
+              <GameRoute
+
+                lang={lang}
+
+              />
+
+            )}
+
+          />
+
+          <Route
+
+            path="/wallet"
+
+            component={() => (
+
+              <WalletPage
+
+                lang={lang}
+
+              />
+
+            )}
+
+          />
+
+          <Route
+
+            path="/rules"
+
+            component={() => (
+
+              <RulesPage
+
+                lang={lang}
+
+              />
+
+            )}
+
+          />
+
+          <Route
+
+            path="/admin"
+
+            component={() => (
+
+              <AdminPage
+
+                lang={lang}
+
+              />
+
+            )}
+
+          />
+
+          <Route
+
+            component={NotFound}
+
+          />
+
+        </Switch>
+
+        {!isGame && (
+
+          <BottomNav lang={lang} />
+
+        )}
+
+      </div>
+
+    </ErrorBoundary>
+
+  );
+
+}
+
 function App() {
 
   const [lang, setLang] =
 
-    useState<Language>("am");
+    useState<Language>(() => {
+
+      if (
+
+        typeof window !==
+
+        "undefined"
+
+      ) {
+
+        const saved =
+
+          localStorage.getItem(
+
+            "fast-bingo-language",
+
+          );
+
+        if (
+
+          saved === "en" ||
+
+          saved === "am"
+
+        ) {
+
+          return saved;
+
+        }
+
+      }
+
+      return "am";
+
+    });
+
+  useEffect(() => {
+
+    localStorage.setItem(
+
+      "fast-bingo-language",
+
+      lang,
+
+    );
+
+  }, [lang]);
 
   useEffect(() => {
 
@@ -4042,9 +4492,29 @@ function App() {
 
     ) {
 
-      window.Telegram.WebApp.ready();
+      const webApp =
 
-      window.Telegram.WebApp.expand();
+        window.Telegram.WebApp;
+
+      webApp.ready();
+
+      webApp.expand();
+
+      try {
+
+        webApp.setHeaderColor(
+
+          "#09090b",
+
+        );
+
+        webApp.setBackgroundColor(
+
+          "#09090b",
+
+        );
+
+      } catch {}
 
     }
 
