@@ -1,4 +1,16 @@
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+
+  type ReactNode,
+
+  useEffect,
+
+  useMemo,
+
+  useRef,
+
+  useState,
+
+} from "react";
 
 import {
 
@@ -32,17 +44,17 @@ import {
 
   ArrowUpRight,
 
-  BarChart3,
-
   Check,
 
   ChevronRight,
 
+  CircleDollarSign,
+
+  Clock3,
+
   Copy,
 
   CreditCard,
-
-  Gauge,
 
   LayoutDashboard,
 
@@ -50,29 +62,25 @@ import {
 
   Play,
 
-  Plus,
-
   RefreshCw,
 
   ShieldCheck,
 
   Ticket,
 
+  Trophy,
+
   Users,
+
+  Volume2,
+
+  VolumeX,
 
   WalletCards,
 
   X,
 
   Zap,
-
-  Volume2,
-
-  Trophy,
-
-  Clock3,
-
-  CircleDollarSign,
 
 } from "lucide-react";
 
@@ -87,8 +95,6 @@ import {
   getListBingoGamesQueryKey,
 
   useAdvanceBingoGame,
-
-  useCreateBingoGame,
 
   useGetBingoAdmin,
 
@@ -134,10 +140,6 @@ type Language = "en" | "am";
 
 type Tone = "coral" | "mint" | "gold" | "ink";
 
-const LOBBY_SECONDS = 45;
-
-const CALL_INTERVAL_SECONDS = 3.5;
-
 const CARD_PRICE = 10;
 
 const PRIZE_PER_CARD = 8;
@@ -146,173 +148,29 @@ const copy = {
 
   en: {
 
-    dashboard: "Live console",
+    play: "Play Bingo",
 
-    live: "LIVE NOW",
+    live: "LIVE",
 
-    demo: "DEMO MODE",
+    lobby: "LOBBY",
 
-    create: "Create room",
+    waiting: "Waiting for players",
 
-    join: "Join a room",
+    startsIn: "Starts in",
 
-    room: "Room",
+    players: "Players",
 
-    wallet: "Demo wallet",
+    cards: "Cards",
 
-    admin: "Admin oversight",
+    wallet: "Wallet",
 
-    activeGames: "Active games",
-
-    players: "Players online",
-
-    cards: "Cards available",
-
-    latest: "Latest room",
-
-    activity: "Recent activity",
-
-    viewRoom: "Open room",
-
-    noGames: "No live rooms yet",
-
-    startOne: "Fast 75-ball Bingo.",
-
-    quick: "Quick actions",
-
-    createTitle: "Create a fast room",
-
-    roomName: "Room name",
-
-    category: "Card tier",
-
-    normal: "Normal",
-
-    vip: "VIP",
-
-    vvip: "VVIP",
-
-    cancel: "Cancel",
-
-    createRoom: "Create room",
-
-    joining: "Opening…",
-
-    copyCode: "Copy code",
-
-    copied: "Copied",
+    balance: "Balance",
 
     called: "Called numbers",
 
-    next: "NEXT CALL",
+    latest: "Latest call",
 
-    playersJoined: "players joined",
-
-    host: "Host controls",
-
-    start: "Start round",
-
-    call: "Call next number",
-
-    pause: "Pause round",
-
-    reset: "Reset round",
-
-    claim: "Record winner",
-
-    waiting: "Waiting room",
-
-    completed: "Completed",
-
-    back: "Back to console",
-
-    card: "Your card",
-
-    free: "FREE",
-
-    walletBalance: "Available demo balance",
-
-    deposit: "Deposit demo credits",
-
-    withdraw: "Withdraw demo credits",
-
-    method: "Method",
-
-    amount: "Amount",
-
-    submit: "Submit request",
-
-    demoNote: "Demo only — no real money is moved.",
-
-    transactions: "Recent wallet activity",
-
-    noTransactions: "No wallet activity yet.",
-
-    oversight: "A clear view of the demo floor.",
-
-    users: "Total users",
-
-    inUse: "Cards in use",
-
-    volume: "Demo volume",
-
-    categoryMix: "Category mix",
-
-    inventory: "Card inventory",
-
-    activityLog: "Activity log",
-
-    retry: "Try again",
-
-    loading: "Loading console…",
-
-    hello: "Good evening",
-
-    language: "አማ",
-
-    english: "EN",
-
-    joinCode: "Have a room code?",
-
-    enterCode: "Enter share code",
-
-    openRoom: "Open room",
-
-    sign: "Fast rounds. Clear calls.",
-
-    emptyCards: "No cards in inventory.",
-
-    lobby: "Lobby",
-
-    cardsSelected: "Cards selected",
-
-    cardPrice: "Card price",
-
-    prizePool: "Prize pool",
-
-    selectCard: "Select card",
-
-    selected: "Selected",
-
-    waitingForPlayers: "Waiting for players",
-
-    gameStarting: "Game starts in",
-
-    seconds: "seconds",
-
-    bingo: "BINGO",
-
-    twoLines: "Complete 2 lines to win",
-
-    winner: "WINNER",
-
-    winners: "WINNERS",
-
-    congratulations: "Congratulations!",
-
-    prize: "Prize",
-
-    noNumbers: "No numbers called yet",
+    next: "NEXT",
 
     voice: "Voice",
 
@@ -320,191 +178,135 @@ const copy = {
 
     voiceOff: "Voice off",
 
-    lastCall: "Last call",
+    card: "Your card",
 
-    nextNumber: "Next number",
+    chooseCard: "Choose your card",
 
-    calledCount: "numbers called",
+    selected: "Selected",
+
+    choose: "Choose",
+
+    free: "FREE",
+
+    prizePool: "Prize pool",
+
+    cardPrice: "Card",
+
+    winner: "WINNER",
+
+    winners: "WINNERS",
+
+    congratulations: "Congratulations!",
+
+    twoLines: "2 lines completed",
+
+    noNumbers: "Waiting for the first number",
+
+    numbersCalled: "numbers called",
 
     roundFinished: "Round finished",
 
-    prizeRule: "8 ETB per selected card",
-
-    selectedCards: "selected cards",
-
     playAgain: "Play again",
 
-  },
+    back: "Back",
 
-  am: {
+    walletTitle: "Wallet",
 
-    dashboard: "የቀጥታ መቆጣጠሪያ",
+    deposit: "Deposit",
 
-    live: "ቀጥታ",
+    withdraw: "Withdraw",
 
-    demo: "የሙከራ ሁነታ",
+    amount: "Amount",
 
-    create: "ክፍል ፍጠር",
+    method: "Method",
 
-    join: "ክፍል ተቀላቀል",
+    submit: "Submit",
 
-    room: "ክፍል",
+    transactions: "Transactions",
 
-    wallet: "የሙከራ ቦርሳ",
+    noTransactions: "No transactions yet.",
 
-    admin: "አስተዳደር",
+    help: "Help",
 
-    activeGames: "ንቁ ጨዋታዎች",
+    rules: "Rules",
 
-    players: "ተጫዋቾች",
+    gameRules: "Complete any 2 lines to win.",
 
-    cards: "የሚገኙ ካርዶች",
+    autoPlay: "Automatic calling",
 
-    latest: "የቅርብ ክፍል",
+    room: "Room",
 
-    activity: "የቅርብ እንቅስቃሴ",
+    copy: "Copy",
 
-    viewRoom: "ክፍል ክፈት",
+    copied: "Copied",
 
-    noGames: "ቀጥታ ክፍል የለም",
+    refresh: "Refresh",
 
-    startOne: "ፈጣን 75-ball Bingo።",
+    loading: "Loading…",
 
-    quick: "ፈጣን እርምጃዎች",
+    retry: "Try again",
 
-    createTitle: "ፈጣን ክፍል ፍጠር",
+    noGame: "No active game right now.",
 
-    roomName: "የክፍል ስም",
+    createGame: "Create game",
 
-    category: "የካርድ ደረጃ",
+    admin: "Admin",
 
-    normal: "መደበኛ",
+    normal: "Normal",
 
     vip: "VIP",
 
     vvip: "VVIP",
 
-    cancel: "ሰርዝ",
+    host: "Host",
 
-    createRoom: "ክፍል ፍጠር",
+    pause: "Pause",
 
-    joining: "በመክፈት ላይ…",
+    reset: "Reset",
 
-    copyCode: "ኮድ ቅዳ",
+    start: "Start",
 
-    copied: "ተቀድቷል",
+    call: "Call",
+
+    claim: "Finish",
+
+    system: "System",
+
+    activity: "Activity",
+
+    users: "Users",
+
+    inventory: "Inventory",
+
+    game: "Game",
+
+  },
+
+  am: {
+
+    play: "ቢንጎ ተጫወት",
+
+    live: "ቀጥታ",
+
+    lobby: "መጠባበቂያ",
+
+    waiting: "ተጫዋቾችን በመጠበቅ ላይ",
+
+    startsIn: "የሚጀምረው በ",
+
+    players: "ተጫዋቾች",
+
+    cards: "ካርዶች",
+
+    wallet: "ቦርሳ",
+
+    balance: "ቀሪ ሂሳብ",
 
     called: "የተጠሩ ቁጥሮች",
 
+    latest: "የመጨረሻ ጥሪ",
+
     next: "ቀጣይ",
-
-    playersJoined: "ተጫዋቾች ተቀላቅለዋል",
-
-    host: "የአስተናጋጅ ቁጥጥር",
-
-    start: "ዙር ጀምር",
-
-    call: "ቀጣይ ቁጥር ጥራ",
-
-    pause: "አቁም",
-
-    reset: "ዳግም ጀምር",
-
-    claim: "አሸናፊ መዝግብ",
-
-    waiting: "የመጠበቂያ ክፍል",
-
-    completed: "ተጠናቋል",
-
-    back: "ወደ መቆጣጠሪያ",
-
-    card: "ካርድህ",
-
-    free: "ነፃ",
-
-    walletBalance: "የሙከራ ቀሪ ሂሳብ",
-
-    deposit: "የሙከራ ክሬዲት ጨምር",
-
-    withdraw: "የሙከራ ክሬዲት አውጣ",
-
-    method: "ዘዴ",
-
-    amount: "መጠን",
-
-    submit: "ጥያቄ ላክ",
-
-    demoNote: "የሙከራ ብቻ — እውነተኛ ገንዘብ አይንቀሳቀስም።",
-
-    transactions: "የቅርብ የቦርሳ እንቅስቃሴ",
-
-    noTransactions: "እስካሁን እንቅስቃሴ የለም።",
-
-    oversight: "የሙከራ ወለሉን በግልጽ ይመልከቱ።",
-
-    users: "ጠቅላላ ተጠቃሚዎች",
-
-    inUse: "በጥቅም ላይ ያሉ ካርዶች",
-
-    volume: "የሙከራ መጠን",
-
-    categoryMix: "የደረጃ ድርሻ",
-
-    inventory: "የካርድ ክምችት",
-
-    activityLog: "የእንቅስቃሴ መዝገብ",
-
-    retry: "እንደገና ሞክር",
-
-    loading: "በመጫን ላይ…",
-
-    hello: "መልካም ምሽት",
-
-    language: "አማ",
-
-    english: "EN",
-
-    joinCode: "የክፍል ኮድ አለዎት?",
-
-    enterCode: "የማጋሪያ ኮድ ያስገቡ",
-
-    openRoom: "ክፍል ክፈት",
-
-    sign: "ፈጣን ዙሮች። ግልጽ ጥሪዎች።",
-
-    emptyCards: "በክምችት ውስጥ ካርድ የለም።",
-
-    lobby: "የመጠባበቂያ ጊዜ",
-
-    cardsSelected: "የተመረጡ ካርዶች",
-
-    cardPrice: "የካርድ ዋጋ",
-
-    prizePool: "የሽልማት ገንዘብ",
-
-    selectCard: "ካርድ ምረጥ",
-
-    selected: "ተመርጧል",
-
-    waitingForPlayers: "ተጫዋቾችን በመጠበቅ ላይ",
-
-    gameStarting: "ጨዋታው የሚጀምረው በ",
-
-    seconds: "ሰከንዶች",
-
-    bingo: "BINGO",
-
-    twoLines: "ለማሸነፍ 2 መስመር ሙላ",
-
-    winner: "አሸናፊ",
-
-    winners: "አሸናፊዎች",
-
-    congratulations: "እንኳን ደስ አለዎት!",
-
-    prize: "ሽልማት",
-
-    noNumbers: "እስካሁን ቁጥር አልተጠራም",
 
     voice: "ድምጽ",
 
@@ -512,19 +314,107 @@ const copy = {
 
     voiceOff: "ድምጽ ዝግ",
 
-    lastCall: "የመጨረሻ ጥሪ",
+    card: "የእርስዎ ካርድ",
 
-    nextNumber: "ቀጣይ ቁጥር",
+    chooseCard: "ካርድዎን ይምረጡ",
 
-    calledCount: "ቁጥሮች ተጠርተዋል",
+    selected: "ተመርጧል",
+
+    choose: "ምረጥ",
+
+    free: "ነፃ",
+
+    prizePool: "የሽልማት ገንዘብ",
+
+    cardPrice: "ካርድ",
+
+    winner: "አሸናፊ",
+
+    winners: "አሸናፊዎች",
+
+    congratulations: "እንኳን ደስ አለዎት!",
+
+    twoLines: "2 መስመሮች ተሞልተዋል",
+
+    noNumbers: "የመጀመሪያውን ቁጥር በመጠበቅ ላይ",
+
+    numbersCalled: "ቁጥሮች ተጠርተዋል",
 
     roundFinished: "ዙሩ ተጠናቋል",
 
-    prizeRule: "በእያንዳንዱ ካርድ 8 ETB",
-
-    selectedCards: "የተመረጡ ካርዶች",
-
     playAgain: "እንደገና ተጫወት",
+
+    back: "ተመለስ",
+
+    walletTitle: "ቦርሳ",
+
+    deposit: "ገቢ ማድረግ",
+
+    withdraw: "ወጪ ማድረግ",
+
+    amount: "መጠን",
+
+    method: "ዘዴ",
+
+    submit: "ላክ",
+
+    transactions: "የቅርብ እንቅስቃሴ",
+
+    noTransactions: "እስካሁን እንቅስቃሴ የለም።",
+
+    help: "እርዳታ",
+
+    rules: "ደንቦች",
+
+    gameRules: "ለማሸነፍ 2 መስመሮችን ሙላ።",
+
+    autoPlay: "ራስ-ሰር ጥሪ",
+
+    room: "ክፍል",
+
+    copy: "ቅዳ",
+
+    copied: "ተቀድቷል",
+
+    refresh: "አድስ",
+
+    loading: "በመጫን ላይ…",
+
+    retry: "እንደገና ሞክር",
+
+    noGame: "አሁን ቀጥታ ጨዋታ የለም።",
+
+    createGame: "ጨዋታ ፍጠር",
+
+    admin: "አስተዳደር",
+
+    normal: "መደበኛ",
+
+    vip: "VIP",
+
+    vvip: "VVIP",
+
+    host: "አስተናጋጅ",
+
+    pause: "አቁም",
+
+    reset: "ዳግም ጀምር",
+
+    start: "ጀምር",
+
+    call: "ጥራ",
+
+    claim: "ጨርስ",
+
+    system: "ስርዓት",
+
+    activity: "እንቅስቃሴ",
+
+    users: "ተጠቃሚዎች",
+
+    inventory: "ካርድ ክምችት",
+
+    game: "ጨዋታ",
 
   },
 
@@ -558,11 +448,11 @@ function ErrorState({
 
   return (
 
-    <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+    <div className="rounded-3xl border border-dashed border-border bg-card p-8 text-center shadow-sm">
 
-      <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+      <div className="mx-auto mb-3 flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary">
 
-        <X size={18} />
+        <RefreshCw size={18} />
 
       </div>
 
@@ -576,11 +466,9 @@ function ErrorState({
 
         <button
 
-          data-testid="button-retry"
-
           onClick={onRetry}
 
-          className="mt-4 inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-semibold hover:bg-muted"
+          className="mt-4 inline-flex items-center gap-2 rounded-xl bg-foreground px-4 py-2.5 text-sm font-bold text-background"
 
         >
 
@@ -598,17 +486,17 @@ function ErrorState({
 
 }
 
-function LoadingState({ label = "Loading…" }: { label?: string }) {
+function LoadingState() {
 
   return (
 
-    <div className="space-y-3" aria-label={label}>
+    <div className="space-y-3 p-4">
 
-      <div className="h-24 animate-pulse rounded-2xl bg-muted" />
+      <div className="h-20 animate-pulse rounded-3xl bg-muted" />
 
-      <div className="h-44 animate-pulse rounded-2xl bg-muted" />
+      <div className="h-80 animate-pulse rounded-3xl bg-muted" />
 
-      <div className="h-28 animate-pulse rounded-2xl bg-muted" />
+      <div className="h-32 animate-pulse rounded-3xl bg-muted" />
 
     </div>
 
@@ -632,13 +520,13 @@ function Badge({
 
   const styles: Record<Tone, string> = {
 
-    coral: "bg-primary/12 text-primary",
+    coral: "bg-primary/10 text-primary",
 
     mint: "bg-secondary text-secondary-foreground",
 
     gold: "bg-accent text-accent-foreground",
 
-    ink: "bg-foreground/8 text-foreground",
+    ink: "bg-foreground/10 text-foreground",
 
   };
 
@@ -658,9 +546,7 @@ function Badge({
 
 }
 
-function Shell({
-
-  children,
+function Header({
 
   lang,
 
@@ -668,63 +554,47 @@ function Shell({
 
 }: {
 
-  children: ReactNode;
-
   lang: Language;
 
-  setLang: (l: Language) => void;
+  setLang: (lang: Language) => void;
 
 }) {
 
-  const [location] = useLocation();
-
-  const health = useHealthCheck();
-
   const t = copy[lang];
 
-  const nav = [
-
-    { href: "/", label: t.dashboard, icon: LayoutDashboard },
-
-    { href: "/wallet", label: t.wallet, icon: WalletCards },
-
-    { href: "/admin", label: t.admin, icon: ShieldCheck },
-
-  ];
+  const [location] = useLocation();
 
   return (
 
-    <div className="noise min-h-[100dvh] bg-background">
+    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/90 backdrop-blur-xl">
 
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-sidebar px-5 py-6 text-sidebar-foreground lg:flex">
+      <div className="mx-auto flex h-[62px] max-w-2xl items-center justify-between px-4">
 
         <Link
 
           href="/"
 
-          data-testid="link-brand"
-
-          className="mb-12 flex items-center gap-3"
+          className="flex items-center gap-2.5"
 
         >
 
-          <div className="flex size-10 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
+          <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
 
-            <Zap size={20} fill="currentColor" />
+            <Zap size={17} fill="currentColor" />
 
           </div>
 
           <div>
 
-            <div className="text-lg font-bold tracking-tight">
+            <div className="text-sm font-black tracking-tight">
 
               Fast Bingo
 
             </div>
 
-            <div className="mono text-[9px] uppercase tracking-[.2em] text-sidebar-foreground/55">
+            <div className="text-[9px] font-bold uppercase tracking-[.18em] text-muted-foreground">
 
-              Telegram console
+              {location === "/wallet" ? t.wallet : t.play}
 
             </div>
 
@@ -732,1267 +602,135 @@ function Shell({
 
         </Link>
 
-        <div className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[.2em] text-sidebar-foreground/40">
+        <div className="flex items-center gap-2">
 
-          Workspace
+          <button
 
-        </div>
+            onClick={() =>
 
-        <nav className="space-y-1">
+              setLang(lang === "en" ? "am" : "en")
 
-          {nav.map(({ href, label, icon: Icon }) => (
+            }
 
-            <Link
+            className="rounded-xl border border-border bg-card px-2.5 py-1.5 text-[11px] font-black"
 
-              key={href}
+          >
 
-              href={href}
+            {lang === "en" ? "አማ" : "EN"}
 
-              data-testid={`link-nav-${
+          </button>
 
-                href === "/" ? "dashboard" : href.slice(1)
+          <Link
 
-              }`}
+            href="/wallet"
 
-              className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition ${
+            className={`flex size-9 items-center justify-center rounded-xl border ${
 
-                location === href
+              location === "/wallet"
 
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                ? "border-primary bg-primary/10 text-primary"
 
-                  : "text-sidebar-foreground/65 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground"
+                : "border-border bg-card"
 
-              }`}
+            }`}
 
-            >
+          >
 
-              <Icon size={17} />
+            <WalletCards size={17} />
 
-              <span>{label}</span>
-
-              {location === href && (
-
-                <ChevronRight
-
-                  size={14}
-
-                  className="ml-auto text-sidebar-primary"
-
-                />
-
-              )}
-
-            </Link>
-
-          ))}
-
-        </nav>
-
-        <div className="mt-auto rounded-2xl border border-sidebar-border bg-sidebar-accent/60 p-4">
-
-          <div className="mb-3 flex items-center gap-2">
-
-            <span
-
-              className={`${
-
-                health.isError ? "" : "live-dot"
-
-              } size-2 rounded-full ${
-
-                health.isError ? "bg-destructive" : "bg-sidebar-primary"
-
-              }`}
-
-            />
-
-            <span className="mono text-[10px] uppercase tracking-[.16em] text-sidebar-foreground/55">
-
-              {health.data?.status === "ok" ? t.live : t.demo}
-
-            </span>
-
-          </div>
-
-          <div className="text-sm font-semibold">{t.sign}</div>
-
-          <div className="mt-1 text-xs text-sidebar-foreground/50">
-
-            {t.demo}
-
-          </div>
+          </Link>
 
         </div>
 
-      </aside>
+      </div>
 
-      <header className="sticky top-0 z-20 flex h-[68px] items-center justify-between border-b border-border/80 bg-background/90 px-4 backdrop-blur lg:ml-64 lg:px-8">
+    </header>
+
+  );
+
+}
+
+function BottomNav({ lang }: { lang: Language }) {
+
+  const t = copy[lang];
+
+  const [location] = useLocation();
+
+  return (
+
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 px-4 pb-[max(8px,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl">
+
+      <div className="mx-auto flex max-w-2xl items-center justify-around">
 
         <Link
 
           href="/"
 
-          className="flex items-center gap-2 lg:hidden"
+          className={`flex min-w-16 flex-col items-center gap-1 rounded-xl py-1.5 text-[10px] font-bold ${
 
-          data-testid="link-mobile-brand"
+            location === "/"
+
+              ? "text-primary"
+
+              : "text-muted-foreground"
+
+          }`}
 
         >
 
-          <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <Ticket size={19} />
 
-            <Zap size={16} fill="currentColor" />
-
-          </span>
-
-          <span className="font-bold">Fast Bingo</span>
+          <span>{t.play}</span>
 
         </Link>
-
-        <div className="hidden lg:block">
-
-          <span className="mono text-[10px] uppercase tracking-[.22em] text-muted-foreground">
-
-            {t.demo}
-
-          </span>
-
-        </div>
-
-        <div className="ml-auto flex items-center gap-2">
-
-          <button
-
-            data-testid="button-language"
-
-            onClick={() => setLang(lang === "en" ? "am" : "en")}
-
-            className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-bold shadow-sm hover:bg-muted"
-
-          >
-
-            <span className="text-primary">
-
-              {lang === "en" ? "EN" : "አማ"}
-
-            </span>
-
-            <span className="mx-1 text-muted-foreground">/</span>
-
-            <span className="text-muted-foreground">
-
-              {lang === "en" ? "አማ" : "EN"}
-
-            </span>
-
-          </button>
-
-          <div className="flex size-8 items-center justify-center rounded-full bg-secondary text-xs font-bold text-secondary-foreground">
-
-            FB
-
-          </div>
-
-        </div>
-
-      </header>
-
-      <main className="pb-24 lg:ml-64 lg:pb-8">{children}</main>
-
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex h-[70px] items-center justify-around border-t border-border bg-card/95 px-3 backdrop-blur lg:hidden">
-
-        {nav.map(({ href, label, icon: Icon }) => (
-
-          <Link
-
-            key={href}
-
-            href={href}
-
-            data-testid={`link-mobile-${
-
-              href === "/" ? "dashboard" : href.slice(1)
-
-            }`}
-
-            className={`flex min-w-20 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold ${
-
-              location === href
-
-                ? "text-primary"
-
-                : "text-muted-foreground"
-
-            }`}
-
-          >
-
-            <Icon size={19} />
-
-            <span>{label}</span>
-
-          </Link>
-
-        ))}
-
-      </nav>
-
-    </div>
-
-  );
-
-}
-
-function SectionTitle({
-
-  eyebrow,
-
-  title,
-
-  detail,
-
-}: {
-
-  eyebrow?: string;
-
-  title: string;
-
-  detail?: string;
-
-}) {
-
-  return (
-
-    <div className="mb-5">
-
-      <div className="mono mb-1 text-[10px] font-medium uppercase tracking-[.2em] text-primary">
-
-        {eyebrow}
-
-      </div>
-
-      <h2 className="text-xl font-bold tracking-tight text-foreground">
-
-        {title}
-
-      </h2>
-
-      {detail && (
-
-        <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
-
-      )}
-
-    </div>
-
-  );
-
-}
-
-function Metric({
-
-  label,
-
-  value,
-
-  icon: Icon,
-
-  accent = "coral",
-
-  detail,
-
-}: {
-
-  label: string;
-
-  value: ReactNode;
-
-  icon: typeof Users;
-
-  accent?: Tone;
-
-  detail?: string;
-
-}) {
-
-  const border: Record<Tone, string> = {
-
-    coral: "border-l-primary",
-
-    mint: "border-l-secondary-foreground",
-
-    gold: "border-l-accent",
-
-    ink: "border-l-foreground",
-
-  };
-
-  return (
-
-    <div
-
-      className={`rounded-2xl border border-border border-l-4 ${border[accent]} bg-card p-4 shadow-sm`}
-
-    >
-
-      <div className="flex items-start justify-between">
-
-        <span className="text-xs font-semibold text-muted-foreground">
-
-          {label}
-
-        </span>
-
-        <Icon size={16} className="text-muted-foreground" />
-
-      </div>
-
-      <div className="mt-3 text-2xl font-bold tracking-tight">{value}</div>
-
-      {detail && (
-
-        <div className="mt-1 text-[11px] text-muted-foreground">
-
-          {detail}
-
-        </div>
-
-      )}
-
-    </div>
-
-  );
-
-}
-
-function CreateRoomModal({
-
-  lang,
-
-  onClose,
-
-}: {
-
-  lang: Language;
-
-  onClose: () => void;
-
-}) {
-
-  const t = copy[lang];
-
-  const [name, setName] = useState("");
-
-  const [category, setCategory] = useState<"normal" | "vip" | "vvip">(
-
-    "normal",
-
-  );
-
-  const create = useCreateBingoGame();
-
-  const [, setLocation] = useLocation();
-
-  const submit = (event: React.FormEvent) => {
-
-    event.preventDefault();
-
-    if (!name.trim()) return;
-
-    create.mutate(
-
-      {
-
-        data: {
-
-          name: name.trim(),
-
-          category,
-
-        },
-
-      },
-
-      {
-
-        onSuccess: (game) => {
-
-          onClose();
-
-          setLocation(`/play/${game.id}`);
-
-        },
-
-      },
-
-    );
-
-  };
-
-  return (
-
-    <div
-
-      className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/45 p-0 sm:items-center sm:p-4"
-
-      role="dialog"
-
-      aria-modal="true"
-
-    >
-
-      <div className="w-full max-w-md rounded-t-3xl border border-border bg-card p-6 shadow-lg sm:rounded-3xl">
-
-        <div className="mb-6 flex items-start justify-between">
-
-          <div>
-
-            <Badge tone="coral">{t.demo}</Badge>
-
-            <h2 className="mt-3 text-2xl font-bold">{t.createTitle}</h2>
-
-          </div>
-
-          <button
-
-            data-testid="button-close-create"
-
-            onClick={onClose}
-
-            className="rounded-lg p-2 text-muted-foreground hover:bg-muted"
-
-          >
-
-            <X size={18} />
-
-          </button>
-
-        </div>
-
-        <form onSubmit={submit} className="space-y-5">
-
-          <label className="block">
-
-            <span className="mb-2 block text-xs font-semibold text-muted-foreground">
-
-              {t.roomName}
-
-            </span>
-
-            <input
-
-              data-testid="input-room-name"
-
-              autoFocus
-
-              value={name}
-
-              onChange={(e) => setName(e.target.value)}
-
-              placeholder="Friday night sprint"
-
-              className="h-12 w-full rounded-xl border border-input bg-background px-4 text-sm outline-none ring-primary/30 placeholder:text-muted-foreground/50 focus:ring-4"
-
-            />
-
-          </label>
-
-          <div>
-
-            <span className="mb-2 block text-xs font-semibold text-muted-foreground">
-
-              {t.category}
-
-            </span>
-
-            <div className="grid grid-cols-3 gap-2">
-
-              {(["normal", "vip", "vvip"] as const).map((item) => (
-
-                <button
-
-                  type="button"
-
-                  key={item}
-
-                  data-testid={`button-category-${item}`}
-
-                  onClick={() => setCategory(item)}
-
-                  className={`rounded-xl border px-2 py-3 text-sm font-semibold transition ${
-
-                    category === item
-
-                      ? "border-primary bg-primary/10 text-primary"
-
-                      : "border-border bg-background hover:bg-muted"
-
-                  }`}
-
-                >
-
-                  {t[item]}
-
-                </button>
-
-              ))}
-
-            </div>
-
-          </div>
-
-          <div className="rounded-xl bg-muted p-3 text-xs text-muted-foreground">
-
-            {t.cardPrice}: <strong>10 ETB</strong>
-
-            <br />
-
-            {t.prizeRule}
-
-          </div>
-
-          <div className="flex gap-3 pt-1">
-
-            <button
-
-              type="button"
-
-              data-testid="button-cancel-create"
-
-              onClick={onClose}
-
-              className="h-12 flex-1 rounded-xl border border-border font-semibold hover:bg-muted"
-
-            >
-
-              {t.cancel}
-
-            </button>
-
-            <button
-
-              disabled={create.isPending}
-
-              data-testid="button-submit-create"
-
-              className="h-12 flex-1 rounded-xl bg-primary font-bold text-primary-foreground shadow-sm transition hover:brightness-95 disabled:opacity-60"
-
-            >
-
-              {create.isPending ? t.joining : t.createRoom}
-
-            </button>
-
-          </div>
-
-          {create.isError && (
-
-            <p className="text-center text-xs text-destructive">
-
-              Could not create this demo room. Try again.
-
-            </p>
-
-          )}
-
-        </form>
-
-      </div>
-
-    </div>
-
-  );
-
-}
-
-function HomePage({ lang }: { lang: Language }) {
-
-  const t = copy[lang];
-
-  const [showCreate, setShowCreate] = useState(false);
-
-  const [roomCode, setRoomCode] = useState("");
-
-  const [, setLocation] = useLocation();
-
-  const overview = useGetBingoOverview();
-
-  const games = useListBingoGames();
-
-  const wallet = useGetBingoWallet();
-
-  const loading =
-
-    overview.isLoading || games.isLoading || wallet.isLoading;
-
-  if (loading) {
-
-    return (
-
-      <div className="mx-auto max-w-7xl p-4 lg:p-8">
-
-        <LoadingState label={t.loading} />
-
-      </div>
-
-    );
-
-  }
-
-  if (overview.isError || games.isError || wallet.isError) {
-
-    return (
-
-      <div className="mx-auto max-w-7xl p-4 lg:p-8">
-
-        <ErrorState
-
-          onRetry={() => {
-
-            overview.refetch();
-
-            games.refetch();
-
-            wallet.refetch();
-
-          }}
-
-        />
-
-      </div>
-
-    );
-
-  }
-
-  const data = overview.data;
-
-  const gameList = games.data ?? [];
-
-  const balance = wallet.data;
-
-  return (
-
-    <div className="mx-auto max-w-7xl p-4 lg:p-8">
-
-      <div className="animate-rise mb-7 flex flex-col justify-between gap-5 md:flex-row md:items-end">
-
-        <div>
-
-          <div className="mono mb-2 text-[10px] uppercase tracking-[.2em] text-primary">
-
-            {t.live} · {t.demo}
-
-          </div>
-
-          <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
-
-            {t.hello}, <span className="text-primary">player.</span>
-
-          </h1>
-
-          <p className="mt-2 text-sm text-muted-foreground">
-
-            {t.startOne}
-
-          </p>
-
-        </div>
-
-        <div className="flex gap-2">
-
-          <button
-
-            data-testid="button-open-create"
-
-            onClick={() => setShowCreate(true)}
-
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground shadow-sm transition hover:brightness-95"
-
-          >
-
-            <Plus size={17} />
-
-            {t.create}
-
-          </button>
-
-        </div>
-
-      </div>
-
-      <div className="mb-7 grid grid-cols-2 gap-3 md:grid-cols-4">
-
-        <Metric
-
-          label={t.activeGames}
-
-          value={data?.activeGames ?? 0}
-
-          icon={Gauge}
-
-        />
-
-        <Metric
-
-          label={t.players}
-
-          value={data?.playersOnline ?? 0}
-
-          icon={Users}
-
-          accent="mint"
-
-        />
-
-        <Metric
-
-          label={t.cards}
-
-          value={data?.cardsAvailable ?? 0}
-
-          icon={Ticket}
-
-          accent="gold"
-
-        />
-
-        <Metric
-
-          label={t.walletBalance}
-
-          value={money(
-
-            data?.demoBalance ?? balance?.balance ?? 0,
-
-            balance?.currency,
-
-          )}
-
-          icon={WalletCards}
-
-          accent="ink"
-
-        />
-
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_.65fr]">
-
-        <section className="rounded-3xl border border-border bg-card p-5 shadow-sm md:p-6">
-
-          <div className="mb-5 flex items-start justify-between">
-
-            <SectionTitle eyebrow={t.live} title={t.latest} />
-
-            <Badge
-
-              tone={
-
-                data?.latestGame?.status === "live"
-
-                  ? "coral"
-
-                  : "gold"
-
-              }
-
-            >
-
-              {data?.latestGame?.status ?? "—"}
-
-            </Badge>
-
-          </div>
-
-          {data?.latestGame ? (
-
-            <FeaturedGame game={data.latestGame} lang={lang} />
-
-          ) : (
-
-            <div className="rounded-2xl bg-muted p-8 text-center text-sm text-muted-foreground">
-
-              {t.noGames}
-
-            </div>
-
-          )}
-
-        </section>
-
-        <section className="rounded-3xl border border-border bg-card p-5 shadow-sm md:p-6">
-
-          <SectionTitle eyebrow={t.wallet} title={t.quick} />
-
-          <div className="rounded-2xl bg-foreground p-5 text-background">
-
-            <div className="flex items-center justify-between">
-
-              <span className="mono text-[10px] uppercase tracking-[.16em] text-background/55">
-
-                {t.demo}
-
-              </span>
-
-              <CreditCard size={18} className="text-primary" />
-
-            </div>
-
-            <div className="mt-6 text-3xl font-bold">
-
-              {money(balance?.balance ?? 0, balance?.currency)}
-
-            </div>
-
-            <Link
-
-              href="/wallet"
-
-              data-testid="link-wallet-snapshot"
-
-              className="mt-5 flex items-center justify-between border-t border-background/15 pt-4 text-xs font-semibold text-background/70 hover:text-background"
-
-            >
-
-              <span>{t.wallet}</span>
-
-              <ChevronRight size={15} />
-
-            </Link>
-
-          </div>
-
-          <div className="mt-3 grid grid-cols-2 gap-2">
-
-            <button
-
-              data-testid="button-quick-create"
-
-              onClick={() => setShowCreate(true)}
-
-              className="rounded-xl border border-border p-3 text-left text-xs font-semibold hover:bg-muted"
-
-            >
-
-              <Plus size={15} className="mb-2 text-primary" />
-
-              {t.create}
-
-            </button>
-
-            <Link
-
-              href="/admin"
-
-              data-testid="link-quick-admin"
-
-              className="rounded-xl border border-border p-3 text-left text-xs font-semibold hover:bg-muted"
-
-            >
-
-              <BarChart3
-
-                size={15}
-
-                className="mb-2 text-secondary-foreground"
-
-              />
-
-              {t.admin}
-
-            </Link>
-
-          </div>
-
-        </section>
-
-      </div>
-
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1fr]">
-
-        <section>
-
-          <SectionTitle eyebrow={t.room} title={t.activeGames} />
-
-          <div className="space-y-2">
-
-            {gameList.length ? (
-
-              gameList
-
-                .slice(0, 4)
-
-                .map((game) => (
-
-                  <GameRow
-
-                    key={game.id}
-
-                    game={game}
-
-                    lang={lang}
-
-                  />
-
-                ))
-
-            ) : (
-
-              <div className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground">
-
-                {t.noGames}
-
-              </div>
-
-            )}
-
-          </div>
-
-        </section>
-
-        <section>
-
-          <SectionTitle eyebrow={t.activity} title={t.activity} />
-
-          <div className="rounded-2xl border border-border bg-card p-2 shadow-sm">
-
-            {data?.recentActivity?.length ? (
-
-              data.recentActivity.slice(0, 5).map((item) => (
-
-                <div
-
-                  key={item.id}
-
-                  className="flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-muted"
-
-                >
-
-                  <span
-
-                    className={`size-2 rounded-full ${
-
-                      item.tone === "success"
-
-                        ? "bg-secondary-foreground"
-
-                        : item.tone === "warning"
-
-                          ? "bg-accent-foreground"
-
-                          : "bg-primary"
-
-                    }`}
-
-                  />
-
-                  <div className="min-w-0 flex-1">
-
-                    <div className="truncate text-sm font-semibold">
-
-                      {item.title}
-
-                    </div>
-
-                    <div className="truncate text-xs text-muted-foreground">
-
-                      {item.detail}
-
-                    </div>
-
-                  </div>
-
-                  <span className="mono text-[10px] text-muted-foreground">
-
-                    {item.time}
-
-                  </span>
-
-                </div>
-
-              ))
-
-            ) : (
-
-              <div className="p-5 text-sm text-muted-foreground">
-
-                No recent activity.
-
-              </div>
-
-            )}
-
-          </div>
-
-        </section>
-
-      </div>
-
-      <section className="mt-6 rounded-2xl border border-dashed border-border bg-card/60 p-4">
-
-        <div className="flex flex-col gap-3 md:flex-row md:items-center">
-
-          <div className="flex-1">
-
-            <div className="text-sm font-bold">{t.joinCode}</div>
-
-            <div className="text-xs text-muted-foreground">
-
-              {t.enterCode}
-
-            </div>
-
-          </div>
-
-          <div className="flex gap-2">
-
-            <input
-
-              data-testid="input-join-code"
-
-              value={roomCode}
-
-              onChange={(e) => setRoomCode(e.target.value)}
-
-              placeholder="FB-7Q2K"
-
-              className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm uppercase outline-none focus:ring-2 focus:ring-primary/30 md:w-40"
-
-            />
-
-            <button
-
-              data-testid="button-open-room"
-
-              disabled={!roomCode.trim()}
-
-              onClick={() =>
-
-                setLocation(`/play/${roomCode.trim()}`)
-
-              }
-
-              className="h-10 rounded-lg bg-foreground px-4 text-sm font-bold text-background disabled:opacity-40"
-
-            >
-
-              {t.openRoom}
-
-            </button>
-
-          </div>
-
-        </div>
-
-      </section>
-
-      {showCreate && (
-
-        <CreateRoomModal
-
-          lang={lang}
-
-          onClose={() => setShowCreate(false)}
-
-        />
-
-      )}
-
-    </div>
-
-  );
-
-}
-
-function FeaturedGame({
-
-  game,
-
-  lang,
-
-}: {
-
-  game: BingoGame;
-
-  lang: Language;
-
-}) {
-
-  const t = copy[lang];
-
-  return (
-
-    <div className="grid gap-5 md:grid-cols-[1fr_180px]">
-
-      <div>
-
-        <div className="flex items-center gap-2">
-
-          <span className="live-dot size-2 rounded-full bg-primary" />
-
-          <span className="mono text-[10px] font-medium uppercase tracking-[.18em] text-primary">
-
-            {game.status === "live" ? t.live : game.status}
-
-          </span>
-
-        </div>
-
-        <h3 className="mt-3 text-2xl font-bold">{game.name}</h3>
-
-        <p className="mt-1 text-sm text-muted-foreground">
-
-          Hosted by {game.hostName} · {game.players.length}{" "}
-
-          {t.playersJoined}
-
-        </p>
-
-        <div className="mt-5 flex flex-wrap gap-2">
-
-          <Badge tone="mint">{game.shareCode}</Badge>
-
-          <Badge tone="ink">
-
-            {game.winnerCount} {t.winners}
-
-          </Badge>
-
-        </div>
 
         <Link
 
-          href={`/play/${game.id}`}
+          href="/wallet"
 
-          className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-primary transition-all hover:gap-3"
+          className={`flex min-w-16 flex-col items-center gap-1 rounded-xl py-1.5 text-[10px] font-bold ${
+
+            location === "/wallet"
+
+              ? "text-primary"
+
+              : "text-muted-foreground"
+
+          }`}
 
         >
 
-          {t.viewRoom}
+          <WalletCards size={19} />
 
-          <ChevronRight size={16} />
+          <span>{t.wallet}</span>
 
         </Link>
 
       </div>
 
-      <div className="rounded-2xl bg-primary p-5 text-primary-foreground">
-
-        <div className="mono text-[10px] uppercase tracking-[.18em] text-primary-foreground/65">
-
-          {t.next}
-
-        </div>
-
-        <div className="mt-3 text-6xl font-bold">
-
-          {game.currentNumber || "—"}
-
-        </div>
-
-        <div className="mt-3 border-t border-primary-foreground/20 pt-3 text-xs text-primary-foreground/70">
-
-          {game.nextCallIn}s until call
-
-        </div>
-
-      </div>
-
-    </div>
+    </nav>
 
   );
 
 }
 
-function GameRow({
-
-  game,
-
-  lang,
-
-}: {
-
-  game: BingoGame;
-
-  lang: Language;
-
-}) {
-
-  const t = copy[lang];
+function BingoLetters() {
 
   return (
 
-    <Link
+    <div className="grid grid-cols-5 overflow-hidden rounded-t-2xl bg-foreground text-center text-sm font-black text-background">
 
-      href={`/play/${game.id}`}
+      {["B", "I", "N", "G", "O"].map((letter) => (
 
-      className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+        <div key={letter} className="py-3">
 
-    >
-
-      <div
-
-        className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${
-
-          game.status === "live"
-
-            ? "bg-primary text-primary-foreground"
-
-            : "bg-muted text-muted-foreground"
-
-        }`}
-
-      >
-
-        <Ticket size={18} />
-
-      </div>
-
-      <div className="min-w-0 flex-1">
-
-        <div className="truncate text-sm font-bold">{game.name}</div>
-
-        <div className="mt-0.5 text-xs text-muted-foreground">
-
-          {game.players.length} {t.playersJoined} ·{" "}
-
-          {game.shareCode}
+          {letter}
 
         </div>
 
-      </div>
+      ))}
 
-      <Badge
-
-        tone={
-
-          game.status === "live"
-
-            ? "coral"
-
-            : game.status === "waiting"
-
-              ? "gold"
-
-              : "ink"
-
-        }
-
-      >
-
-        {game.status}
-
-      </Badge>
-
-      <ChevronRight
-
-        size={15}
-
-        className="text-muted-foreground"
-
-      />
-
-    </Link>
+    </div>
 
   );
 
@@ -2030,7 +768,7 @@ function getCompletedLines(
 
   );
 
-  const lines: number[][] = [
+  const lines = [
 
     [0, 1, 2, 3, 4],
 
@@ -2054,7 +792,7 @@ function getCompletedLines(
 
     [0, 6, 12, 18, 24],
 
-    [4, 8, 12, 16, 20],
+    [4, 8, 12, 18, 20],
 
   ];
 
@@ -2066,13 +804,15 @@ function getCompletedLines(
 
 }
 
-function BingoGrid({
+function BingoCardView({
 
   card,
 
   called,
 
   lang,
+
+  large = false,
 
 }: {
 
@@ -2081,6 +821,8 @@ function BingoGrid({
   called: number[];
 
   lang: Language;
+
+  large?: boolean;
 
 }) {
 
@@ -2094,7 +836,7 @@ function BingoGrid({
 
   );
 
-  const nums =
+  const numbers =
 
     card?.numbers?.length === 25
 
@@ -2104,7 +846,13 @@ function BingoGrid({
 
   const calledSet = new Set(called);
 
-  const completedLines = getCompletedLines(nums, called);
+  const completedLines = getCompletedLines(
+
+    numbers,
+
+    called,
+
+  );
 
   const completedCells = new Set(
 
@@ -2114,33 +862,31 @@ function BingoGrid({
 
   return (
 
-    <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
+    <div
 
-      <div className="grid grid-cols-5 border-b border-border bg-foreground text-center text-xs font-bold text-background">
+      className={`overflow-hidden rounded-2xl border border-border bg-border shadow-lg ${
 
-        {["B", "I", "N", "G", "O"].map((letter) => (
+        large ? "mx-auto max-w-[430px]" : ""
 
-          <div key={letter} className="py-3">
+      }`}
 
-            {letter}
+    >
 
-          </div>
+      <BingoLetters />
 
-        ))}
+      <div className="grid grid-cols-5 gap-px">
 
-      </div>
+        {numbers.map((number, index) => {
 
-      <div className="grid grid-cols-5 gap-px bg-border p-px">
+          const free = index === 12;
 
-        {nums.map((number, index) => {
+          const marked =
 
-          const isFree = index === 12;
+            free || calledSet.has(number);
 
-          const isMarked =
+          const completed =
 
-            isFree || calledSet.has(number);
-
-          const isLine = completedCells.has(index);
+            completedCells.has(index);
 
           return (
 
@@ -2148,17 +894,25 @@ function BingoGrid({
 
               key={`${number}-${index}`}
 
-              className={`relative flex aspect-square items-center justify-center bg-card text-base font-bold transition ${
+              className={`relative flex aspect-square items-center justify-center bg-card font-black transition-all ${
 
-                isMarked
+                large
 
-                  ? "bg-primary/10 text-primary"
+                  ? "text-[clamp(17px,5vw,25px)]"
 
-                  : ""
+                  : "text-sm"
 
               } ${
 
-                isLine
+                marked
+
+                  ? "bg-primary/10 text-primary"
+
+                  : "text-foreground"
+
+              } ${
+
+                completed
 
                   ? "ring-2 ring-inset ring-primary"
 
@@ -2168,9 +922,17 @@ function BingoGrid({
 
             >
 
-              {isFree ? (
+              {free ? (
 
-                <span className="text-[9px] font-bold uppercase tracking-wider">
+                <span
+
+                  className={`font-black uppercase tracking-wider ${
+
+                    large ? "text-[10px]" : "text-[8px]"
+
+                  }`}
+
+                >
 
                   {t.free}
 
@@ -2182,9 +944,9 @@ function BingoGrid({
 
               )}
 
-              {isMarked && !isFree && (
+              {marked && !free && (
 
-                <span className="absolute inset-2 rounded-full border-2 border-primary/60" />
+                <span className="absolute inset-[18%] rounded-full border-2 border-primary/50" />
 
               )}
 
@@ -2197,6 +959,122 @@ function BingoGrid({
       </div>
 
     </div>
+
+  );
+
+}
+
+function CalledNumbers({
+
+  numbers,
+
+  lang,
+
+}: {
+
+  numbers: number[];
+
+  lang: Language;
+
+}) {
+
+  const t = copy[lang];
+
+  const latest =
+
+    numbers.length > 0
+
+      ? numbers[numbers.length - 1]
+
+      : undefined;
+
+  return (
+
+    <section className="rounded-3xl border border-border bg-card p-4 shadow-sm">
+
+      <div className="mb-4 flex items-center justify-between">
+
+        <div>
+
+          <div className="text-[10px] font-bold uppercase tracking-[.18em] text-primary">
+
+            {t.called}
+
+          </div>
+
+          <div className="mt-1 text-lg font-black">
+
+            {latest
+
+              ? `${bingoColumn(latest)}${latest}`
+
+              : t.noNumbers}
+
+          </div>
+
+        </div>
+
+        {latest && (
+
+          <div className="flex size-14 items-center justify-center rounded-2xl bg-primary text-xl font-black text-primary-foreground shadow-sm">
+
+            {latest}
+
+          </div>
+
+        )}
+
+      </div>
+
+      {numbers.length ? (
+
+        <div className="flex max-h-36 flex-wrap gap-1.5 overflow-y-auto">
+
+          {numbers
+
+            .slice()
+
+            .reverse()
+
+            .map((number, index) => (
+
+              <div
+
+                key={`${number}-${index}`}
+
+                className={`flex size-9 items-center justify-center rounded-xl text-[11px] font-black ${
+
+                  index === 0
+
+                    ? "bg-primary text-primary-foreground"
+
+                    : "bg-muted text-foreground"
+
+                }`}
+
+              >
+
+                {bingoColumn(number)}
+
+                {number}
+
+              </div>
+
+            ))}
+
+        </div>
+
+      ) : (
+
+        <div className="rounded-xl bg-muted p-4 text-center text-xs text-muted-foreground">
+
+          {t.noNumbers}
+
+        </div>
+
+      )}
+
+    </section>
 
   );
 
@@ -2220,17 +1098,29 @@ function useCountdown(
 
     if (!active) {
 
-      setSeconds(Math.max(0, Math.ceil(value ?? 0)));
+      setSeconds(
+
+        Math.max(0, Math.ceil(value ?? 0)),
+
+      );
 
       return;
 
     }
 
-    setSeconds(Math.max(0, Math.ceil(value ?? 0)));
+    setSeconds(
+
+      Math.max(0, Math.ceil(value ?? 0)),
+
+    );
 
     const id = window.setInterval(() => {
 
-      setSeconds((current) => Math.max(0, current - 1));
+      setSeconds((current) =>
+
+        Math.max(0, current - 1),
+
+      );
 
     }, 1000);
 
@@ -2262,19 +1152,15 @@ function speakNumber(
 
   }
 
-  const letter = bingoColumn(number);
-
-  const text =
-
-    language === "am"
-
-      ? `${letter} ${number}`
-
-      : `${letter} ${number}`;
-
   window.speechSynthesis.cancel();
 
-  const utterance = new SpeechSynthesisUtterance(text);
+  const utterance =
+
+    new SpeechSynthesisUtterance(
+
+      `${bingoColumn(number)} ${number}`,
+
+    );
 
   utterance.rate = 0.85;
 
@@ -2284,11 +1170,17 @@ function speakNumber(
 
   if (language === "am") {
 
-    const voices = window.speechSynthesis.getVoices();
+    const voices =
+
+      window.speechSynthesis.getVoices();
 
     const amharic = voices.find((voice) =>
 
-      voice.lang.toLowerCase().startsWith("am"),
+      voice.lang
+
+        .toLowerCase()
+
+        .startsWith("am"),
 
     );
 
@@ -2314,7 +1206,7 @@ function speakNumber(
 
 }
 
-function LobbyCardSelector({
+function CardSelector({
 
   cards,
 
@@ -2358,7 +1250,7 @@ function LobbyCardSelector({
 
       <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
 
-        {t.emptyCards}
+        {t.noNumbers}
 
       </div>
 
@@ -2368,11 +1260,13 @@ function LobbyCardSelector({
 
   return (
 
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-2">
 
       {available.map((card) => {
 
-        const selected = selectedCardId === card.id;
+        const selected =
+
+          selectedCardId === card.id;
 
         return (
 
@@ -2382,7 +1276,7 @@ function LobbyCardSelector({
 
             onClick={() => onSelect(card.id)}
 
-            className={`rounded-xl border p-3 text-left transition ${
+            className={`rounded-2xl border p-3 text-left transition-all ${
 
               selected
 
@@ -2400,19 +1294,17 @@ function LobbyCardSelector({
 
               {selected && (
 
-                <Check
+                <span className="flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
 
-                  size={15}
+                  <Check size={12} />
 
-                  className="text-primary"
-
-                />
+                </span>
 
               )}
 
             </div>
 
-            <div className="mt-2 text-xs font-bold">
+            <div className="mt-3 text-sm font-black">
 
               {card.label}
 
@@ -2420,7 +1312,7 @@ function LobbyCardSelector({
 
             <div className="mt-1 text-[10px] text-muted-foreground">
 
-              {selected ? t.selected : t.selectCard}
+              {selected ? t.selected : t.choose}
 
             </div>
 
@@ -2436,13 +1328,23 @@ function LobbyCardSelector({
 
 }
 
-function GamePage({ lang }: { lang: Language }) {
+function GameScreen({
+
+  lang,
+
+  gameId,
+
+}: {
+
+  lang: Language;
+
+  gameId: string;
+
+}) {
 
   const t = copy[lang];
 
-  const params = useParams<{ gameId: string }>();
-
-  const gameQuery = useGetBingoGame(params.gameId);
+  const gameQuery = useGetBingoGame(gameId);
 
   const cardsQuery = useListBingoCards();
 
@@ -2450,29 +1352,19 @@ function GamePage({ lang }: { lang: Language }) {
 
   const client = useQueryClient();
 
-  const [isHost, setIsHost] = useState(true);
+  const [voiceEnabled, setVoiceEnabled] =
 
-  const [copied, setCopied] = useState(false);
-
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
+    useState(true);
 
   const [selectedCardId, setSelectedCardId] =
 
     useState<string>();
 
-  const previousCalls = useRef<number[]>([]);
+  const [copied, setCopied] = useState(false);
 
-  /*
+  const previousCalls =
 
-   * Live refresh.
-
-   *
-
-   * The server is responsible for the actual 3.5-second
-
-   * number calling. The Mini App only watches the server.
-
-   */
+    useRef<number[]>([]);
 
   useEffect(() => {
 
@@ -2486,15 +1378,11 @@ function GamePage({ lang }: { lang: Language }) {
 
   }, [gameQuery.refetch]);
 
-  /*
-
-   * Speak only when a NEW number appears.
-
-   */
-
   useEffect(() => {
 
-    const called = gameQuery.data?.calledNumbers ?? [];
+    const called =
+
+      gameQuery.data?.calledNumbers ?? [];
 
     if (!called.length) {
 
@@ -2504,7 +1392,9 @@ function GamePage({ lang }: { lang: Language }) {
 
     }
 
-    const previous = previousCalls.current;
+    const previous =
+
+      previousCalls.current;
 
     if (
 
@@ -2516,7 +1406,9 @@ function GamePage({ lang }: { lang: Language }) {
 
     ) {
 
-      const newNumber = called[called.length - 1];
+      const newNumber =
+
+        called[called.length - 1];
 
       if (!previous.includes(newNumber)) {
 
@@ -2540,6 +1432,8 @@ function GamePage({ lang }: { lang: Language }) {
 
   const game = gameQuery.data;
 
+  const cards = cardsQuery.data ?? [];
+
   const countdown = useCountdown(
 
     game?.nextCallIn,
@@ -2550,8 +1444,6 @@ function GamePage({ lang }: { lang: Language }) {
 
   );
 
-  const cards = cardsQuery.data ?? [];
-
   const card = useMemo(() => {
 
     if (selectedCardId) {
@@ -2560,13 +1452,17 @@ function GamePage({ lang }: { lang: Language }) {
 
         cards.find(
 
-          (item) => item.id === selectedCardId,
+          (item) =>
+
+            item.id === selectedCardId,
 
         ) ??
 
         cards.find(
 
-          (item) => item.status === "in-play",
+          (item) =>
+
+            item.status === "in-play",
 
         ) ??
 
@@ -2590,7 +1486,11 @@ function GamePage({ lang }: { lang: Language }) {
 
   const completedLines = useMemo(() => {
 
-    if (!card?.numbers?.length) return [];
+    if (!card?.numbers?.length) {
+
+      return [];
+
+    }
 
     return getCompletedLines(
 
@@ -2600,15 +1500,31 @@ function GamePage({ lang }: { lang: Language }) {
 
     );
 
-  }, [card, game?.calledNumbers]);
+  }, [
 
-  const hasWon = completedLines.length >= 2;
+    card,
+
+    game?.calledNumbers,
+
+  ]);
+
+  const hasWon =
+
+    completedLines.length >= 2;
+
+  const selectedCards =
+
+    game?.players?.length ?? 0;
 
   const prizePool =
 
-    (game?.players?.length ?? 0) * PRIZE_PER_CARD;
+    selectedCards * PRIZE_PER_CARD;
 
-  const call = (action: BingoGameActionAction) => {
+  const call = (
+
+    action: BingoGameActionAction,
+
+  ) => {
 
     if (!game) return;
 
@@ -2628,25 +1544,37 @@ function GamePage({ lang }: { lang: Language }) {
 
           client.invalidateQueries({
 
-            queryKey: getGetBingoGameQueryKey(game.id),
+            queryKey:
+
+              getGetBingoGameQueryKey(
+
+                game.id,
+
+              ),
 
           });
 
           client.invalidateQueries({
 
-            queryKey: getListBingoGamesQueryKey(),
+            queryKey:
+
+              getListBingoGamesQueryKey(),
 
           });
 
           client.invalidateQueries({
 
-            queryKey: getGetBingoOverviewQueryKey(),
+            queryKey:
+
+              getGetBingoOverviewQueryKey(),
 
           });
 
           client.invalidateQueries({
 
-            queryKey: getGetBingoWalletQueryKey(),
+            queryKey:
+
+              getGetBingoWalletQueryKey(),
 
           });
 
@@ -2660,9 +1588,11 @@ function GamePage({ lang }: { lang: Language }) {
 
   const copyCode = async () => {
 
+    if (!game?.shareCode) return;
+
     await navigator.clipboard?.writeText(
 
-      game?.shareCode ?? "",
+      game.shareCode,
 
     );
 
@@ -2684,15 +1614,7 @@ function GamePage({ lang }: { lang: Language }) {
 
   ) {
 
-    return (
-
-      <div className="mx-auto max-w-6xl p-4 lg:p-8">
-
-        <LoadingState label={t.loading} />
-
-      </div>
-
-    );
+    return <LoadingState />;
 
   }
 
@@ -2706,11 +1628,15 @@ function GamePage({ lang }: { lang: Language }) {
 
     return (
 
-      <div className="mx-auto max-w-6xl p-4 lg:p-8">
+      <div className="mx-auto max-w-2xl p-4 pt-8">
 
         <ErrorState
 
-          onRetry={() => gameQuery.refetch()}
+          onRetry={() =>
+
+            gameQuery.refetch()
+
+          }
 
         />
 
@@ -2720,13 +1646,19 @@ function GamePage({ lang }: { lang: Language }) {
 
   }
 
-  const isWaiting = game.status === "waiting";
+  const waiting =
 
-  const isLive = game.status === "live";
+    game.status === "waiting";
 
-  const isCompleted = game.status === "completed";
+  const live =
 
-  const latestNumber =
+    game.status === "live";
+
+  const completed =
+
+    game.status === "completed";
+
+  const latest =
 
     game.calledNumbers?.length
 
@@ -2740,33 +1672,61 @@ function GamePage({ lang }: { lang: Language }) {
 
   return (
 
-    <div className="mx-auto max-w-6xl p-4 lg:p-8">
+    <div className="mx-auto max-w-2xl px-3 pb-28 pt-4">
 
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-4 flex items-center justify-between">
 
-        <Link
+        <div className="flex items-center gap-2">
 
-          href="/"
+          <span
 
-          className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground"
+            className={`size-2.5 rounded-full ${
 
-        >
+              live
 
-          ← {t.back}
+                ? "live-dot bg-primary"
 
-        </Link>
+                : waiting
 
-        <div className="flex flex-wrap items-center gap-2">
+                  ? "bg-accent-foreground"
+
+                  : "bg-muted-foreground"
+
+            }`}
+
+          />
+
+          <span className="text-[10px] font-black uppercase tracking-[.18em]">
+
+            {live
+
+              ? t.live
+
+              : waiting
+
+                ? t.lobby
+
+                : t.roundFinished}
+
+          </span>
+
+        </div>
+
+        <div className="flex items-center gap-2">
 
           <button
 
             onClick={() =>
 
-              setVoiceEnabled((value) => !value)
+              setVoiceEnabled(
+
+                (value) => !value,
+
+              )
 
             }
 
-            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold ${
+            className={`flex size-9 items-center justify-center rounded-xl border ${
 
               voiceEnabled
 
@@ -2778,9 +1738,15 @@ function GamePage({ lang }: { lang: Language }) {
 
           >
 
-            <Volume2 size={14} />
+            {voiceEnabled ? (
 
-            {voiceEnabled ? t.voiceOn : t.voiceOff}
+              <Volume2 size={16} />
+
+            ) : (
+
+              <VolumeX size={16} />
+
+            )}
 
           </button>
 
@@ -2788,49 +1754,19 @@ function GamePage({ lang }: { lang: Language }) {
 
             onClick={copyCode}
 
-            className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-bold hover:bg-muted"
+            className="flex size-9 items-center justify-center rounded-xl border border-border bg-card"
 
           >
 
             {copied ? (
 
-              <Check size={14} />
+              <Check size={16} />
 
             ) : (
 
-              <Copy size={14} />
+              <Copy size={16} />
 
             )}
-
-            {copied
-
-              ? t.copied
-
-              : `${t.copyCode} · ${game.shareCode}`}
-
-          </button>
-
-          <button
-
-            onClick={() =>
-
-              setIsHost((value) => !value)
-
-            }
-
-            className={`rounded-lg px-3 py-2 text-xs font-bold ${
-
-              isHost
-
-                ? "bg-foreground text-background"
-
-                : "border border-border bg-card"
-
-            }`}
-
-          >
-
-            {isHost ? t.host : "Player view"}
 
           </button>
 
@@ -2838,195 +1774,139 @@ function GamePage({ lang }: { lang: Language }) {
 
       </div>
 
-      <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+      <section className="mb-4 rounded-3xl bg-foreground p-5 text-background shadow-lg">
 
-        <div>
+        <div className="flex items-start justify-between gap-3">
 
-          <div className="flex items-center gap-2">
+          <div className="min-w-0">
 
-            <span
+            <div className="text-[10px] font-bold uppercase tracking-[.18em] text-background/45">
 
-              className={`size-2 rounded-full ${
+              {t.game}
 
-                isLive
+            </div>
 
-                  ? "live-dot bg-primary"
+            <h1 className="mt-1 truncate text-2xl font-black">
 
-                  : isWaiting
+              {game.name}
 
-                    ? "bg-accent-foreground"
+            </h1>
 
-                    : "bg-muted-foreground"
+            <div className="mt-2 flex flex-wrap gap-2">
 
-              }`}
+              <span className="rounded-full bg-background/10 px-2.5 py-1 text-[10px] font-bold">
 
-            />
+                {game.shareCode}
 
-            <span className="mono text-[10px] uppercase tracking-[.2em] text-primary">
+              </span>
 
-              {isLive
+              <span className="rounded-full bg-background/10 px-2.5 py-1 text-[10px] font-bold">
 
-                ? t.live
+                {game.players.length}{" "}
 
-                : isWaiting
+                {t.players}
 
-                  ? t.waiting
+              </span>
 
-                  : t.completed}
+            </div>
+
+          </div>
+
+          <div className="flex size-16 shrink-0 flex-col items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+
+            <div className="text-[8px] font-black uppercase">
+
+              {t.latest}
+
+            </div>
+
+            <div className="text-2xl font-black">
+
+              {latest ?? "—"}
+
+            </div>
+
+          </div>
+
+        </div>
+
+        {live && (
+
+          <div className="mt-5 flex items-center justify-between border-t border-background/10 pt-4">
+
+            <span className="text-xs text-background/50">
+
+              {game.calledNumbers.length}{" "}
+
+              {t.numbersCalled}
+
+            </span>
+
+            <span className="flex items-center gap-1.5 text-xs font-bold">
+
+              <Clock3 size={14} />
+
+              {countdown}s
 
             </span>
 
           </div>
 
-          <h1 className="mt-2 text-3xl font-bold tracking-tight">
+        )}
 
-            {game.name}
+      </section>
 
-          </h1>
+      {waiting && (
 
-          <p className="mt-1 text-sm text-muted-foreground">
+        <section className="mb-4 overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
 
-            {game.players.length} {t.playersJoined} ·{" "}
+          <div className="bg-primary p-5 text-primary-foreground">
 
-            {game.shareCode}
-
-          </p>
-
-        </div>
-
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-
-          <div className="flex items-center gap-4">
-
-            <div>
-
-              <div className="mono text-[9px] uppercase tracking-[.16em] text-muted-foreground">
-
-                {isWaiting ? t.gameStarting : t.lastCall}
-
-              </div>
-
-              <div className="mt-1 text-3xl font-black text-primary">
-
-                {latestNumber ?? "—"}
-
-              </div>
-
-            </div>
-
-            <div className="h-10 w-px bg-border" />
-
-            <div className="text-right">
-
-              <div className="mono text-[9px] uppercase tracking-[.16em] text-muted-foreground">
-
-                {isWaiting
-
-                  ? t.seconds
-
-                  : t.next}
-
-              </div>
-
-              <div className="mt-1 text-xl font-bold">
-
-                {Math.max(
-
-                  0,
-
-                  Math.ceil(countdown),
-
-                )}
-
-                s
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
-
-      </div>
-
-      {isWaiting && (
-
-        <section className="mb-6 overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
-
-          <div className="bg-foreground p-5 text-background md:p-6">
-
-            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+            <div className="flex items-center justify-between">
 
               <div>
 
-                <div className="mono text-[10px] uppercase tracking-[.2em] text-background/50">
+                <div className="text-[10px] font-bold uppercase tracking-[.18em] opacity-70">
 
                   {t.lobby}
 
                 </div>
 
-                <h2 className="mt-2 text-2xl font-bold">
+                <div className="mt-1 text-xl font-black">
 
-                  {t.waitingForPlayers}
-
-                </h2>
-
-                <p className="mt-1 text-sm text-background/60">
-
-                  {t.gameStarting}{" "}
-
-                  <strong className="text-background">
-
-                    {Math.max(
-
-                      0,
-
-                      Math.ceil(countdown),
-
-                    )}
-
-                  </strong>{" "}
-
-                  {t.seconds}
-
-                </p>
-
-              </div>
-
-              <div className="flex items-center gap-3">
-
-                <div className="flex size-16 items-center justify-center rounded-2xl bg-primary text-2xl font-black text-primary-foreground">
-
-                  {Math.max(
-
-                    0,
-
-                    Math.ceil(countdown),
-
-                  )}
+                  {t.waiting}
 
                 </div>
 
-                <Clock3 size={24} />
+              </div>
+
+              <div className="flex size-16 items-center justify-center rounded-2xl bg-primary-foreground/15 text-3xl font-black">
+
+                {countdown}
 
               </div>
 
             </div>
 
+            <div className="mt-2 text-xs opacity-70">
+
+              {t.startsIn} {countdown}s
+
+            </div>
+
           </div>
 
-          <div className="grid grid-cols-3 gap-px bg-border">
+          <div className="grid grid-cols-3 divide-x divide-border">
 
-            <div className="bg-card p-4">
+            <div className="p-4 text-center">
 
-              <div className="text-xs text-muted-foreground">
+              <div className="text-[10px] text-muted-foreground">
 
                 {t.players}
 
               </div>
 
-              <div className="mt-1 text-2xl font-black">
+              <div className="mt-1 text-xl font-black">
 
                 {game.players.length}
 
@@ -3034,21 +1914,21 @@ function GamePage({ lang }: { lang: Language }) {
 
             </div>
 
-            <div className="bg-card p-4">
+            <div className="p-4 text-center">
 
-              <div className="text-xs text-muted-foreground">
+              <div className="text-[10px] text-muted-foreground">
 
                 {t.cardPrice}
 
               </div>
 
-              <div className="mt-1 text-2xl font-black">
+              <div className="mt-1 text-xl font-black">
 
                 {CARD_PRICE}
 
               </div>
 
-              <div className="text-[10px] text-muted-foreground">
+              <div className="text-[9px] text-muted-foreground">
 
                 ETB
 
@@ -3056,21 +1936,21 @@ function GamePage({ lang }: { lang: Language }) {
 
             </div>
 
-            <div className="bg-card p-4">
+            <div className="p-4 text-center">
 
-              <div className="text-xs text-muted-foreground">
+              <div className="text-[10px] text-muted-foreground">
 
                 {t.prizePool}
 
               </div>
 
-              <div className="mt-1 text-2xl font-black text-primary">
+              <div className="mt-1 text-xl font-black text-primary">
 
                 {prizePool}
 
               </div>
 
-              <div className="text-[10px] text-muted-foreground">
+              <div className="text-[9px] text-muted-foreground">
 
                 ETB
 
@@ -3084,41 +1964,59 @@ function GamePage({ lang }: { lang: Language }) {
 
       )}
 
-      {isWaiting && (
+      {waiting && (
 
-        <section className="mb-6">
+        <section className="mb-4 rounded-3xl border border-border bg-card p-4 shadow-sm">
 
-          <SectionTitle
+          <div className="mb-4 flex items-center justify-between">
 
-            eyebrow={t.cardsSelected}
+            <div>
 
-            title={t.selectCard}
+              <div className="text-[10px] font-bold uppercase tracking-[.18em] text-primary">
 
-            detail={`${cards.length || 400} cards available`}
+                {t.cards}
 
-          />
+              </div>
 
-          <LobbyCardSelector
+              <h2 className="mt-1 text-xl font-black">
+
+                {t.chooseCard}
+
+              </h2>
+
+            </div>
+
+            <Ticket
+
+              size={20}
+
+              className="text-primary"
+
+            />
+
+          </div>
+
+          <CardSelector
 
             cards={cards}
 
-            selectedCardId={selectedCardId}
+            selectedCardId={
 
-            onSelect={(id) => setSelectedCardId(id)}
+              selectedCardId
+
+            }
+
+            onSelect={setSelectedCardId}
 
             lang={lang}
 
           />
 
-          <div className="mt-3 rounded-xl border border-dashed border-border bg-muted/50 p-3 text-xs text-muted-foreground">
+          <div className="mt-3 rounded-xl bg-muted p-3 text-center text-[11px] text-muted-foreground">
 
-            {t.cardPrice}:{" "}
+            {CARD_PRICE} ETB ·{" "}
 
-            <strong>{CARD_PRICE} ETB</strong>
-
-            {" · "}
-
-            {t.prizeRule}
+            {t.gameRules}
 
           </div>
 
@@ -3126,77 +2024,77 @@ function GamePage({ lang }: { lang: Language }) {
 
       )}
 
-      {isLive && (
+      {live && (
 
-        <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="mb-4 grid grid-cols-3 gap-2">
 
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="rounded-2xl border border-border bg-card p-3 text-center shadow-sm">
 
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Users
 
-              <Users size={14} />
+              size={16}
+
+              className="mx-auto text-primary"
+
+            />
+
+            <div className="mt-1 text-lg font-black">
+
+              {game.players.length}
+
+            </div>
+
+            <div className="text-[9px] text-muted-foreground">
 
               {t.players}
 
             </div>
 
-            <div className="mt-2 text-2xl font-black">
-
-              {game.players.length}
-
-            </div>
-
           </div>
 
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="rounded-2xl border border-border bg-card p-3 text-center shadow-sm">
 
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <CircleDollarSign
 
-              <Ticket size={14} />
+              size={16}
 
-              {t.selectedCards}
+              className="mx-auto text-primary"
 
-            </div>
+            />
 
-            <div className="mt-2 text-2xl font-black">
-
-              {game.players.length}
-
-            </div>
-
-          </div>
-
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-
-              <CircleDollarSign size={14} />
-
-              {t.prizePool}
-
-            </div>
-
-            <div className="mt-2 text-2xl font-black text-primary">
+            <div className="mt-1 text-lg font-black">
 
               {prizePool}
 
             </div>
 
-          </div>
+            <div className="text-[9px] text-muted-foreground">
 
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-
-              <Zap size={14} />
-
-              {t.called}
+              ETB
 
             </div>
 
-            <div className="mt-2 text-2xl font-black">
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card p-3 text-center shadow-sm">
+
+            <Zap
+
+              size={16}
+
+              className="mx-auto text-primary"
+
+            />
+
+            <div className="mt-1 text-lg font-black">
 
               {game.calledNumbers.length}
+
+            </div>
+
+            <div className="text-[9px] text-muted-foreground">
+
+              {t.called}
 
             </div>
 
@@ -3206,29 +2104,37 @@ function GamePage({ lang }: { lang: Language }) {
 
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <section className="mb-4">
 
-        <section>
+        <div className="mb-3 flex items-center justify-between px-1">
 
-          <div className="mb-3 flex items-center justify-between">
+          <div>
 
-            <SectionTitle
+            <div className="text-[10px] font-bold uppercase tracking-[.18em] text-primary">
 
-              eyebrow={t.card}
+              {t.card}
 
-              title={card?.label ?? "Player card"}
+            </div>
 
-            />
+            <h2 className="text-xl font-black">
+
+              {card?.label ?? "Bingo Card"}
+
+            </h2>
+
+          </div>
+
+          {card && (
 
             <Badge
 
               tone={
 
-                card?.category === "vvip"
+                card.category === "vvip"
 
                   ? "gold"
 
-                  : card?.category === "vip"
+                  : card.category === "vip"
 
                     ? "mint"
 
@@ -3238,85 +2144,107 @@ function GamePage({ lang }: { lang: Language }) {
 
             >
 
-              {card?.category ?? "normal"}
+              {card.category}
 
             </Badge>
 
+          )}
+
+        </div>
+
+        <BingoCardView
+
+          card={card}
+
+          called={
+
+            game.calledNumbers
+
+          }
+
+          lang={lang}
+
+          large
+
+        />
+
+      </section>
+
+      <CalledNumbers
+
+        numbers={
+
+          game.calledNumbers
+
+        }
+
+        lang={lang}
+
+      />
+
+      {completedLines.length > 0 && (
+
+        <section
+
+          className={`mt-4 rounded-3xl border p-5 shadow-sm ${
+
+            hasWon
+
+              ? "border-primary bg-primary/10"
+
+              : "border-border bg-card"
+
+          }`}
+
+        >
+
+          <div className="flex items-center gap-3">
+
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+
+              <Trophy size={23} />
+
+            </div>
+
+            <div>
+
+              <div className="text-[10px] font-black uppercase tracking-[.18em] text-primary">
+
+                {hasWon
+
+                  ? t.winner
+
+                  : "BINGO"}
+
+              </div>
+
+              <div className="mt-1 text-lg font-black">
+
+                {hasWon
+
+                  ? t.congratulations
+
+                  : `${completedLines.length} ${t.twoLines}`}
+
+              </div>
+
+            </div>
+
           </div>
 
-          <BingoGrid
+          {hasWon && (
 
-            card={card}
+            <div className="mt-4 rounded-2xl bg-card p-4">
 
-            called={game.calledNumbers}
+              <div className="text-xs text-muted-foreground">
 
-            lang={lang}
+                {t.prizePool}
 
-          />
+              </div>
 
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-muted px-3 py-3 text-xs text-muted-foreground">
+              <div className="mt-1 text-2xl font-black text-primary">
 
-            <span>
-
-              {game.calledNumbers.length}{" "}
-
-              {t.calledCount}
-
-            </span>
-
-            <span className="mono">
-
-              {game.shareCode}
-
-            </span>
-
-          </div>
-
-          {completedLines.length > 0 && (
-
-            <div
-
-              className={`mt-4 rounded-2xl border p-5 ${
-
-                hasWon
-
-                  ? "border-primary bg-primary/10"
-
-                  : "border-border bg-card"
-
-              }`}
-
-            >
-
-              <div className="flex items-center gap-3">
-
-                <div className="flex size-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
-
-                  <Trophy size={20} />
-
-                </div>
-
-                <div>
-
-                  <div className="text-sm font-black uppercase tracking-wider text-primary">
-
-                    {hasWon
-
-                      ? t.winner
-
-                      : t.bingo}
-
-                  </div>
-
-                  <div className="text-sm font-semibold">
-
-                    {completedLines.length}{" "}
-
-                    {t.twoLines}
-
-                  </div>
-
-                </div>
+                {money(prizePool)}
 
               </div>
 
@@ -3326,369 +2254,103 @@ function GamePage({ lang }: { lang: Language }) {
 
         </section>
 
-        <aside className="space-y-5">
+      )}
 
-          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      {completed && (
 
-            <div className="mb-4 flex items-center justify-between">
+        <section className="mt-4 rounded-3xl border border-primary/20 bg-primary/10 p-5">
 
-              <div>
+          <div className="flex items-center gap-3">
 
-                <div className="mono text-[9px] uppercase tracking-[.18em] text-primary">
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
 
-                  {t.called}
+              <Trophy size={23} />
+
+            </div>
+
+            <div>
+
+              <div className="text-xl font-black">
+
+                {t.roundFinished}
+
+              </div>
+
+              <div className="text-sm text-muted-foreground">
+
+                {game.winnerCount}{" "}
+
+                {t.winners}
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </section>
+
+      )}
+
+      {game.players.length > 0 && (
+
+        <section className="mt-4 rounded-3xl bg-foreground p-5 text-background">
+
+          <div className="mb-4 flex items-center gap-2">
+
+            <Users
+
+              size={17}
+
+              className="text-primary"
+
+            />
+
+            <span className="text-[10px] font-bold uppercase tracking-[.18em] text-background/55">
+
+              {t.players}
+
+            </span>
+
+          </div>
+
+          <div className="space-y-2">
+
+            {game.players
+
+              .slice(0, 10)
+
+              .map((player) => (
+
+                <div
+
+                  key={player.id}
+
+                  className="flex items-center gap-3"
+
+                >
+
+                  <div className="flex size-8 items-center justify-center rounded-full bg-background/10 text-[10px] font-black">
+
+                    {player.initials}
+
+                  </div>
+
+                  <div className="min-w-0 flex-1 truncate text-sm font-semibold">
+
+                    {player.name}
+
+                  </div>
+
+                  <div className="text-[9px] text-background/40">
+
+                    {player.cardLabel}
+
+                  </div>
 
                 </div>
 
-                <h3 className="mt-1 text-lg font-bold">
-
-                  {latestNumber
-
-                    ? `${bingoColumn(latestNumber)}${latestNumber}`
-
-                    : t.noNumbers}
-
-                </h3>
-
-              </div>
-
-              {isLive && (
-
-                <div className="flex size-12 items-center justify-center rounded-xl bg-primary text-lg font-black text-primary-foreground">
-
-                  {countdown}
-
-                </div>
-
-              )}
-
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-
-              {game.calledNumbers.length ? (
-
-                game.calledNumbers
-
-                  .slice()
-
-                  .reverse()
-
-                  .map((number, index) => (
-
-                    <span
-
-                      key={`${number}-${index}`}
-
-                      className={`flex size-9 items-center justify-center rounded-lg text-sm font-bold ${
-
-                        index === 0
-
-                          ? "bg-primary text-primary-foreground"
-
-                          : "bg-muted"
-
-                      }`}
-
-                    >
-
-                      {bingoColumn(number)}
-
-                      {number}
-
-                    </span>
-
-                  ))
-
-              ) : (
-
-                <span className="text-sm text-muted-foreground">
-
-                  {t.noNumbers}
-
-                </span>
-
-              )}
-
-            </div>
-
-          </section>
-
-          <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-
-            <div className="flex items-center gap-3">
-
-              <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-
-                <CircleDollarSign size={19} />
-
-              </div>
-
-              <div>
-
-                <div className="text-xs text-muted-foreground">
-
-                  {t.prizePool}
-
-                </div>
-
-                <div className="text-xl font-black">
-
-                  {money(prizePool)}
-
-                </div>
-
-              </div>
-
-            </div>
-
-            <div className="mt-4 border-t border-border pt-4 text-xs text-muted-foreground">
-
-              {t.prizeRule}
-
-            </div>
-
-          </section>
-
-          {isHost && (
-
-            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-
-              <div className="mb-4 flex items-center justify-between">
-
-                <SectionTitle
-
-                  eyebrow={t.host}
-
-                  title={t.host}
-
-                />
-
-                <Badge tone="coral">{t.demo}</Badge>
-
-              </div>
-
-              <div className="grid gap-2">
-
-                {game.status === "waiting" && (
-
-                  <ActionButton
-
-                    icon={Play}
-
-                    label={t.start}
-
-                    onClick={() => call("start")}
-
-                    pending={advance.isPending}
-
-                    primary
-
-                  />
-
-                )}
-
-                {game.status === "live" && (
-
-                  <>
-
-                    <ActionButton
-
-                      icon={Zap}
-
-                      label={t.call}
-
-                      onClick={() => call("call")}
-
-                      pending={advance.isPending}
-
-                      primary
-
-                    />
-
-                    <div className="grid grid-cols-2 gap-2">
-
-                      <ActionButton
-
-                        icon={Pause}
-
-                        label={t.pause}
-
-                        onClick={() => call("pause")}
-
-                        pending={advance.isPending}
-
-                      />
-
-                      <ActionButton
-
-                        icon={Check}
-
-                        label={t.claim}
-
-                        onClick={() => call("claim")}
-
-                        pending={advance.isPending}
-
-                      />
-
-                    </div>
-
-                  </>
-
-                )}
-
-                {game.status !== "completed" && (
-
-                  <ActionButton
-
-                    icon={RefreshCw}
-
-                    label={t.reset}
-
-                    onClick={() => call("reset")}
-
-                    pending={advance.isPending}
-
-                  />
-
-                )}
-
-              </div>
-
-              {advance.isError && (
-
-                <p className="mt-3 text-xs text-destructive">
-
-                  Action could not be completed.
-
-                </p>
-
-              )}
-
-            </section>
-
-          )}
-
-          <section className="rounded-2xl bg-foreground p-5 text-background">
-
-            <div className="flex items-center gap-2 text-primary">
-
-              <Users size={16} />
-
-              <span className="mono text-[10px] uppercase tracking-[.18em]">
-
-                {t.players}
-
-              </span>
-
-            </div>
-
-            <div className="mt-3 space-y-2">
-
-              {game.players.length ? (
-
-                game.players
-
-                  .slice(0, 10)
-
-                  .map((player) => (
-
-                    <div
-
-                      key={player.id}
-
-                      className="flex items-center gap-2"
-
-                    >
-
-                      <span className="flex size-7 items-center justify-center rounded-full bg-background/10 text-[10px] font-bold">
-
-                        {player.initials}
-
-                      </span>
-
-                      <span className="flex-1 truncate text-sm">
-
-                        {player.name}
-
-                      </span>
-
-                      <span className="text-[10px] text-background/45">
-
-                        {player.cardLabel}
-
-                      </span>
-
-                    </div>
-
-                  ))
-
-              ) : (
-
-                <div className="text-xs text-background/50">
-
-                  {t.waitingForPlayers}
-
-                </div>
-
-              )}
-
-            </div>
-
-          </section>
-
-        </aside>
-
-      </div>
-
-      {isCompleted && (
-
-        <section className="mt-6 rounded-3xl border border-primary/30 bg-primary/10 p-6">
-
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-
-            <div className="flex items-center gap-3">
-
-              <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-
-                <Trophy size={24} />
-
-              </div>
-
-              <div>
-
-                <div className="text-xl font-black">
-
-                  {t.roundFinished}
-
-                </div>
-
-                <div className="text-sm text-muted-foreground">
-
-                  {game.winnerCount} {t.winners}
-
-                </div>
-
-              </div>
-
-            </div>
-
-            <div className="text-left md:text-right">
-
-              <div className="text-xs text-muted-foreground">
-
-                {t.prizePool}
-
-              </div>
-
-              <div className="text-2xl font-black text-primary">
-
-                {money(prizePool)}
-
-              </div>
-
-            </div>
+              ))}
 
           </div>
 
@@ -3702,93 +2364,73 @@ function GamePage({ lang }: { lang: Language }) {
 
 }
 
-function ActionButton({
+function GameLobby() {
 
-  icon: Icon,
+  const games = useListBingoGames();
 
-  label,
+  const [, setLocation] = useLocation();
 
-  onClick,
+  useEffect(() => {
 
-  pending,
+    const id = window.setInterval(() => {
 
-  primary = false,
+      void games.refetch();
 
-}: {
+    }, 2000);
 
-  icon: typeof Play;
+    return () => window.clearInterval(id);
 
-  label: string;
+  }, [games.refetch]);
 
-  onClick: () => void;
+  const liveGame = useMemo(() => {
 
-  pending: boolean;
-
-  primary?: boolean;
-
-}) {
-
-  return (
-
-    <button
-
-      disabled={pending}
-
-      onClick={onClick}
-
-      className={`flex h-11 items-center justify-center gap-2 rounded-xl text-sm font-bold transition disabled:opacity-50 ${
-
-        primary
-
-          ? "bg-primary text-primary-foreground hover:brightness-95"
-
-          : "border border-border bg-background hover:bg-muted"
-
-      }`}
-
-    >
-
-      <Icon size={16} />
-
-      {pending ? "Working…" : label}
-
-    </button>
-
-  );
-
-}
-
-function WalletPage({ lang }: { lang: Language }) {
-
-  const t = copy[lang];
-
-  const wallet = useGetBingoWallet();
-
-  const action = useSubmitBingoWalletAction();
-
-  const client = useQueryClient();
-
-  const [type, setType] =
-
-    useState<"deposit" | "withdrawal">("deposit");
-
-  const [method, setMethod] =
-
-    useState<"telebirr" | "ebirr" | "mpesa">(
-
-      "telebirr",
-
-    );
-
-  const [amount, setAmount] = useState("25");
-
-  if (wallet.isLoading) {
+    const list = games.data ?? [];
 
     return (
 
-      <div className="mx-auto max-w-5xl p-4 lg:p-8">
+      list.find(
 
-        <LoadingState label={t.loading} />
+        (game) =>
+
+          game.status === "live",
+
+      ) ??
+
+      list.find(
+
+        (game) =>
+
+          game.status === "waiting",
+
+      ) ??
+
+      list[0]
+
+    );
+
+  }, [games.data]);
+
+  if (games.isLoading) {
+
+    return <LoadingState />;
+
+  }
+
+  if (games.isError) {
+
+    return (
+
+      <div className="mx-auto max-w-2xl p-4 pt-8">
+
+        <ErrorState
+
+          onRetry={() =>
+
+            games.refetch()
+
+          }
+
+        />
 
       </div>
 
@@ -3796,13 +2438,411 @@ function WalletPage({ lang }: { lang: Language }) {
 
   }
 
-  if (wallet.isError || !wallet.data) {
+  if (liveGame) {
+
+    setLocation(`/play/${liveGame.id}`);
+
+    return <LoadingState />;
+
+  }
+
+  return (
+
+    <div className="mx-auto max-w-2xl px-4 pb-28 pt-8">
+
+      <div className="rounded-[32px] bg-foreground p-7 text-background shadow-xl">
+
+        <div className="flex size-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+
+          <Ticket size={30} />
+
+        </div>
+
+        <h1 className="mt-6 text-3xl font-black">
+
+          Fast Bingo
+
+        </h1>
+
+        <p className="mt-2 text-sm text-background/55">
+
+          75-ball Bingo
+
+        </p>
+
+        <div className="mt-8 grid grid-cols-3 gap-2">
+
+          {["B", "I", "N"].map(
+
+            (letter) => (
+
+              <div
+
+                key={letter}
+
+                className="rounded-2xl bg-background/10 p-4 text-center text-2xl font-black"
+
+              >
+
+                {letter}
+
+              </div>
+
+            ),
+
+          )}
+
+        </div>
+
+        <div className="mt-5 rounded-2xl bg-background/10 p-4 text-sm">
+
+          Waiting for the next game…
+
+        </div>
+
+      </div>
+
+    </div>
+
+  );
+
+}
+
+function HomePage({ lang }: { lang: Language }) {
+
+  const t = copy[lang];
+
+  const overview =
+
+    useGetBingoOverview();
+
+  const wallet =
+
+    useGetBingoWallet();
+
+  if (
+
+    overview.isLoading ||
+
+    wallet.isLoading
+
+  ) {
+
+    return <LoadingState />;
+
+  }
+
+  if (
+
+    overview.isError ||
+
+    wallet.isError
+
+  ) {
 
     return (
 
-      <div className="mx-auto max-w-5xl p-4 lg:p-8">
+      <div className="mx-auto max-w-2xl p-4 pt-8">
 
-        <ErrorState onRetry={() => wallet.refetch()} />
+        <ErrorState
+
+          onRetry={() => {
+
+            overview.refetch();
+
+            wallet.refetch();
+
+          }}
+
+        />
+
+      </div>
+
+    );
+
+  }
+
+  const balance =
+
+    wallet.data?.balance ??
+
+    overview.data?.demoBalance ??
+
+    0;
+
+  return (
+
+    <div className="mx-auto max-w-2xl px-4 pb-28 pt-5">
+
+      <section className="overflow-hidden rounded-[32px] bg-primary p-6 text-primary-foreground shadow-xl">
+
+        <div className="flex items-start justify-between">
+
+          <div>
+
+            <div className="text-[10px] font-black uppercase tracking-[.2em] opacity-70">
+
+              {t.live}
+
+            </div>
+
+            <h1 className="mt-2 text-3xl font-black">
+
+              Fast Bingo
+
+            </h1>
+
+            <p className="mt-1 text-sm opacity-70">
+
+              {t.play}
+
+            </p>
+
+          </div>
+
+          <div className="flex size-12 items-center justify-center rounded-2xl bg-primary-foreground/15">
+
+            <Zap size={22} fill="currentColor" />
+
+          </div>
+
+        </div>
+
+        <div className="mt-7 grid grid-cols-5 gap-2">
+
+          {["B", "I", "N", "G", "O"].map(
+
+            (letter) => (
+
+              <div
+
+                key={letter}
+
+                className="flex aspect-square items-center justify-center rounded-2xl bg-primary-foreground/15 text-xl font-black"
+
+              >
+
+                {letter}
+
+              </div>
+
+            ),
+
+          )}
+
+        </div>
+
+      </section>
+
+      <div className="mt-4 grid grid-cols-2 gap-3">
+
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+
+          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+
+            <WalletCards size={14} />
+
+            {t.balance}
+
+          </div>
+
+          <div className="mt-2 text-xl font-black">
+
+            {money(
+
+              balance,
+
+              wallet.data?.currency,
+
+            )}
+
+          </div>
+
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+
+          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+
+            <Users size={14} />
+
+            {t.players}
+
+          </div>
+
+          <div className="mt-2 text-xl font-black">
+
+            {overview.data
+
+              ?.playersOnline ?? 0}
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <section className="mt-4 rounded-3xl border border-border bg-card p-5 shadow-sm">
+
+        <div className="flex items-center justify-between">
+
+          <div>
+
+            <div className="text-[10px] font-bold uppercase tracking-[.18em] text-primary">
+
+              {t.game}
+
+            </div>
+
+            <h2 className="mt-1 text-xl font-black">
+
+              {t.play}
+
+            </h2>
+
+          </div>
+
+          <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+
+            <Ticket size={21} />
+
+          </div>
+
+        </div>
+
+        <p className="mt-2 text-sm text-muted-foreground">
+
+          {t.gameRules}
+
+        </p>
+
+        <Link
+
+          href="/play"
+
+          className="mt-5 flex h-12 items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-black text-primary-foreground shadow-sm"
+
+        >
+
+          <Play size={17} fill="currentColor" />
+
+          {t.play}
+
+        </Link>
+
+      </section>
+
+      <section className="mt-4 grid grid-cols-2 gap-3">
+
+        <div className="rounded-2xl border border-border bg-card p-4">
+
+          <div className="text-xs text-muted-foreground">
+
+            {t.cardPrice}
+
+          </div>
+
+          <div className="mt-1 text-xl font-black">
+
+            {CARD_PRICE} ETB
+
+          </div>
+
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-4">
+
+          <div className="text-xs text-muted-foreground">
+
+            {t.prizePool}
+
+          </div>
+
+          <div className="mt-1 text-xl font-black text-primary">
+
+            {PRIZE_PER_CARD} ETB
+
+          </div>
+
+        </div>
+
+      </section>
+
+    </div>
+
+  );
+
+}
+
+function WalletPage({
+
+  lang,
+
+}: {
+
+  lang: Language;
+
+}) {
+
+  const t = copy[lang];
+
+  const wallet =
+
+    useGetBingoWallet();
+
+  const action =
+
+    useSubmitBingoWalletAction();
+
+  const client = useQueryClient();
+
+  const [type, setType] =
+
+    useState<"deposit" | "withdrawal">(
+
+      "deposit",
+
+    );
+
+  const [method, setMethod] =
+
+    useState<
+
+      "telebirr" | "ebirr" | "mpesa"
+
+    >("telebirr");
+
+  const [amount, setAmount] =
+
+    useState("25");
+
+  if (wallet.isLoading) {
+
+    return <LoadingState />;
+
+  }
+
+  if (
+
+    wallet.isError ||
+
+    !wallet.data
+
+  ) {
+
+    return (
+
+      <div className="mx-auto max-w-2xl p-4 pt-8">
+
+        <ErrorState
+
+          onRetry={() =>
+
+            wallet.refetch()
+
+          }
+
+        />
 
       </div>
 
@@ -3814,9 +2854,13 @@ function WalletPage({ lang }: { lang: Language }) {
 
   const submit = () => {
 
-    const parsed = Number(amount);
+    const value = Number(amount);
 
-    if (!parsed || parsed < 1) return;
+    if (!value || value < 1) {
+
+      return;
+
+    }
 
     action.mutate(
 
@@ -3828,7 +2872,7 @@ function WalletPage({ lang }: { lang: Language }) {
 
           method,
 
-          amount: parsed,
+          amount: value,
 
         },
 
@@ -3840,7 +2884,9 @@ function WalletPage({ lang }: { lang: Language }) {
 
           client.invalidateQueries({
 
-            queryKey: getGetBingoWalletQueryKey(),
+            queryKey:
+
+              getGetBingoWalletQueryKey(),
 
           });
 
@@ -3854,405 +2900,383 @@ function WalletPage({ lang }: { lang: Language }) {
 
   return (
 
-    <div className="mx-auto max-w-5xl p-4 lg:p-8">
+    <div className="mx-auto max-w-2xl px-4 pb-28 pt-5">
 
-      <div className="mb-8">
+      <section className="rounded-[32px] bg-foreground p-6 text-background shadow-xl">
 
-        <div className="mono mb-2 text-[10px] uppercase tracking-[.2em] text-primary">
+        <div className="flex items-center justify-between">
 
-          {t.demo}
+          <div>
+
+            <div className="text-[10px] font-bold uppercase tracking-[.18em] text-background/45">
+
+              {t.wallet}
+
+            </div>
+
+            <div className="mt-2 text-3xl font-black">
+
+              {money(
+
+                data.balance,
+
+                data.currency,
+
+              )}
+
+            </div>
+
+          </div>
+
+          <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+
+            <WalletCards size={22} />
+
+          </div>
 
         </div>
 
-        <h1 className="text-3xl font-bold tracking-tight">
+        <div className="mt-6 grid grid-cols-2 gap-2">
 
-          {t.wallet}
+          <button
 
-        </h1>
+            onClick={() =>
 
-        <p className="mt-2 text-sm text-muted-foreground">
-
-          {t.demoNote}
-
-        </p>
-
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
-
-        <section className="rounded-3xl bg-foreground p-6 text-background shadow-md">
-
-          <div className="flex items-center justify-between">
-
-            <div className="flex items-center gap-2 text-background/60">
-
-              <WalletCards size={16} />
-
-              <span className="mono text-[10px] uppercase tracking-[.2em]">
-
-                {t.walletBalance}
-
-              </span>
-
-            </div>
-
-            <Badge tone="coral">
-
-              {data.currency}
-
-            </Badge>
-
-          </div>
-
-          <div className="mt-12 text-4xl font-bold tracking-tight">
-
-            {money(data.balance, data.currency)}
-
-          </div>
-
-          <div className="mt-3 flex items-center gap-2 text-xs text-background/50">
-
-            <span className="size-2 rounded-full bg-secondary-foreground" />
-
-            Sandbox balance
-
-          </div>
-
-          <div className="mt-10 grid grid-cols-2 gap-2">
-
-            <button
-
-              onClick={() => setType("deposit")}
-
-              className={`rounded-xl p-3 text-left text-xs font-bold ${
-
-                type === "deposit"
-
-                  ? "bg-primary text-primary-foreground"
-
-                  : "bg-background/10"
-
-              }`}
-
-            >
-
-              <ArrowDownLeft
-
-                size={15}
-
-                className="mb-2"
-
-              />
-
-              {t.deposit}
-
-            </button>
-
-            <button
-
-              onClick={() =>
-
-                setType("withdrawal")
-
-              }
-
-              className={`rounded-xl p-3 text-left text-xs font-bold ${
-
-                type === "withdrawal"
-
-                  ? "bg-primary text-primary-foreground"
-
-                  : "bg-background/10"
-
-              }`}
-
-            >
-
-              <ArrowUpRight
-
-                size={15}
-
-                className="mb-2"
-
-              />
-
-              {t.withdraw}
-
-            </button>
-
-          </div>
-
-        </section>
-
-        <section className="rounded-3xl border border-border bg-card p-6 shadow-sm">
-
-          <SectionTitle
-
-            eyebrow={
-
-              type === "deposit"
-
-                ? t.deposit
-
-                : t.withdraw
+              setType("deposit")
 
             }
 
-            title={t.submit}
+            className={`rounded-2xl p-4 text-left text-xs font-black ${
 
-          />
+              type === "deposit"
 
-          <div className="space-y-5">
+                ? "bg-primary text-primary-foreground"
 
-            <label className="block">
+                : "bg-background/10"
 
-              <span className="mb-2 block text-xs font-semibold text-muted-foreground">
+            }`}
 
-                {t.amount}
+          >
 
-              </span>
+            <ArrowDownLeft
 
-              <div className="relative">
+              size={17}
 
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+              className="mb-2"
 
-                  {data.currency}
+            />
 
-                </span>
+            {t.deposit}
 
-                <input
+          </button>
 
-                  inputMode="decimal"
+          <button
 
-                  value={amount}
+            onClick={() =>
 
-                  onChange={(e) =>
+              setType("withdrawal")
 
-                    setAmount(e.target.value)
+            }
 
-                  }
+            className={`rounded-2xl p-4 text-left text-xs font-black ${
 
-                  className="h-12 w-full rounded-xl border border-input bg-background pl-14 pr-3 text-lg font-bold outline-none focus:ring-4 focus:ring-primary/20"
+              type === "withdrawal"
 
-                />
+                ? "bg-primary text-primary-foreground"
 
-              </div>
+                : "bg-background/10"
 
-            </label>
+            }`}
 
-            <div>
+          >
 
-              <span className="mb-2 block text-xs font-semibold text-muted-foreground">
+            <ArrowUpRight
 
-                {t.method}
+              size={17}
 
-              </span>
+              className="mb-2"
 
-              <div className="grid grid-cols-3 gap-2">
+            />
 
-                {(
+            {t.withdraw}
 
-                  ["telebirr", "ebirr", "mpesa"] as const
+          </button>
 
-                ).map((item) => (
+        </div>
 
-                  <button
+      </section>
 
-                    key={item}
+      <section className="mt-4 rounded-3xl border border-border bg-card p-5 shadow-sm">
 
-                    onClick={() =>
+        <h2 className="text-xl font-black">
 
-                      setMethod(item)
+          {type === "deposit"
 
-                    }
+            ? t.deposit
 
-                    className={`rounded-xl border px-2 py-3 text-xs font-bold ${
+            : t.withdraw}
 
-                      method === item
+        </h2>
 
-                        ? "border-primary bg-primary/10 text-primary"
+        <div className="mt-5">
 
-                        : "border-border hover:bg-muted"
+          <label className="text-xs font-bold text-muted-foreground">
 
-                    }`}
+            {t.amount}
 
-                  >
+          </label>
 
-                    {item}
+          <div className="mt-2 flex items-center rounded-2xl border border-input bg-background px-4">
 
-                  </button>
+            <span className="text-sm font-bold text-muted-foreground">
 
-                ))}
+              {data.currency}
 
-              </div>
+            </span>
 
-            </div>
+            <input
 
-            <button
+              inputMode="decimal"
 
-              disabled={action.isPending}
+              value={amount}
 
-              onClick={submit}
+              onChange={(event) =>
 
-              className="h-12 w-full rounded-xl bg-primary font-bold text-primary-foreground hover:brightness-95 disabled:opacity-50"
+                setAmount(
 
-            >
+                  event.target.value,
 
-              {action.isPending
+                )
 
-                ? "Submitting…"
+              }
 
-                : t.submit}
+              className="h-12 w-full bg-transparent px-3 text-lg font-black outline-none"
 
-            </button>
-
-            {action.isSuccess && (
-
-              <div className="flex items-center gap-2 rounded-xl bg-secondary p-3 text-xs font-semibold text-secondary-foreground">
-
-                <Check size={15} />
-
-                Demo request recorded.
-
-              </div>
-
-            )}
-
-            {action.isError && (
-
-              <p className="text-xs text-destructive">
-
-                The demo request failed. Try again.
-
-              </p>
-
-            )}
+            />
 
           </div>
 
-        </section>
+        </div>
 
-      </div>
+        <div className="mt-5">
 
-      <section className="mt-8">
+          <div className="text-xs font-bold text-muted-foreground">
 
-        <SectionTitle
+            {t.method}
 
-          eyebrow={t.transactions}
+          </div>
 
-          title={t.transactions}
+          <div className="mt-2 grid grid-cols-3 gap-2">
 
-        />
+            {(
 
-        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+              [
 
-          {data.entries?.length ? (
+                "telebirr",
 
-            data.entries.map(
+                "ebirr",
 
-              (entry: BingoWalletEntry) => (
+                "mpesa",
+
+              ] as const
+
+            ).map((item) => (
+
+              <button
+
+                key={item}
+
+                onClick={() =>
+
+                  setMethod(item)
+
+                }
+
+                className={`rounded-2xl border p-3 text-xs font-black ${
+
+                  method === item
+
+                    ? "border-primary bg-primary/10 text-primary"
+
+                    : "border-border"
+
+                }`}
+
+              >
+
+                {item}
+
+              </button>
+
+            ))}
+
+          </div>
+
+        </div>
+
+        <button
+
+          disabled={action.isPending}
+
+          onClick={submit}
+
+          className="mt-5 h-12 w-full rounded-2xl bg-primary text-sm font-black text-primary-foreground disabled:opacity-50"
+
+        >
+
+          {action.isPending
+
+            ? "..."
+
+            : t.submit}
+
+        </button>
+
+        {action.isSuccess && (
+
+          <div className="mt-3 rounded-2xl bg-secondary p-3 text-center text-xs font-bold text-secondary-foreground">
+
+            <Check
+
+              size={14}
+
+              className="mr-1 inline"
+
+            />
+
+            {t.submit}
+
+          </div>
+
+        )}
+
+      </section>
+
+      <section className="mt-5 rounded-3xl border border-border bg-card shadow-sm">
+
+        <div className="border-b border-border p-5">
+
+          <h2 className="font-black">
+
+            {t.transactions}
+
+          </h2>
+
+        </div>
+
+        {data.entries?.length ? (
+
+          data.entries.map(
+
+            (
+
+              entry: BingoWalletEntry,
+
+            ) => (
+
+              <div
+
+                key={entry.id}
+
+                className="flex items-center gap-3 border-b border-border p-4 last:border-0"
+
+              >
 
                 <div
 
-                  key={entry.id}
+                  className={`flex size-9 items-center justify-center rounded-xl ${
 
-                  className="flex items-center gap-3 border-b border-border px-4 py-4 last:border-0"
+                    entry.type ===
+
+                    "deposit"
+
+                      ? "bg-secondary text-secondary-foreground"
+
+                      : "bg-primary/10 text-primary"
+
+                  }`}
 
                 >
 
-                  <div
+                  {entry.type ===
 
-                    className={`flex size-9 items-center justify-center rounded-lg ${
+                  "deposit" ? (
 
-                      entry.type === "deposit"
+                    <ArrowDownLeft
 
-                        ? "bg-secondary text-secondary-foreground"
+                      size={16}
 
-                        : "bg-primary/10 text-primary"
+                    />
 
-                    }`}
+                  ) : (
 
-                  >
+                    <ArrowUpRight
 
-                    {entry.type === "deposit" ? (
+                      size={16}
 
-                      <ArrowDownLeft size={16} />
+                    />
 
-                    ) : (
+                  )}
 
-                      <ArrowUpRight size={16} />
+                </div>
 
-                    )}
+                <div className="min-w-0 flex-1">
 
-                  </div>
+                  <div className="text-sm font-bold capitalize">
 
-                  <div className="min-w-0 flex-1">
-
-                    <div className="text-sm font-bold capitalize">
-
-                      {entry.type}
-
-                    </div>
-
-                    <div className="text-xs text-muted-foreground">
-
-                      {entry.method} ·{" "}
-
-                      {entry.status}
-
-                    </div>
+                    {entry.type}
 
                   </div>
 
-                  <div className="text-right">
+                  <div className="text-[10px] text-muted-foreground">
 
-                    <div className="mono text-sm font-medium">
+                    {entry.method} ·{" "}
 
-                      {entry.type === "deposit"
-
-                        ? "+"
-
-                        : "-"}
-
-                      {money(
-
-                        entry.amount,
-
-                        data.currency,
-
-                      )}
-
-                    </div>
-
-                    <div className="text-[10px] text-muted-foreground">
-
-                      {new Date(
-
-                        entry.createdAt,
-
-                      ).toLocaleDateString()}
-
-                    </div>
+                    {entry.status}
 
                   </div>
 
                 </div>
 
-              ),
+                <div className="text-right">
 
-            )
+                  <div className="text-sm font-black">
 
-          ) : (
+                    {entry.type ===
 
-            <div className="p-8 text-center text-sm text-muted-foreground">
+                    "deposit"
 
-              {t.noTransactions}
+                      ? "+"
 
-            </div>
+                      : "-"}
 
-          )}
+                    {money(
 
-        </div>
+                      entry.amount,
+
+                      data.currency,
+
+                    )}
+
+                  </div>
+
+                </div>
+
+              </div>
+
+            ),
+
+          )
+
+        ) : (
+
+          <div className="p-7 text-center text-sm text-muted-foreground">
+
+            {t.noTransactions}
+
+          </div>
+
+        )}
 
       </section>
 
@@ -4262,21 +3286,29 @@ function WalletPage({ lang }: { lang: Language }) {
 
 }
 
-function AdminPage({ lang }: { lang: Language }) {
+function AdminPage({
+
+  lang,
+
+}: {
+
+  lang: Language;
+
+}) {
 
   const t = copy[lang];
 
-  const admin = useGetBingoAdmin();
+  const admin =
 
-  const cards = useListBingoCards();
+    useGetBingoAdmin();
 
-  const games = useListBingoGames();
+  const cards =
 
-  const [filter, setFilter] = useState<
+    useListBingoCards();
 
-    "all" | "normal" | "vip" | "vvip"
+  const games =
 
-  >("all");
+    useListBingoGames();
 
   if (
 
@@ -4288,15 +3320,7 @@ function AdminPage({ lang }: { lang: Language }) {
 
   ) {
 
-    return (
-
-      <div className="mx-auto max-w-7xl p-4 lg:p-8">
-
-        <LoadingState label={t.loading} />
-
-      </div>
-
-    );
+    return <LoadingState />;
 
   }
 
@@ -4314,7 +3338,7 @@ function AdminPage({ lang }: { lang: Language }) {
 
     return (
 
-      <div className="mx-auto max-w-7xl p-4 lg:p-8">
+      <div className="mx-auto max-w-2xl p-4 pt-8">
 
         <ErrorState
 
@@ -4338,361 +3362,445 @@ function AdminPage({ lang }: { lang: Language }) {
 
   const data = admin.data;
 
-  const filtered = (cards.data ?? []).filter(
-
-    (card) =>
-
-      filter === "all" ||
-
-      card.category === filter,
-
-  );
-
   return (
 
-    <div className="mx-auto max-w-7xl p-4 lg:p-8">
+    <div className="mx-auto max-w-2xl px-4 pb-28 pt-5">
 
-      <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+      <section className="rounded-3xl bg-foreground p-6 text-background shadow-xl">
 
-        <div>
+        <ShieldCheck
 
-          <div className="mono mb-2 text-[10px] uppercase tracking-[.2em] text-primary">
+          size={26}
 
-            {t.admin} · {t.demo}
+          className="text-primary"
 
-          </div>
+        />
 
-          <h1 className="text-3xl font-bold tracking-tight">
+        <h1 className="mt-3 text-2xl font-black">
 
-            {t.oversight}
+          {t.admin}
 
-          </h1>
+        </h1>
 
-        </div>
+        <p className="mt-1 text-sm text-background/50">
 
-        <Badge tone="mint">
+          {t.system}
 
-          <span className="live-dot mr-2 size-1.5 rounded-full bg-secondary-foreground" />
+        </p>
 
-          System nominal
+      </section>
 
-        </Badge>
+      <div className="mt-4 grid grid-cols-2 gap-3">
 
-      </div>
+        <Stat
 
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-
-        <Metric
+          icon={Users}
 
           label={t.users}
 
           value={data.totalUsers}
 
-          icon={Users}
-
         />
 
-        <Metric
+        <Stat
 
-          label={t.activeGames}
+          icon={Zap}
+
+          label={t.game}
 
           value={data.activeGames}
 
-          icon={Gauge}
-
-          accent="mint"
-
         />
 
-        <Metric
-
-          label={t.inUse}
-
-          value={data.cardsInUse}
+        <Stat
 
           icon={Ticket}
 
-          accent="gold"
+          label={t.inventory}
+
+          value={cards.data?.length ?? 0}
 
         />
 
-        <Metric
+        <Stat
 
-          label={t.volume}
+          icon={CircleDollarSign}
 
-          value={money(data.demoVolume)}
+          label={t.activity}
 
-          icon={BarChart3}
-
-          accent="ink"
+          value={games.data?.length ?? 0}
 
         />
 
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1.15fr_.85fr]">
+      <section className="mt-4 rounded-3xl border border-border bg-card p-5 shadow-sm">
 
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="mb-4 flex items-center justify-between">
 
-          <SectionTitle
+          <h2 className="font-black">
 
-            eyebrow={t.inventory}
+            {t.inventory}
 
-            title={t.inventory}
+          </h2>
 
-            detail={`${filtered.length} cards in current view`}
+          <Badge tone="mint">
 
-          />
+            {cards.data?.length ?? 0}
 
-          <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+          </Badge>
 
-            {(
+        </div>
 
-              ["all", "normal", "vip", "vvip"] as const
+        <div className="space-y-2">
 
-            ).map((item) => (
+          {(cards.data ?? [])
 
-              <button
+            .slice(0, 20)
 
-                key={item}
-
-                onClick={() => setFilter(item)}
-
-                className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-bold capitalize ${
-
-                  filter === item
-
-                    ? "bg-foreground text-background"
-
-                    : "bg-muted text-muted-foreground"
-
-                }`}
-
-              >
-
-                {item}
-
-              </button>
-
-            ))}
-
-          </div>
-
-          <div className="overflow-hidden rounded-xl border border-border">
-
-            {filtered.length ? (
-
-              filtered.slice(0, 12).map((card) => (
-
-                <div
-
-                  key={card.id}
-
-                  className="flex items-center gap-3 border-b border-border px-3 py-3 last:border-0"
-
-                >
-
-                  <div className="flex size-8 items-center justify-center rounded-lg bg-muted">
-
-                    <Ticket size={14} />
-
-                  </div>
-
-                  <div className="flex-1">
-
-                    <div className="text-sm font-bold">
-
-                      {card.label}
-
-                    </div>
-
-                    <div className="text-[11px] text-muted-foreground">
-
-                      {card.id} ·{" "}
-
-                      {card.numbers.length} numbers
-
-                    </div>
-
-                  </div>
-
-                  <Badge
-
-                    tone={
-
-                      card.status === "in-play"
-
-                        ? "coral"
-
-                        : card.status === "reserved"
-
-                          ? "gold"
-
-                          : "mint"
-
-                    }
-
-                  >
-
-                    {card.status}
-
-                  </Badge>
-
-                </div>
-
-              ))
-
-            ) : (
-
-              <div className="p-8 text-center text-sm text-muted-foreground">
-
-                {t.emptyCards}
-
-              </div>
-
-            )}
-
-          </div>
-
-        </section>
-
-        <section className="space-y-6">
-
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-
-            <SectionTitle
-
-              eyebrow={t.categoryMix}
-
-              title={t.categoryMix}
-
-            />
-
-            {data.topCategories.map((item) => (
+            .map((card) => (
 
               <div
 
-                key={item.category}
+                key={card.id}
 
-                className="mb-4 last:mb-0"
+                className="flex items-center gap-3 rounded-2xl bg-muted p-3"
 
               >
 
-                <div className="mb-2 flex justify-between text-xs font-semibold">
+                <Ticket size={16} />
 
-                  <span className="capitalize">
+                <div className="min-w-0 flex-1">
 
-                    {item.category}
+                  <div className="truncate text-sm font-black">
 
-                  </span>
+                    {card.label}
 
-                  <span className="mono text-muted-foreground">
+                  </div>
 
-                    {item.players} ·{" "}
+                  <div className="text-[10px] text-muted-foreground">
 
-                    {item.share}%
+                    {card.category}
 
-                  </span>
-
-                </div>
-
-                <div className="h-2 overflow-hidden rounded-full bg-muted">
-
-                  <div
-
-                    className={`h-full rounded-full ${
-
-                      item.category === "normal"
-
-                        ? "bg-secondary-foreground"
-
-                        : item.category === "vip"
-
-                          ? "bg-primary"
-
-                          : "bg-accent-foreground"
-
-                    }`}
-
-                    style={{
-
-                      width: `${Math.min(
-
-                        item.share,
-
-                        100,
-
-                      )}%`,
-
-                    }}
-
-                  />
+                  </div>
 
                 </div>
+
+                <Badge
+
+                  tone={
+
+                    card.status ===
+
+                    "in-play"
+
+                      ? "coral"
+
+                      : "mint"
+
+                  }
+
+                >
+
+                  {card.status}
+
+                </Badge>
 
               </div>
 
             ))}
 
-          </div>
+        </div>
 
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      </section>
 
-            <SectionTitle
+    </div>
 
-              eyebrow={t.activityLog}
+  );
 
-              title={t.activityLog}
+}
 
-            />
+function Stat({
 
-            <div className="space-y-3">
+  icon: Icon,
 
-              {data.activity
+  label,
 
-                .slice(0, 8)
+  value,
 
-                .map((item) => (
+}: {
 
-                  <div
+  icon: typeof Users;
 
-                    key={item.id}
+  label: string;
 
-                    className="flex gap-3"
+  value: ReactNode;
 
-                  >
+}) {
 
-                    <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />
+  return (
 
-                    <div className="min-w-0">
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
 
-                      <div className="text-sm font-semibold">
+      <Icon
 
-                        {item.title}
+        size={16}
 
-                      </div>
+        className="text-primary"
 
-                      <div className="text-xs text-muted-foreground">
+      />
 
-                        {item.detail} · {item.time}
+      <div className="mt-3 text-2xl font-black">
 
-                      </div>
+        {value}
 
-                    </div>
+      </div>
 
-                  </div>
+      <div className="mt-1 text-[10px] font-bold text-muted-foreground">
 
-                ))}
-
-            </div>
-
-          </div>
-
-        </section>
+        {label}
 
       </div>
 
     </div>
+
+  );
+
+}
+
+function HostControls({
+
+  lang,
+
+  game,
+
+}: {
+
+  lang: Language;
+
+  game: BingoGame;
+
+}) {
+
+  const t = copy[lang];
+
+  const advance =
+
+    useAdvanceBingoGame();
+
+  const client = useQueryClient();
+
+  const call = (
+
+    action: BingoGameActionAction,
+
+  ) => {
+
+    advance.mutate(
+
+      {
+
+        gameId: game.id,
+
+        data: { action },
+
+      },
+
+      {
+
+        onSuccess: () => {
+
+          client.invalidateQueries({
+
+            queryKey:
+
+              getGetBingoGameQueryKey(
+
+                game.id,
+
+              ),
+
+          });
+
+        },
+
+      },
+
+    );
+
+  };
+
+  return (
+
+    <section className="mt-4 rounded-3xl border border-border bg-card p-5 shadow-sm">
+
+      <div className="mb-4 flex items-center gap-2">
+
+        <ShieldCheck
+
+          size={17}
+
+          className="text-primary"
+
+        />
+
+        <h2 className="font-black">
+
+          {t.host}
+
+        </h2>
+
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+
+        {game.status === "waiting" && (
+
+          <button
+
+            onClick={() =>
+
+              call("start")
+
+            }
+
+            disabled={
+
+              advance.isPending
+
+            }
+
+            className="col-span-2 flex h-11 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-black text-primary-foreground disabled:opacity-50"
+
+          >
+
+            <Play
+
+              size={16}
+
+              fill="currentColor"
+
+            />
+
+            {t.start}
+
+          </button>
+
+        )}
+
+        {game.status === "live" && (
+
+          <>
+
+            <button
+
+              onClick={() =>
+
+                call("call")
+
+              }
+
+              disabled={
+
+                advance.isPending
+
+              }
+
+              className="col-span-2 flex h-11 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-black text-primary-foreground disabled:opacity-50"
+
+            >
+
+              <Zap size={16} />
+
+              {t.call}
+
+            </button>
+
+            <button
+
+              onClick={() =>
+
+                call("pause")
+
+              }
+
+              disabled={
+
+                advance.isPending
+
+              }
+
+              className="flex h-10 items-center justify-center gap-2 rounded-xl border border-border text-xs font-bold"
+
+            >
+
+              <Pause size={14} />
+
+              {t.pause}
+
+            </button>
+
+            <button
+
+              onClick={() =>
+
+                call("claim")
+
+              }
+
+              disabled={
+
+                advance.isPending
+
+              }
+
+              className="flex h-10 items-center justify-center gap-2 rounded-xl border border-border text-xs font-bold"
+
+            >
+
+              <Check size={14} />
+
+              {t.claim}
+
+            </button>
+
+          </>
+
+        )}
+
+        {game.status !==
+
+          "completed" && (
+
+          <button
+
+            onClick={() =>
+
+              call("reset")
+
+            }
+
+            disabled={
+
+              advance.isPending
+
+            }
+
+            className="col-span-2 flex h-10 items-center justify-center gap-2 rounded-xl border border-border text-xs font-bold"
+
+          >
+
+            <RefreshCw size={14} />
+
+            {t.reset}
+
+          </button>
+
+        )}
+
+      </div>
+
+    </section>
 
   );
 
@@ -4708,17 +3816,37 @@ function Router({
 
   lang: Language;
 
-  setLang: (l: Language) => void;
+  setLang: (lang: Language) => void;
 
 }) {
 
   const [location] = useLocation();
 
+  const isGame =
+
+    location.startsWith("/play/");
+
   return (
 
-    <ErrorBoundary resetKey={location}>
+    <ErrorBoundary
 
-      <Shell lang={lang} setLang={setLang}>
+      resetKey={location}
+
+    >
+
+      <div className="noise min-h-[100dvh] bg-background">
+
+        {!isGame && (
+
+          <Header
+
+            lang={lang}
+
+            setLang={setLang}
+
+          />
+
+        )}
 
         <Switch>
 
@@ -4736,11 +3864,23 @@ function Router({
 
           <Route
 
+            path="/play"
+
+            component={() => (
+
+              <GameLobby />
+
+            )}
+
+          />
+
+          <Route
+
             path="/play/:gameId"
 
             component={() => (
 
-              <GamePage lang={lang} />
+              <GameRoute lang={lang} />
 
             )}
 
@@ -4770,13 +3910,117 @@ function Router({
 
           />
 
-          <Route component={NotFound} />
+          <Route
+
+            component={NotFound}
+
+          />
 
         </Switch>
 
-      </Shell>
+        {!isGame && (
+
+          <BottomNav lang={lang} />
+
+        )}
+
+      </div>
 
     </ErrorBoundary>
+
+  );
+
+}
+
+function GameRoute({
+
+  lang,
+
+}: {
+
+  lang: Language;
+
+}) {
+
+  const params =
+
+    useParams<{
+
+      gameId: string;
+
+    }>();
+
+  return (
+
+    <>
+
+      <GameScreen
+
+        lang={lang}
+
+        gameId={params.gameId}
+
+      />
+
+      <HostRoute
+
+        gameId={params.gameId}
+
+        lang={lang}
+
+      />
+
+    </>
+
+  );
+
+}
+
+function HostRoute({
+
+  gameId,
+
+  lang,
+
+}: {
+
+  gameId: string;
+
+  lang: Language;
+
+}) {
+
+  const game =
+
+    useGetBingoGame(gameId);
+
+  if (
+
+    game.isLoading ||
+
+    game.isError ||
+
+    !game.data
+
+  ) {
+
+    return null;
+
+  }
+
+  return (
+
+    <div className="mx-auto max-w-2xl px-3 pb-28">
+
+      <HostControls
+
+        lang={lang}
+
+        game={game.data}
+
+      />
+
+    </div>
 
   );
 
@@ -4786,11 +4030,33 @@ function App() {
 
   const [lang, setLang] =
 
-    useState<Language>("en");
+    useState<Language>("am");
+
+  useEffect(() => {
+
+    if (
+
+      typeof window !== "undefined" &&
+
+      window.Telegram?.WebApp
+
+    ) {
+
+      window.Telegram.WebApp.ready();
+
+      window.Telegram.WebApp.expand();
+
+    }
+
+  }, []);
 
   return (
 
-    <QueryClientProvider client={queryClient}>
+    <QueryClientProvider
+
+      client={queryClient}
+
+    >
 
       <TooltipProvider>
 
