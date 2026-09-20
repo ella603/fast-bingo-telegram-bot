@@ -25,8 +25,13 @@ import {
 } from "./bingo-store";
 
 type Language = "en" | "am";
+type TelegramButton = {
+  text: string;
+  callback_data?: string;
+  web_app?: { url: string };
+};
 type TelegramKeyboard = {
-  inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
+  inline_keyboard: Array<Array<TelegramButton>>;
 };
 type TelegramMessage = {
   message_id: number;
@@ -48,6 +53,7 @@ type TelegramUpdate = {
 
 const botToken = process.env.BOT_TOKEN;
 const apiBase = botToken ? `https://api.telegram.org/bot${botToken}` : undefined;
+const telegramMiniAppUrl = process.env.TELEGRAM_MINI_APP_URL;
 const activeCallSnapshots = new Map<string, number>();
 const pendingRoomNames = new Map<string, string>();
 let polling = false;
@@ -130,7 +136,7 @@ function categoryButtons(prefix: "create" | "join"): TelegramKeyboard {
 
 function menuKeyboard(language: Language): TelegramKeyboard {
   if (language === "am") {
-    return {
+    const keyboard: TelegramKeyboard = {
       inline_keyboard: [
         [
           { text: "🎮 ይጫወቱ", callback_data: "menu:create" },
@@ -151,6 +157,12 @@ function menuKeyboard(language: Language): TelegramKeyboard {
         [{ text: "⚖️ ደንቦች", callback_data: "menu:home" }],
       ],
     };
+    if (telegramMiniAppUrl) {
+      keyboard.inline_keyboard.push([
+        { text: "🚀 Fast Bingo ክፈት", web_app: { url: telegramMiniAppUrl } },
+      ]);
+    }
+    return keyboard;
   }
   return {
     inline_keyboard: [
