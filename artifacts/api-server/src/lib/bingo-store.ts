@@ -6,11 +6,33 @@ import { DatabaseSync } from "node:sqlite";
 
 export type BingoCategory = "normal" | "vip" | "vvip";
 
-export type BingoGameStatus = "waiting" | "live" | "completed";
+export type BingoGameStatus =
 
-export type BingoAction = "start" | "call" | "pause" | "reset" | "claim";
+  | "waiting"
 
-export type WalletMethod = "telebirr" | "ebirr" | "mpesa";
+  | "live"
+
+  | "completed";
+
+export type BingoAction =
+
+  | "start"
+
+  | "call"
+
+  | "pause"
+
+  | "reset"
+
+  | "claim";
+
+export type WalletMethod =
+
+  | "telebirr"
+
+  | "ebirr"
+
+  | "mpesa";
 
 export type BingoPlayer = {
 
@@ -62,7 +84,13 @@ export type BingoCard = {
 
   category: BingoCategory;
 
-  status: "available" | "in-play" | "reserved";
+  status:
+
+    | "available"
+
+    | "in-play"
+
+    | "reserved";
 
   numbers: number[];
 
@@ -80,7 +108,15 @@ export type BingoActivity = {
 
   time: string;
 
-  tone: "success" | "info" | "warning" | "neutral";
+  tone:
+
+    | "success"
+
+    | "info"
+
+    | "warning"
+
+    | "neutral";
 
 };
 
@@ -94,13 +130,21 @@ export type BingoWallet = {
 
     id: string;
 
-    type: "deposit" | "withdrawal";
+    type:
+
+      | "deposit"
+
+      | "withdrawal";
 
     amount: number;
 
     method: WalletMethod;
 
-    status: "demo" | "pending";
+    status:
+
+      | "pending"
+
+      | "completed";
 
     createdAt: string;
 
@@ -114,45 +158,49 @@ const PRIZE_PER_CARD = 8;
 
 const LOBBY_SECONDS = 45;
 
-/*
-
- * REAL game calling interval.
-
- *
-
- * The Telegram bot continues to call every 3500ms.
-
- */
-
 const CALL_INTERVAL_SECONDS = 3.5;
-
-/*
-
- * The generated API Zod schema currently expects
-
- * nextCallIn to be an integer.
-
- *
-
- * Keep the real game interval at 3.5 seconds,
-
- * but expose 3 seconds to the API to avoid
-
- * Zod validation errors in the Mini App.
-
- */
 
 const DISPLAY_CALL_INTERVAL_SECONDS = 3;
 
-const dataDir = path.resolve(process.cwd(), "data");
+const MAX_CARDS_PER_USER = 4;
 
-mkdirSync(dataDir, { recursive: true });
+const TOTAL_CARDS = 400;
+
+const TOTAL_NUMBERS = 75;
+
+const WINNING_LINES = 2;
+
+const dataDir = path.resolve(
+
+  process.cwd(),
+
+  "data",
+
+);
+
+mkdirSync(dataDir, {
+
+  recursive: true,
+
+});
 
 const database = new DatabaseSync(
 
-  path.join(dataDir, "fast-bingo.sqlite"),
+  path.join(
+
+    dataDir,
+
+    "fast-bingo.sqlite",
+
+  ),
 
 );
+
+/* =========================================================
+
+   DATABASE
+
+   ========================================================= */
 
 database.exec(`
 
@@ -310,7 +358,7 @@ database.exec(`
 
     player_id TEXT NOT NULL,
 
-    PRIMARY KEY (game_id, telegram_id)
+    PRIMARY KEY (game_id, telegram_id, player_id)
 
   );
 
@@ -326,27 +374,313 @@ database.exec(`
 
     created_at TEXT NOT NULL,
 
-    PRIMARY KEY (game_id, telegram_id)
+    PRIMARY KEY (game_id, telegram_id, player_id)
 
   );
 
 `);
 
-const now = () => new Date().toISOString();
+/* =========================================================
 
-const randomId = (prefix: string) =>
+   OLD DATABASE MIGRATION
 
-  `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
+   ========================================================= */
 
-function shuffle<T>(items: T[]): T[] {
+function migrateGamePlayerLinks(): void {
+
+  const columns = database
+
+    .prepare(
+
+      "PRAGMA table_info(game_player_links)",
+
+    )
+
+    .all() as Array<
+
+    Record<string, unknown>
+
+  >;
+
+  const primaryKeys = columns.filter(
+
+    (column) =>
+
+      Number(column.pk) > 0,
+
+  );
+
+  const alreadySupportsMultipleCards =
+
+    primaryKeys.length === 3 &&
+
+    primaryKeys.some(
+
+      (column) =>
+
+        String(column.name) ===
+
+        "game_id",
+
+    ) &&
+
+    primaryKeys.some(
+
+      (column) =>
+
+        String(column.name) ===
+
+        "telegram_id",
+
+    ) &&
+
+    primaryKeys.some(
+
+      (column) =>
+
+        String(column.name) ===
+
+        "player_id",
+
+    );
+
+  if (
+
+    alreadySupportsMultipleCards
+
+  ) {
+
+    return;
+
+  }
+
+  database.exec(`
+
+    ALTER TABLE game_player_links
+
+    RENAME TO game_player_links_old;
+
+    CREATE TABLE game_player_links (
+
+      game_id TEXT NOT NULL,
+
+      telegram_id TEXT NOT NULL,
+
+      player_id TEXT NOT NULL,
+
+      PRIMARY KEY (game_id, telegram_id, player_id)
+
+    );
+
+    INSERT OR IGNORE INTO game_player_links
+
+      (game_id, telegram_id, player_id)
+
+    SELECT
+
+      game_id,
+
+      telegram_id,
+
+      player_id
+
+    FROM game_player_links_old;
+
+    DROP TABLE game_player_links_old;
+
+  `);
+
+}
+
+function migrateGameWinners(): void {
+
+  const columns = database
+
+    .prepare(
+
+      "PRAGMA table_info(game_winners)",
+
+    )
+
+    .all() as Array<
+
+    Record<string, unknown>
+
+  >;
+
+  const primaryKeys = columns.filter(
+
+    (column) =>
+
+      Number(column.pk) > 0,
+
+  );
+
+  const supportsMultipleWinnerCards =
+
+    primaryKeys.length === 3 &&
+
+    primaryKeys.some(
+
+      (column) =>
+
+        String(column.name) ===
+
+        "game_id",
+
+    ) &&
+
+    primaryKeys.some(
+
+      (column) =>
+
+        String(column.name) ===
+
+        "telegram_id",
+
+    ) &&
+
+    primaryKeys.some(
+
+      (column) =>
+
+        String(column.name) ===
+
+        "player_id",
+
+    );
+
+  if (
+
+    supportsMultipleWinnerCards
+
+  ) {
+
+    return;
+
+  }
+
+  database.exec(`
+
+    ALTER TABLE game_winners
+
+    RENAME TO game_winners_old;
+
+    CREATE TABLE game_winners (
+
+      game_id TEXT NOT NULL,
+
+      telegram_id TEXT NOT NULL,
+
+      player_id TEXT NOT NULL,
+
+      prize REAL NOT NULL DEFAULT 0,
+
+      created_at TEXT NOT NULL,
+
+      PRIMARY KEY (game_id, telegram_id, player_id)
+
+    );
+
+    INSERT OR IGNORE INTO game_winners
+
+      (
+
+        game_id,
+
+        telegram_id,
+
+        player_id,
+
+        prize,
+
+        created_at
+
+      )
+
+    SELECT
+
+      game_id,
+
+      telegram_id,
+
+      player_id,
+
+      prize,
+
+      created_at
+
+    FROM game_winners_old;
+
+    DROP TABLE game_winners_old;
+
+  `);
+
+}
+
+migrateGamePlayerLinks();
+
+migrateGameWinners();
+
+/* =========================================================
+
+   HELPERS
+
+   ========================================================= */
+
+const now = () =>
+
+  new Date().toISOString();
+
+const randomId = (
+
+  prefix: string,
+
+) =>
+
+  `${prefix}-${Math.random()
+
+    .toString(36)
+
+    .slice(2, 8)}`;
+
+function shuffle<T>(
+
+  items: T[],
+
+): T[] {
 
   const copy = [...items];
 
-  for (let i = copy.length - 1; i > 0; i -= 1) {
+  for (
 
-    const j = Math.floor(Math.random() * (i + 1));
+    let i = copy.length - 1;
 
-    [copy[i], copy[j]] = [copy[j], copy[i]];
+    i > 0;
+
+    i -= 1
+
+  ) {
+
+    const j = Math.floor(
+
+      Math.random() * (i + 1),
+
+    );
+
+    [
+
+      copy[i],
+
+      copy[j],
+
+    ] = [
+
+      copy[j],
+
+      copy[i],
+
+    ];
 
   }
 
@@ -354,31 +688,19 @@ function shuffle<T>(items: T[]): T[] {
 
 }
 
-/**
+/* =========================================================
 
- * Classic 75-ball Bingo:
+   CARD GENERATION
 
- *
-
- * B = 1-15
-
- * I = 16-30
-
- * N = 31-45
-
- * G = 46-60
-
- * O = 61-75
-
- *
-
- * Center N3 is FREE and stored as 0.
-
- */
+   ========================================================= */
 
 function makeCardNumbers(): number[] {
 
-  const ranges: Array<[number, number]> = [
+  const ranges: Array<
+
+    [number, number]
+
+  > = [
 
     [1, 15],
 
@@ -394,157 +716,309 @@ function makeCardNumbers(): number[] {
 
   const columns: number[][] = [];
 
-  for (const [min, max] of ranges) {
+  for (
+
+    const [min, max] of ranges
+
+  ) {
 
     const pool = Array.from(
 
-      { length: max - min + 1 },
+      {
 
-      (_, index) => min + index,
+        length:
+
+          max - min + 1,
+
+      },
+
+      (_, index) =>
+
+        min + index,
 
     );
 
-    const selected = shuffle(pool)
+    const selected = shuffle(
+
+      pool,
+
+    )
 
       .slice(0, 5)
 
-      .sort((a, b) => a - b);
+      .sort(
 
-    columns.push(selected);
+        (a, b) => a - b,
+
+      );
+
+    columns.push(
+
+      selected,
+
+    );
 
   }
 
-  return Array.from({ length: 5 }, (_, row) =>
+  return Array.from(
 
-    Array.from({ length: 5 }, (_, column) => {
+    { length: 5 },
 
-      if (row === 2 && column === 2) {
+    (_, row) =>
 
-        return 0;
+      Array.from(
 
-      }
+        { length: 5 },
 
-      return columns[column][row];
+        (_, column) => {
 
-    }),
+          if (
+
+            row === 2 &&
+
+            column === 2
+
+          ) {
+
+            return 0;
+
+          }
+
+          return columns[
+
+            column
+
+          ][row];
+
+        },
+
+      ),
 
   ).flat();
 
 }
 
-function cardSignature(numbers: number[]): string {
+function cardSignature(
+
+  numbers: number[],
+
+): string {
 
   return numbers.join(",");
 
 }
 
-/**
-
- * Create 400 guaranteed-different cards.
-
- *
-
- * Existing old cards are replaced with fresh unique layouts if the
-
- * current database does not contain 400 unique layouts.
-
- */
-
 function seedCards(): void {
 
-  const rows = database
+  const rows =
 
-    .prepare("SELECT id, numbers FROM cards ORDER BY id")
+    database
 
-    .all() as Array<Record<string, unknown>>;
+      .prepare(
 
-  const signatures = new Set<string>();
+        "SELECT id, numbers FROM cards ORDER BY id",
+
+      )
+
+      .all() as Array<
+
+      Record<string, unknown>
+
+    >;
+
+  const signatures =
+
+    new Set<string>();
 
   for (const row of rows) {
 
     try {
 
-      const numbers = JSON.parse(String(row.numbers)) as number[];
+      const numbers =
 
-      signatures.add(cardSignature(numbers));
+        JSON.parse(
+
+          String(row.numbers),
+
+        ) as number[];
+
+      signatures.add(
+
+        cardSignature(numbers),
+
+      );
 
     } catch {
 
-      // Invalid old card will be regenerated below.
+      // Regenerate invalid cards.
 
     }
 
   }
 
-  const needsRegeneration =
+  if (
 
-    rows.length < 400 || signatures.size < 400;
+    rows.length >= TOTAL_CARDS &&
 
-  if (!needsRegeneration) {
+    signatures.size >= TOTAL_CARDS
+
+  ) {
 
     return;
 
   }
 
-  database.exec("DELETE FROM cards");
+  database.exec(
 
-  const insert = database.prepare(`
+    "DELETE FROM cards",
 
-    INSERT INTO cards
+  );
 
-      (id, label, category, status, numbers, marked)
+  const insert =
 
-    VALUES
+    database.prepare(`
 
-      (?, ?, ?, 'available', ?, '[]')
+      INSERT INTO cards
 
-  `);
+        (
 
-  const categories: BingoCategory[] = [
+          id,
 
-    ...Array(360).fill("normal"),
+          label,
 
-    ...Array(32).fill("vip"),
+          category,
 
-    ...Array(8).fill("vvip"),
+          status,
 
-  ];
+          numbers,
 
-  const unique = new Set<string>();
+          marked
+
+        )
+
+      VALUES
+
+        (
+
+          ?,
+
+          ?,
+
+          ?,
+
+          'available',
+
+          ?,
+
+          '[]'
+
+        )
+
+    `);
+
+  const categories:
+
+    BingoCategory[] = [
+
+      ...Array(360).fill(
+
+        "normal",
+
+      ),
+
+      ...Array(32).fill(
+
+        "vip",
+
+      ),
+
+      ...Array(8).fill(
+
+        "vvip",
+
+      ),
+
+    ];
+
+  const unique =
+
+    new Set<string>();
 
   let index = 0;
 
-  while (index < 400) {
+  while (
 
-    const numbers = makeCardNumbers();
+    index < TOTAL_CARDS
 
-    const signature = cardSignature(numbers);
+  ) {
 
-    if (unique.has(signature)) {
+    const numbers =
+
+      makeCardNumbers();
+
+    const signature =
+
+      cardSignature(
+
+        numbers,
+
+      );
+
+    if (
+
+      unique.has(signature)
+
+    ) {
 
       continue;
 
     }
 
-    unique.add(signature);
+    unique.add(
+
+      signature,
+
+    );
 
     index += 1;
 
     insert.run(
 
-      `card-${String(index).padStart(3, "0")}`,
+      `card-${String(
 
-      `FB-${String(index).padStart(3, "0")}`,
+        index,
 
-      categories[index - 1] ?? "normal",
+      ).padStart(3, "0")}`,
 
-      JSON.stringify(numbers),
+      `FB-${String(
+
+        index,
+
+      ).padStart(3, "0")}`,
+
+      categories[
+
+        index - 1
+
+      ] ?? "normal",
+
+      JSON.stringify(
+
+        numbers,
+
+      ),
 
     );
 
   }
 
 }
+
+/* =========================================================
+
+   WALLET / ACTIVITY SEED
+
+   ========================================================= */
 
 function seedWallet(): void {
 
@@ -554,11 +1028,27 @@ function seedWallet(): void {
 
       INSERT OR IGNORE INTO wallet
 
-        (id, balance, currency)
+        (
+
+          id,
+
+          balance,
+
+          currency
+
+        )
 
       VALUES
 
-        (1, 2500, 'ETB')
+        (
+
+          1,
+
+          2500,
+
+          'ETB'
+
+        )
 
     `)
 
@@ -568,19 +1058,29 @@ function seedWallet(): void {
 
 function seedActivities(): void {
 
-  const count = Number(
+  const count =
 
-    (
+    Number(
 
-      database
+      (
 
-        .prepare("SELECT COUNT(*) as count FROM activities")
+        database
 
-        .get() as { count: number }
+          .prepare(
 
-    ).count,
+            "SELECT COUNT(*) as count FROM activities",
 
-  );
+          )
+
+          .get() as {
+
+          count: number;
+
+        }
+
+      ).count,
+
+    );
 
   if (count > 0) {
 
@@ -588,17 +1088,31 @@ function seedActivities(): void {
 
   }
 
-  const insert = database.prepare(`
+  const insert =
 
-    INSERT INTO activities
+    database.prepare(`
 
-      (id, title, detail, time, tone)
+      INSERT INTO activities
 
-    VALUES
+        (
 
-      (?, ?, ?, ?, ?)
+          id,
 
-  `);
+          title,
+
+          detail,
+
+          time,
+
+          tone
+
+        )
+
+      VALUES
+
+        (?, ?, ?, ?, ?)
+
+    `);
 
   insert.run(
 
@@ -620,7 +1134,7 @@ function seedActivities(): void {
 
     "Bingo verified",
 
-    "A demo player completed two lines",
+    "A player completed two lines",
 
     "8 min ago",
 
@@ -632,7 +1146,7 @@ function seedActivities(): void {
 
     "activity-3",
 
-    "Demo balance added",
+    "Balance added",
 
     "Wallet credited with 500 ETB",
 
@@ -644,7 +1158,17 @@ function seedActivities(): void {
 
 }
 
-function readCard(row: Record<string, unknown>): BingoCard {
+/* =========================================================
+
+   READ / WRITE
+
+   ========================================================= */
+
+function readCard(
+
+  row: Record<string, unknown>,
+
+): BingoCard {
 
   return {
 
@@ -652,19 +1176,39 @@ function readCard(row: Record<string, unknown>): BingoCard {
 
     label: String(row.label),
 
-    category: row.category as BingoCategory,
+    category:
 
-    status: row.status as BingoCard["status"],
+      row.category as BingoCategory,
 
-    numbers: JSON.parse(String(row.numbers)) as number[],
+    status:
 
-    marked: JSON.parse(String(row.marked)) as number[],
+      row.status as BingoCard["status"],
+
+    numbers:
+
+      JSON.parse(
+
+        String(row.numbers),
+
+      ) as number[],
+
+    marked:
+
+      JSON.parse(
+
+        String(row.marked),
+
+      ) as number[],
 
   };
 
 }
 
-function readGame(row: Record<string, unknown>): BingoGame {
+function readGame(
+
+  row: Record<string, unknown>,
+
+): BingoGame {
 
   return {
 
@@ -672,29 +1216,81 @@ function readGame(row: Record<string, unknown>): BingoGame {
 
     name: String(row.name),
 
-    status: row.status as BingoGameStatus,
+    status:
 
-    hostName: String(row.host_name),
+      row.status as BingoGameStatus,
 
-    players: JSON.parse(String(row.players)) as BingoPlayer[],
+    hostName: String(
 
-    calledNumbers: JSON.parse(String(row.called_numbers)) as number[],
+      row.host_name,
 
-    currentNumber: Number(row.current_number),
+    ),
 
-    nextCallIn: Number(row.next_call_in),
+    players:
 
-    shareCode: String(row.share_code),
+      JSON.parse(
 
-    winnerCount: Number(row.winner_count),
+        String(row.players),
 
-    startedAt: String(row.started_at),
+      ) as BingoPlayer[],
+
+    calledNumbers:
+
+      JSON.parse(
+
+        String(
+
+          row.called_numbers,
+
+        ),
+
+      ) as number[],
+
+    currentNumber:
+
+      Number(
+
+        row.current_number,
+
+      ),
+
+    nextCallIn:
+
+      Number(
+
+        row.next_call_in,
+
+      ),
+
+    shareCode: String(
+
+      row.share_code,
+
+    ),
+
+    winnerCount:
+
+      Number(
+
+        row.winner_count,
+
+      ),
+
+    startedAt: String(
+
+      row.started_at,
+
+    ),
 
   };
 
 }
 
-function writeGame(game: BingoGame): void {
+function writeGame(
+
+  game: BingoGame,
+
+): void {
 
   database
 
@@ -728,9 +1324,17 @@ function writeGame(game: BingoGame): void {
 
       game.hostName,
 
-      JSON.stringify(game.players),
+      JSON.stringify(
 
-      JSON.stringify(game.calledNumbers),
+        game.players,
+
+      ),
+
+      JSON.stringify(
+
+        game.calledNumbers,
+
+      ),
 
       game.currentNumber,
 
@@ -744,15 +1348,11 @@ function writeGame(game: BingoGame): void {
 
 }
 
-/**
+/* =========================================================
 
- * A winner needs TWO completed lines.
+   BINGO WIN RULE
 
- *
-
- * FREE center counts automatically.
-
- */
+   ========================================================= */
 
 function countCompletedLines(
 
@@ -762,13 +1362,25 @@ function countCompletedLines(
 
 ): number {
 
-  const called = new Set(calledNumbers);
+  const called =
 
-  const grid = card.numbers.map(
+    new Set(
 
-    (value) => value === 0 || called.has(value),
+      calledNumbers,
 
-  );
+    );
+
+  const grid =
+
+    card.numbers.map(
+
+      (value) =>
+
+        value === 0 ||
+
+        called.has(value),
+
+    );
 
   const lines = [
 
@@ -798,9 +1410,17 @@ function countCompletedLines(
 
   ];
 
-  return lines.filter((line) =>
+  return lines.filter(
 
-    line.every((index) => grid[index]),
+    (line) =>
+
+      line.every(
+
+        (index) =>
+
+          grid[index],
+
+      ),
 
   ).length;
 
@@ -814,33 +1434,225 @@ function cardHasWin(
 
 ): boolean {
 
-  return countCompletedLines(card, calledNumbers) >= 2;
+  return (
+
+    countCompletedLines(
+
+      card,
+
+      calledNumbers,
+
+    ) >= WINNING_LINES
+
+  );
 
 }
 
-function getPrizePool(game: BingoGame): number {
+/* =========================================================
 
-  return game.players.length * PRIZE_PER_CARD;
+   CARD / PLAYER HELPERS
+
+   ========================================================= */
+
+function getPlayersForTelegramUser(
+
+  gameId: string,
+
+  telegramId: string,
+
+): BingoPlayer[] {
+
+  const game =
+
+    getGame(gameId);
+
+  if (!game) {
+
+    return [];
+
+  }
+
+  const links =
+
+    database
+
+      .prepare(`
+
+        SELECT player_id
+
+        FROM game_player_links
+
+        WHERE
+
+          game_id = ?
+
+          AND telegram_id = ?
+
+        ORDER BY rowid ASC
+
+      `)
+
+      .all(
+
+        gameId,
+
+        telegramId,
+
+      ) as Array<
+
+      Record<string, unknown>
+
+    >;
+
+  const ids =
+
+    new Set(
+
+      links.map(
+
+        (row) =>
+
+          String(
+
+            row.player_id,
+
+          ),
+
+      ),
+
+    );
+
+  return game.players.filter(
+
+    (player) =>
+
+      ids.has(player.id),
+
+  );
 
 }
 
-function getCardCount(game: BingoGame): number {
+function countTelegramCards(
+
+  gameId: string,
+
+  telegramId: string,
+
+): number {
+
+  return Number(
+
+    (
+
+      database
+
+        .prepare(`
+
+          SELECT COUNT(*) as count
+
+          FROM game_player_links
+
+          WHERE
+
+            game_id = ?
+
+            AND telegram_id = ?
+
+        `)
+
+        .get(
+
+          gameId,
+
+          telegramId,
+
+        ) as {
+
+        count: number;
+
+      }
+
+    ).count,
+
+  );
+
+}
+
+function releasePlayerCards(
+
+  game: BingoGame,
+
+): void {
+
+  for (
+
+    const player of game.players
+
+  ) {
+
+    database
+
+      .prepare(`
+
+        UPDATE cards
+
+        SET
+
+          status = 'available',
+
+          marked = '[]'
+
+        WHERE label = ?
+
+      `)
+
+      .run(
+
+        player.cardLabel,
+
+      );
+
+  }
+
+}
+
+/* =========================================================
+
+   PRIZE POOL
+
+   ========================================================= */
+
+function getPrizePool(
+
+  game: BingoGame,
+
+): number {
+
+  return (
+
+    game.players.length *
+
+    PRIZE_PER_CARD
+
+  );
+
+}
+
+function getCardCount(
+
+  game: BingoGame,
+
+): number {
 
   return game.players.length;
 
 }
 
-/**
+/* =========================================================
 
- * Credit every Telegram winner.
+   WINNER SETTLEMENT
 
- *
-
- * If 2+ players win on the same call, all of them are winners.
-
- * The demo prize pool is split equally between all winners.
-
- */
+   ========================================================= */
 
 function settleWinners(
 
@@ -848,23 +1660,37 @@ function settleWinners(
 
 ): string[] {
 
-  const winnerIds: string[] = [];
+  const winnerRows:
 
-  const winnerRows: Array<{
+    Array<{
 
-    telegramId: string;
+      telegramId: string;
 
-    playerId: string;
+      playerId: string;
 
-  }> = [];
+    }> = [];
 
-  for (const player of game.players) {
+  for (
 
-    const cardRow = database
+    const player of game.players
 
-      .prepare("SELECT * FROM cards WHERE label = ?")
+  ) {
 
-      .get(player.cardLabel);
+    const cardRow =
+
+      database
+
+        .prepare(
+
+          "SELECT * FROM cards WHERE label = ?",
+
+        )
+
+        .get(
+
+          player.cardLabel,
+
+        );
 
     if (!cardRow) {
 
@@ -872,35 +1698,71 @@ function settleWinners(
 
     }
 
-    const card = readCard(
+    const card =
 
-      cardRow as Record<string, unknown>,
+      readCard(
 
-    );
+        cardRow as Record<
 
-    if (!cardHasWin(card, game.calledNumbers)) {
+          string,
+
+          unknown
+
+        >,
+
+      );
+
+    if (
+
+      !cardHasWin(
+
+        card,
+
+        game.calledNumbers,
+
+      )
+
+    ) {
 
       continue;
 
     }
 
-    const link = database
+    const link =
 
-      .prepare(`
+      database
 
-        SELECT telegram_id
+        .prepare(`
 
-        FROM game_player_links
+          SELECT telegram_id
 
-        WHERE game_id = ? AND player_id = ?
+          FROM game_player_links
 
-      `)
+          WHERE
 
-      .get(game.id, player.id) as
+            game_id = ?
 
-      | Record<string, unknown>
+            AND player_id = ?
 
-      | undefined;
+        `)
+
+        .get(
+
+          game.id,
+
+          player.id,
+
+        ) as
+
+        | Record<
+
+            string,
+
+            unknown
+
+          >
+
+        | undefined;
 
     if (!link) {
 
@@ -910,49 +1772,145 @@ function settleWinners(
 
     winnerRows.push({
 
-      telegramId: String(link.telegram_id),
+      telegramId:
 
-      playerId: player.id,
+        String(
+
+          link.telegram_id,
+
+        ),
+
+      playerId:
+
+        player.id,
 
     });
 
-    winnerIds.push(player.id);
-
   }
 
-  if (winnerRows.length === 0) {
+  if (
+
+    winnerRows.length === 0
+
+  ) {
 
     return [];
 
   }
 
-  const alreadySettled = database
+  const unsettled =
 
-    .prepare(
+    winnerRows.filter(
 
-      "SELECT COUNT(*) as count FROM game_winners WHERE game_id = ?",
+      (winner) => {
 
-    )
+        const row =
 
-    .get(game.id) as { count: number };
+          database
 
-  if (Number(alreadySettled.count) > 0) {
+            .prepare(`
 
-    return winnerIds;
+              SELECT 1
+
+              FROM game_winners
+
+              WHERE
+
+                game_id = ?
+
+                AND telegram_id = ?
+
+                AND player_id = ?
+
+              LIMIT 1
+
+            `)
+
+            .get(
+
+              game.id,
+
+              winner.telegramId,
+
+              winner.playerId,
+
+            );
+
+        return !row;
+
+      },
+
+    );
+
+  if (
+
+    unsettled.length === 0
+
+  ) {
+
+    return winnerRows.map(
+
+      (winner) =>
+
+        winner.playerId,
+
+    );
 
   }
 
-  const totalPrize = getPrizePool(game);
+  const totalPrize =
+
+    getPrizePool(game);
 
   const prizePerWinner =
 
-    winnerRows.length > 0
+    Number(
 
-      ? Number((totalPrize / winnerRows.length).toFixed(2))
+      (
 
-      : 0;
+        totalPrize /
 
-  for (const winner of winnerRows) {
+        winnerRows.length
+
+      ).toFixed(2),
+
+    );
+
+  for (
+
+    const winner of unsettled
+
+  ) {
+
+    database
+
+      .prepare(`
+
+        INSERT OR IGNORE INTO
+
+          telegram_wallets
+
+          (
+
+            telegram_id,
+
+            balance,
+
+            currency
+
+          )
+
+        VALUES
+
+          (?, 0, 'ETB')
+
+      `)
+
+      .run(
+
+        winner.telegramId,
+
+      );
 
     database
 
@@ -960,25 +1918,67 @@ function settleWinners(
 
         UPDATE telegram_wallets
 
-        SET balance = balance + ?
+        SET balance =
+
+          balance + ?
 
         WHERE telegram_id = ?
 
       `)
 
-      .run(prizePerWinner, winner.telegramId);
+      .run(
+
+        prizePerWinner,
+
+        winner.telegramId,
+
+      );
 
     database
 
       .prepare(`
 
-        INSERT INTO telegram_wallet_entries
+        INSERT INTO
 
-          (id, telegram_id, type, amount, method, status, created_at)
+          telegram_wallet_entries
+
+          (
+
+            id,
+
+            telegram_id,
+
+            type,
+
+            amount,
+
+            method,
+
+            status,
+
+            created_at
+
+          )
 
         VALUES
 
-          (?, ?, 'deposit', ?, 'telebirr', 'demo', ?)
+          (
+
+            ?,
+
+            ?,
+
+            'deposit',
+
+            ?,
+
+            'telebirr',
+
+            'completed',
+
+            ?
+
+          )
 
       `)
 
@@ -998,9 +1998,23 @@ function settleWinners(
 
       .prepare(`
 
-        INSERT OR IGNORE INTO game_winners
+        INSERT OR IGNORE INTO
 
-          (game_id, telegram_id, player_id, prize, created_at)
+          game_winners
+
+          (
+
+            game_id,
+
+            telegram_id,
+
+            player_id,
+
+            prize,
+
+            created_at
+
+          )
 
         VALUES
 
@@ -1024,345 +2038,27 @@ function settleWinners(
 
   }
 
-  return winnerIds;
+  return winnerRows.map(
 
-}
+    (winner) =>
 
-function seedGame(): void {
-
-  const count = Number(
-
-    (
-
-      database
-
-        .prepare("SELECT COUNT(*) as count FROM games")
-
-        .get() as { count: number }
-
-    ).count,
+      winner.playerId,
 
   );
 
-  if (count > 0) {
-
-    return;
-
-  }
-
-  const card = getCards("normal", 1)[0];
-
-  if (!card) {
-
-    return;
-
-  }
-
-  const players: BingoPlayer[] = [
-
-    {
-
-      id: "player-1",
-
-      name: "You",
-
-      initials: "YO",
-
-      category: "normal",
-
-      cardLabel: card.label,
-
-      joinedAt: now(),
-
-    },
-
-    {
-
-      id: "player-2",
-
-      name: "Mimi",
-
-      initials: "MI",
-
-      category: "vip",
-
-      cardLabel: "FB-041",
-
-      joinedAt: now(),
-
-    },
-
-    {
-
-      id: "player-3",
-
-      name: "Dawit",
-
-      initials: "DA",
-
-      category: "normal",
-
-      cardLabel: "FB-112",
-
-      joinedAt: now(),
-
-    },
-
-    {
-
-      id: "player-4",
-
-      name: "Hana",
-
-      initials: "HA",
-
-      category: "vvip",
-
-      cardLabel: "FB-397",
-
-      joinedAt: now(),
-
-    },
-
-  ];
-
-  const game: BingoGame = {
-
-    id: "game-friday-rush",
-
-    name: "Friday Rush",
-
-    status: "live",
-
-    hostName: "Selam",
-
-    players,
-
-    calledNumbers: [
-
-      14,
-
-      62,
-
-      37,
-
-      8,
-
-      54,
-
-      22,
-
-      71,
-
-      31,
-
-      6,
-
-      45,
-
-      18,
-
-      69,
-
-    ],
-
-    currentNumber: 69,
-
-    /*
-
-     * IMPORTANT:
-
-     * Keep this integer for the generated Zod API schema.
-
-     * The real Telegram calling interval remains 3.5 seconds.
-
-     */
-
-    nextCallIn: DISPLAY_CALL_INTERVAL_SECONDS,
-
-    shareCode: "FB-7K2P",
-
-    winnerCount: 0,
-
-    startedAt: now(),
-
-  };
-
-  database
-
-    .prepare(`
-
-      INSERT INTO games
-
-        (
-
-          id,
-
-          name,
-
-          status,
-
-          host_name,
-
-          players,
-
-          called_numbers,
-
-          current_number,
-
-          next_call_in,
-
-          share_code,
-
-          winner_count,
-
-          started_at
-
-        )
-
-      VALUES
-
-        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-
-    `)
-
-    .run(
-
-      game.id,
-
-      game.name,
-
-      game.status,
-
-      game.hostName,
-
-      JSON.stringify(game.players),
-
-      JSON.stringify(game.calledNumbers),
-
-      game.currentNumber,
-
-      game.nextCallIn,
-
-      game.shareCode,
-
-      game.winnerCount,
-
-      game.startedAt,
-
-    );
-
 }
 
-seedCards();
+/* =========================================================
 
-seedWallet();
+   AUTOMATIC GAME SEED
 
-seedActivities();
+   ========================================================= */
 
-seedGame();
+function createLobbyGame(): BingoGame {
 
-export function getCards(
+  const id =
 
-  category?: BingoCategory,
-
-  limit = 400,
-
-): BingoCard[] {
-
-  const rows = category
-
-    ? database
-
-        .prepare(`
-
-          SELECT *
-
-          FROM cards
-
-          WHERE category = ?
-
-          ORDER BY id
-
-          LIMIT ?
-
-        `)
-
-        .all(category, limit)
-
-    : database
-
-        .prepare(`
-
-          SELECT *
-
-          FROM cards
-
-          ORDER BY id
-
-          LIMIT ?
-
-        `)
-
-        .all(limit);
-
-  return rows.map((row) =>
-
-    readCard(row as Record<string, unknown>),
-
-  );
-
-}
-
-export function getGames(): BingoGame[] {
-
-  return database
-
-    .prepare(
-
-      "SELECT * FROM games ORDER BY started_at DESC",
-
-    )
-
-    .all()
-
-    .map((row) =>
-
-      readGame(row as Record<string, unknown>),
-
-    );
-
-}
-
-export function getGame(
-
-  id: string,
-
-): BingoGame | undefined {
-
-  const row = database
-
-    .prepare("SELECT * FROM games WHERE id = ?")
-
-    .get(id);
-
-  return row
-
-    ? readGame(row as Record<string, unknown>)
-
-    : undefined;
-
-}
-
-export function createGame(
-
-  name: string,
-
-  category: BingoCategory,
-
-): BingoGame {
-
-  const id = randomId("game");
+    randomId("game");
 
   const shareCode =
 
@@ -1374,47 +2070,27 @@ export function createGame(
 
       .toUpperCase()}`;
 
-  const card = getCards(category, 1)[0];
-
-  if (!card) {
-
-    throw new Error("No Bingo card available");
-
-  }
-
-  const player: BingoPlayer = {
-
-    id: randomId("player"),
-
-    name: "You",
-
-    initials: "YO",
-
-    category,
-
-    cardLabel: card.label,
-
-    joinedAt: now(),
-
-  };
-
   const game: BingoGame = {
 
     id,
 
-    name,
+    name: "Fast Bingo",
 
     status: "waiting",
 
-    hostName: "You",
+    hostName:
 
-    players: [player],
+      "Fast Bingo",
+
+    players: [],
 
     calledNumbers: [],
 
     currentNumber: 0,
 
-    nextCallIn: LOBBY_SECONDS,
+    nextCallIn:
+
+      LOBBY_SECONDS,
 
     shareCode,
 
@@ -1472,9 +2148,461 @@ export function createGame(
 
       game.hostName,
 
-      JSON.stringify(game.players),
+      JSON.stringify(
 
-      JSON.stringify(game.calledNumbers),
+        game.players,
+
+      ),
+
+      JSON.stringify(
+
+        game.calledNumbers,
+
+      ),
+
+      game.currentNumber,
+
+      game.nextCallIn,
+
+      game.shareCode,
+
+      game.winnerCount,
+
+      game.startedAt,
+
+    );
+
+  return game;
+
+}
+
+function seedGame(): void {
+
+  const count =
+
+    Number(
+
+      (
+
+        database
+
+          .prepare(
+
+            "SELECT COUNT(*) as count FROM games",
+
+          )
+
+          .get() as {
+
+          count: number;
+
+        }
+
+      ).count,
+
+    );
+
+  if (count > 0) {
+
+    return;
+
+  }
+
+  createLobbyGame();
+
+}
+
+seedCards();
+
+seedWallet();
+
+seedActivities();
+
+seedGame();
+
+/* =========================================================
+
+   PUBLIC GAME FUNCTIONS
+
+   ========================================================= */
+
+export function getCards(
+
+  category?: BingoCategory,
+
+  limit = TOTAL_CARDS,
+
+): BingoCard[] {
+
+  const rows = category
+
+    ? database
+
+        .prepare(`
+
+          SELECT *
+
+          FROM cards
+
+          WHERE category = ?
+
+          ORDER BY id
+
+          LIMIT ?
+
+        `)
+
+        .all(
+
+          category,
+
+          limit,
+
+        )
+
+    : database
+
+        .prepare(`
+
+          SELECT *
+
+          FROM cards
+
+          ORDER BY id
+
+          LIMIT ?
+
+        `)
+
+        .all(limit);
+
+  return rows.map(
+
+    (row) =>
+
+      readCard(
+
+        row as Record<
+
+          string,
+
+          unknown
+
+        >,
+
+      ),
+
+  );
+
+}
+
+export function getGames(): BingoGame[] {
+
+  return database
+
+    .prepare(`
+
+      SELECT *
+
+      FROM games
+
+      ORDER BY started_at DESC
+
+    `)
+
+    .all()
+
+    .map(
+
+      (row) =>
+
+        readGame(
+
+          row as Record<
+
+            string,
+
+            unknown
+
+          >,
+
+        ),
+
+    );
+
+}
+
+export function getGame(
+
+  id: string,
+
+): BingoGame | undefined {
+
+  const row =
+
+    database
+
+      .prepare(
+
+        "SELECT * FROM games WHERE id = ?",
+
+      )
+
+      .get(id);
+
+  return row
+
+    ? readGame(
+
+        row as Record<
+
+          string,
+
+          unknown
+
+        >,
+
+      )
+
+    : undefined;
+
+}
+
+export function getCurrentAutomaticGame():
+
+  BingoGame {
+
+  const row =
+
+    database
+
+      .prepare(`
+
+        SELECT *
+
+        FROM games
+
+        WHERE status != 'completed'
+
+        ORDER BY
+
+          CASE
+
+            WHEN status = 'waiting'
+
+            THEN 0
+
+            ELSE 1
+
+          END,
+
+          started_at DESC
+
+        LIMIT 1
+
+      `)
+
+      .get();
+
+  if (row) {
+
+    return readGame(
+
+      row as Record<
+
+        string,
+
+        unknown
+
+      >,
+
+    );
+
+  }
+
+  return createLobbyGame();
+
+}
+
+export function createGame(
+
+  name: string,
+
+  category: BingoCategory,
+
+): BingoGame {
+
+  const id =
+
+    randomId("game");
+
+  const shareCode =
+
+    `FB-${Math.random()
+
+      .toString(36)
+
+      .slice(2, 6)
+
+      .toUpperCase()}`;
+
+  const card =
+
+    getCards(
+
+      category,
+
+      TOTAL_CARDS,
+
+    ).find(
+
+      (item) =>
+
+        item.status ===
+
+        "available",
+
+    ) ??
+
+    getCards(
+
+      "normal",
+
+      TOTAL_CARDS,
+
+    ).find(
+
+      (item) =>
+
+        item.status ===
+
+        "available",
+
+    );
+
+  if (!card) {
+
+    throw new Error(
+
+      "No Bingo card available",
+
+    );
+
+  }
+
+  const player:
+
+    BingoPlayer = {
+
+      id: randomId(
+
+        "player",
+
+      ),
+
+      name: "You",
+
+      initials: "YO",
+
+      category,
+
+      cardLabel:
+
+        card.label,
+
+      joinedAt: now(),
+
+    };
+
+  const game:
+
+    BingoGame = {
+
+      id,
+
+      name,
+
+      status: "waiting",
+
+      hostName: "You",
+
+      players: [player],
+
+      calledNumbers: [],
+
+      currentNumber: 0,
+
+      nextCallIn:
+
+        LOBBY_SECONDS,
+
+      shareCode,
+
+      winnerCount: 0,
+
+      startedAt: now(),
+
+    };
+
+  database
+
+    .prepare(`
+
+      INSERT INTO games
+
+        (
+
+          id,
+
+          name,
+
+          status,
+
+          host_name,
+
+          players,
+
+          called_numbers,
+
+          current_number,
+
+          next_call_in,
+
+          share_code,
+
+          winner_count,
+
+          started_at
+
+        )
+
+      VALUES
+
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+
+    `)
+
+    .run(
+
+      game.id,
+
+      game.name,
+
+      game.status,
+
+      game.hostName,
+
+      JSON.stringify(
+
+        game.players,
+
+      ),
+
+      JSON.stringify(
+
+        game.calledNumbers,
+
+      ),
 
       game.currentNumber,
 
@@ -1490,17 +2618,31 @@ export function createGame(
 
   database
 
-    .prepare(
+    .prepare(`
 
-      "UPDATE cards SET status = 'reserved' WHERE id = ?",
+      UPDATE cards
 
-    )
+      SET
+
+        status = 'reserved',
+
+        marked = '[]'
+
+      WHERE id = ?
+
+    `)
 
     .run(card.id);
 
   return game;
 
 }
+
+/* =========================================================
+
+   TELEGRAM GAME
+
+   ========================================================= */
 
 export function createTelegramGame(
 
@@ -1514,17 +2656,31 @@ export function createTelegramGame(
 
 ): BingoGame {
 
-  const game = createGame(name, category);
+  const game =
 
-  game.hostName = hostName;
+    createGame(
 
-  game.players[0].name = hostName;
+      name,
 
-  game.players[0].initials = hostName
+      category,
 
-    .slice(0, 2)
+    );
 
-    .toUpperCase();
+  game.hostName =
+
+    hostName;
+
+  game.players[0].name =
+
+    hostName;
+
+  game.players[0].initials =
+
+    hostName
+
+      .slice(0, 2)
+
+      .toUpperCase();
 
   writeGame(game);
 
@@ -1532,9 +2688,17 @@ export function createTelegramGame(
 
     .prepare(`
 
-      INSERT OR REPLACE INTO game_hosts
+      INSERT OR REPLACE INTO
 
-        (game_id, telegram_id)
+        game_hosts
+
+        (
+
+          game_id,
+
+          telegram_id
+
+        )
 
       VALUES
 
@@ -1542,15 +2706,31 @@ export function createTelegramGame(
 
     `)
 
-    .run(game.id, telegramId);
+    .run(
+
+      game.id,
+
+      telegramId,
+
+    );
 
   database
 
     .prepare(`
 
-      INSERT OR REPLACE INTO game_player_links
+      INSERT OR IGNORE INTO
 
-        (game_id, telegram_id, player_id)
+        game_player_links
+
+        (
+
+          game_id,
+
+          telegram_id,
+
+          player_id
+
+        )
 
       VALUES
 
@@ -1572,6 +2752,12 @@ export function createTelegramGame(
 
 }
 
+/* =========================================================
+
+   JOIN WITH ONE CARD
+
+   ========================================================= */
+
 export function joinTelegramGame(
 
   gameId: string,
@@ -1584,47 +2770,69 @@ export function joinTelegramGame(
 
 ): BingoGame | undefined {
 
-  const game = getGame(gameId);
+  const game =
 
-  if (!game || game.status === "completed") {
+    getGame(gameId);
+
+  if (
+
+    !game ||
+
+    game.status !==
+
+      "waiting"
+
+  ) {
 
     return undefined;
 
   }
 
-  if (game.status === "live") {
+  const existingCount =
 
-    return undefined;
+    countTelegramCards(
 
-  }
+      gameId,
 
-  const existing = database
+      telegramId,
 
-    .prepare(`
+    );
 
-      SELECT player_id
+  if (
 
-      FROM game_player_links
+    existingCount >=
 
-      WHERE game_id = ? AND telegram_id = ?
+    MAX_CARDS_PER_USER
 
-    `)
-
-    .get(gameId, telegramId);
-
-  if (existing) {
-
-    return game;
-
-  }
-
-  const wallet = getTelegramWallet(telegramId);
-
-  if (wallet.balance < CARD_PRICE) {
+  ) {
 
     throw new Error(
 
-      `A demo card costs ${CARD_PRICE} ETB`,
+      `Maximum ${MAX_CARDS_PER_USER} cards allowed`,
+
+    );
+
+  }
+
+  const wallet =
+
+    getTelegramWallet(
+
+      telegramId,
+
+    );
+
+  if (
+
+    wallet.balance <
+
+    CARD_PRICE
+
+  ) {
+
+    throw new Error(
+
+      `Insufficient balance for a card`,
 
     );
 
@@ -1632,21 +2840,45 @@ export function joinTelegramGame(
 
   const card =
 
-    getCards(category, 400).find(
+    getCards(
 
-      (item) => item.status === "available",
+      category,
+
+      TOTAL_CARDS,
+
+    ).find(
+
+      (item) =>
+
+        item.status ===
+
+        "available",
 
     ) ??
 
-    getCards("normal", 400).find(
+    getCards(
 
-      (item) => item.status === "available",
+      "normal",
+
+      TOTAL_CARDS,
+
+    ).find(
+
+      (item) =>
+
+        item.status ===
+
+        "available",
 
     );
 
   if (!card) {
 
-    throw new Error("No available Bingo card");
+    throw new Error(
+
+      "No available Bingo card",
+
+    );
 
   }
 
@@ -1656,19 +2888,29 @@ export function joinTelegramGame(
 
       UPDATE telegram_wallets
 
-      SET balance = balance - ?
+      SET balance =
+
+        balance - ?
 
       WHERE telegram_id = ?
 
     `)
 
-    .run(CARD_PRICE, telegramId);
+    .run(
+
+      CARD_PRICE,
+
+      telegramId,
+
+    );
 
   database
 
     .prepare(`
 
-      INSERT INTO telegram_wallet_entries
+      INSERT INTO
+
+        telegram_wallet_entries
 
         (
 
@@ -1690,7 +2932,23 @@ export function joinTelegramGame(
 
       VALUES
 
-        (?, ?, 'withdrawal', ?, 'telebirr', 'demo', ?)
+        (
+
+          ?,
+
+          ?,
+
+          'withdrawal',
+
+          ?,
+
+          'telebirr',
+
+          'completed',
+
+          ?
+
+        )
 
     `)
 
@@ -1706,37 +2964,59 @@ export function joinTelegramGame(
 
     );
 
-  const player: BingoPlayer = {
+  const player:
 
-    id: randomId("player"),
+    BingoPlayer = {
 
-    name: playerName,
+      id: randomId(
 
-    initials: playerName
+        "player",
 
-      .slice(0, 2)
+      ),
 
-      .toUpperCase(),
+      name: playerName,
 
-    category,
+      initials:
 
-    cardLabel: card.label,
+        playerName
 
-    joinedAt: now(),
+          .slice(0, 2)
 
-  };
+          .toUpperCase(),
 
-  game.players.push(player);
+      category,
+
+      cardLabel:
+
+        card.label,
+
+      joinedAt: now(),
+
+    };
+
+  game.players.push(
+
+    player,
+
+  );
 
   writeGame(game);
 
   database
 
-    .prepare(
+    .prepare(`
 
-      "UPDATE cards SET status = 'reserved', marked = '[]' WHERE id = ?",
+      UPDATE cards
 
-    )
+      SET
+
+        status = 'reserved',
+
+        marked = '[]'
+
+      WHERE id = ?
+
+    `)
 
     .run(card.id);
 
@@ -1744,9 +3024,19 @@ export function joinTelegramGame(
 
     .prepare(`
 
-      INSERT OR REPLACE INTO game_player_links
+      INSERT INTO
 
-        (game_id, telegram_id, player_id)
+        game_player_links
+
+        (
+
+          game_id,
+
+          telegram_id,
+
+          player_id
+
+        )
 
       VALUES
 
@@ -1768,11 +3058,11 @@ export function joinTelegramGame(
 
 }
 
-/**
+/* =========================================================
 
- * Select a specific available card during the 45-second lobby.
+   SELECT / REPLACE ONE CARD
 
- */
+   ========================================================= */
 
 export function selectTelegramCard(
 
@@ -1784,61 +3074,69 @@ export function selectTelegramCard(
 
 ): BingoGame | undefined {
 
-  const game = getGame(gameId);
+  const game =
 
-  if (!game || game.status !== "waiting") {
+    getGame(gameId);
 
-    return undefined;
+  if (
 
-  }
+    !game ||
 
-  const link = database
+    game.status !==
 
-    .prepare(`
+      "waiting"
 
-      SELECT player_id
-
-      FROM game_player_links
-
-      WHERE game_id = ? AND telegram_id = ?
-
-    `)
-
-    .get(gameId, telegramId) as
-
-    | Record<string, unknown>
-
-    | undefined;
-
-  if (!link) {
+  ) {
 
     return undefined;
 
   }
 
-  const playerId = String(link.player_id);
+  const players =
 
-  const player = game.players.find(
+    getPlayersForTelegramUser(
 
-    (item) => item.id === playerId,
+      gameId,
 
-  );
+      telegramId,
 
-  if (!player) {
+    );
+
+  if (
+
+    players.length === 0
+
+  ) {
 
     return undefined;
 
   }
 
-  const cardRow = database
+  const cardRow =
 
-    .prepare("SELECT * FROM cards WHERE id = ?")
+    database
 
-    .get(cardId) as
+      .prepare(
 
-    | Record<string, unknown>
+        "SELECT * FROM cards WHERE id = ?",
 
-    | undefined;
+      )
+
+      .get(
+
+        cardId,
+
+      ) as
+
+      | Record<
+
+          string,
+
+          unknown
+
+        >
+
+      | undefined;
 
   if (!cardRow) {
 
@@ -1846,23 +3144,45 @@ export function selectTelegramCard(
 
   }
 
-  const card = readCard(cardRow);
+  const card =
 
-  if (card.status !== "available") {
+    readCard(
+
+      cardRow,
+
+    );
+
+  if (
+
+    card.status !==
+
+    "available"
+
+  ) {
 
     return undefined;
 
   }
 
-  const oldCard = database
+  const player =
 
-    .prepare(
+    players[0];
 
-      "SELECT * FROM cards WHERE label = ?",
+  const oldCard =
 
-    )
+    database
 
-    .get(player.cardLabel);
+      .prepare(
+
+        "SELECT * FROM cards WHERE label = ?",
+
+      )
+
+      .get(
+
+        player.cardLabel,
+
+      );
 
   if (oldCard) {
 
@@ -1872,17 +3192,27 @@ export function selectTelegramCard(
 
         UPDATE cards
 
-        SET status = 'available', marked = '[]'
+        SET
+
+          status = 'available',
+
+          marked = '[]'
 
         WHERE label = ?
 
       `)
 
-      .run(player.cardLabel);
+      .run(
+
+        player.cardLabel,
+
+      );
 
   }
 
-  player.cardLabel = card.label;
+  player.cardLabel =
+
+    card.label;
 
   writeGame(game);
 
@@ -1892,17 +3222,135 @@ export function selectTelegramCard(
 
       UPDATE cards
 
-      SET status = 'reserved', marked = '[]'
+      SET
+
+        status = 'reserved',
+
+        marked = '[]'
 
       WHERE id = ?
 
     `)
 
-    .run(card.id);
+    .run(
+
+      card.id,
+
+    );
 
   return game;
 
 }
+
+/* =========================================================
+
+   TELEGRAM CARDS — NEW
+
+   ========================================================= */
+
+export function getTelegramCards(
+
+  gameId: string,
+
+  telegramId: string,
+
+): BingoCard[] {
+
+  const players =
+
+    getPlayersForTelegramUser(
+
+      gameId,
+
+      telegramId,
+
+    );
+
+  if (
+
+    players.length === 0
+
+  ) {
+
+    return [];
+
+  }
+
+  const cards:
+
+    BingoCard[] = [];
+
+  for (
+
+    const player of players
+
+  ) {
+
+    const row =
+
+      database
+
+        .prepare(
+
+          "SELECT * FROM cards WHERE label = ?",
+
+        )
+
+        .get(
+
+          player.cardLabel,
+
+        );
+
+    if (row) {
+
+      cards.push(
+
+        readCard(
+
+          row as Record<
+
+            string,
+
+            unknown
+
+          >,
+
+        ),
+
+      );
+
+    }
+
+  }
+
+  return cards;
+
+}
+
+export function getTelegramCardCount(
+
+  gameId: string,
+
+  telegramId: string,
+
+): number {
+
+  return countTelegramCards(
+
+    gameId,
+
+    telegramId,
+
+  );
+
+}
+
+/* =========================================================
+
+   PARTICIPANTS
+
+   ========================================================= */
 
 export function getTelegramParticipants(
 
@@ -1914,7 +3362,9 @@ export function getTelegramParticipants(
 
     .prepare(`
 
-      SELECT telegram_id
+      SELECT DISTINCT
+
+        telegram_id
 
       FROM game_player_links
 
@@ -1924,15 +3374,25 @@ export function getTelegramParticipants(
 
     .all(gameId)
 
-    .map((row) =>
+    .map(
 
-      String(
+      (row) =>
 
-        (row as Record<string, unknown>)
+        String(
 
-          .telegram_id,
+          (
 
-      ),
+            row as Record<
+
+              string,
+
+              unknown
+
+            >
+
+          ).telegram_id,
+
+        ),
 
     );
 
@@ -1944,27 +3404,41 @@ export function getTelegramHost(
 
 ): string | undefined {
 
-  const row = database
+  const row =
 
-    .prepare(`
+    database
 
-      SELECT telegram_id
+      .prepare(`
 
-      FROM game_hosts
+        SELECT telegram_id
 
-      WHERE game_id = ?
+        FROM game_hosts
 
-    `)
+        WHERE game_id = ?
 
-    .get(gameId);
+      `)
+
+      .get(
+
+        gameId,
+
+      );
 
   return row
 
     ? String(
 
-        (row as Record<string, unknown>)
+        (
 
-          .telegram_id,
+          row as Record<
+
+            string,
+
+            unknown
+
+          >
+
+        ).telegram_id,
 
       )
 
@@ -1978,37 +3452,57 @@ export function getTelegramGame(
 
 ): BingoGame | undefined {
 
-  const row = database
+  const row =
 
-    .prepare(`
+    database
 
-      SELECT g.*
+      .prepare(`
 
-      FROM games g
+        SELECT g.*
 
-      INNER JOIN game_player_links l
+        FROM games g
 
-        ON l.game_id = g.id
+        INNER JOIN game_player_links l
 
-      WHERE
+          ON l.game_id = g.id
 
-        l.telegram_id = ?
+        WHERE
 
-        AND g.status != 'completed'
+          l.telegram_id = ?
 
-      ORDER BY g.started_at DESC
+          AND g.status != 'completed'
 
-      LIMIT 1
+        ORDER BY
 
-    `)
+          g.started_at DESC
 
-    .get(telegramId);
+        LIMIT 1
 
-  return row
+      `)
 
-    ? readGame(row as Record<string, unknown>)
+      .get(
 
-    : undefined;
+        telegramId,
+
+      );
+
+  if (row) {
+
+    return readGame(
+
+      row as Record<
+
+        string,
+
+        unknown
+
+      >,
+
+    );
+
+  }
+
+  return getCurrentAutomaticGame();
 
 }
 
@@ -2018,23 +3512,43 @@ export function getGameByShareCode(
 
 ): BingoGame | undefined {
 
-  const row = database
+  const row =
 
-    .prepare(`
+    database
 
-      SELECT *
+      .prepare(`
 
-      FROM games
+        SELECT *
 
-      WHERE UPPER(share_code) = UPPER(?)
+        FROM games
 
-    `)
+        WHERE
 
-    .get(shareCode.trim());
+          UPPER(share_code) =
+
+          UPPER(?)
+
+      `)
+
+      .get(
+
+        shareCode.trim(),
+
+      );
 
   return row
 
-    ? readGame(row as Record<string, unknown>)
+    ? readGame(
+
+        row as Record<
+
+          string,
+
+          unknown
+
+        >,
+
+      )
 
     : undefined;
 
@@ -2048,63 +3562,21 @@ export function getTelegramCard(
 
 ): BingoCard | undefined {
 
-  const link = database
+  return getTelegramCards(
 
-    .prepare(`
+    gameId,
 
-      SELECT player_id
+    telegramId,
 
-      FROM game_player_links
-
-      WHERE game_id = ? AND telegram_id = ?
-
-    `)
-
-    .get(gameId, telegramId) as
-
-    | Record<string, unknown>
-
-    | undefined;
-
-  if (!link) {
-
-    return undefined;
-
-  }
-
-  const game = getGame(gameId);
-
-  const player = game?.players.find(
-
-    (item) =>
-
-      item.id === String(link.player_id),
-
-  );
-
-  if (!player) {
-
-    return undefined;
-
-  }
-
-  const row = database
-
-    .prepare(
-
-      "SELECT * FROM cards WHERE label = ?",
-
-    )
-
-    .get(player.cardLabel);
-
-  return row
-
-    ? readCard(row as Record<string, unknown>)
-
-    : undefined;
+  )[0];
 
 }
+
+/* =========================================================
+
+   TELEGRAM USER
+
+   ========================================================= */
 
 export function upsertTelegramUser(
 
@@ -2120,7 +3592,9 @@ export function upsertTelegramUser(
 
     .prepare(`
 
-      INSERT INTO telegram_users
+      INSERT INTO
+
+        telegram_users
 
         (
 
@@ -2138,13 +3612,21 @@ export function upsertTelegramUser(
 
         (?, ?, ?, ?)
 
-      ON CONFLICT(telegram_id)
+      ON CONFLICT(
+
+        telegram_id
+
+      )
 
       DO UPDATE SET
 
-        first_name = excluded.first_name,
+        first_name =
 
-        username = excluded.username
+          excluded.first_name,
+
+        username =
+
+          excluded.username
 
     `)
 
@@ -2154,7 +3636,9 @@ export function upsertTelegramUser(
 
       firstName,
 
-      username ?? null,
+      username ??
+
+        null,
 
       now(),
 
@@ -2164,9 +3648,19 @@ export function upsertTelegramUser(
 
     .prepare(`
 
-      INSERT OR IGNORE INTO telegram_wallets
+      INSERT OR IGNORE INTO
 
-        (telegram_id, balance, currency)
+        telegram_wallets
+
+        (
+
+          telegram_id,
+
+          balance,
+
+          currency
+
+        )
 
       VALUES
 
@@ -2174,15 +3668,29 @@ export function upsertTelegramUser(
 
     `)
 
-    .run(telegramId);
+    .run(
+
+      telegramId,
+
+    );
 
   database
 
     .prepare(`
 
-      INSERT OR IGNORE INTO telegram_sessions
+      INSERT OR IGNORE INTO
 
-        (telegram_id, state, updated_at)
+        telegram_sessions
+
+        (
+
+          telegram_id,
+
+          state,
+
+          updated_at
+
+        )
 
       VALUES
 
@@ -2190,7 +3698,13 @@ export function upsertTelegramUser(
 
     `)
 
-    .run(telegramId, now());
+    .run(
+
+      telegramId,
+
+      now(),
+
+    );
 
 }
 
@@ -2200,19 +3714,25 @@ export function hasTelegramUser(
 
 ): boolean {
 
-  const row = database
+  const row =
 
-    .prepare(`
+    database
 
-      SELECT telegram_id
+      .prepare(`
 
-      FROM telegram_users
+        SELECT telegram_id
 
-      WHERE telegram_id = ?
+        FROM telegram_users
 
-    `)
+        WHERE telegram_id = ?
 
-    .get(telegramId);
+      `)
+
+      .get(
+
+        telegramId,
+
+      );
 
   return Boolean(row);
 
@@ -2238,7 +3758,13 @@ export function setTelegramLanguage(
 
     `)
 
-    .run(language, telegramId);
+    .run(
+
+      language,
+
+      telegramId,
+
+    );
 
 }
 
@@ -2248,31 +3774,53 @@ export function getTelegramLanguage(
 
 ): "en" | "am" {
 
-  const row = database
+  const row =
 
-    .prepare(`
+    database
 
-      SELECT language
+      .prepare(`
 
-      FROM telegram_users
+        SELECT language
 
-      WHERE telegram_id = ?
+        FROM telegram_users
 
-    `)
+        WHERE telegram_id = ?
 
-    .get(telegramId);
+      `)
+
+      .get(
+
+        telegramId,
+
+      );
 
   return row &&
 
-    (row as Record<string, unknown>)
+    (
 
-      .language === "am"
+      row as Record<
+
+        string,
+
+        unknown
+
+      >
+
+    ).language ===
+
+      "am"
 
     ? "am"
 
     : "en";
 
 }
+
+/* =========================================================
+
+   SESSION
+
+   ========================================================= */
 
 export type TelegramSessionState =
 
@@ -2300,7 +3848,9 @@ export function setTelegramSession(
 
     .prepare(`
 
-      INSERT INTO telegram_sessions
+      INSERT INTO
+
+        telegram_sessions
 
         (
 
@@ -2318,15 +3868,25 @@ export function setTelegramSession(
 
         (?, ?, ?, ?)
 
-      ON CONFLICT(telegram_id)
+      ON CONFLICT(
+
+        telegram_id
+
+      )
 
       DO UPDATE SET
 
-        state = excluded.state,
+        state =
 
-        game_id = excluded.game_id,
+          excluded.state,
 
-        updated_at = excluded.updated_at
+        game_id =
+
+          excluded.game_id,
+
+        updated_at =
+
+          excluded.updated_at
 
     `)
 
@@ -2336,7 +3896,9 @@ export function setTelegramSession(
 
       state,
 
-      gameId ?? null,
+      gameId ??
+
+        null,
 
       now(),
 
@@ -2356,43 +3918,75 @@ export function getTelegramSession(
 
 } {
 
-  const row = database
+  const row =
 
-    .prepare(`
+    database
 
-      SELECT state, game_id
+      .prepare(`
 
-      FROM telegram_sessions
+        SELECT
 
-      WHERE telegram_id = ?
+          state,
 
-    `)
+          game_id
 
-    .get(telegramId) as
+        FROM telegram_sessions
 
-    | Record<string, unknown>
+        WHERE telegram_id = ?
 
-    | undefined;
+      `)
+
+      .get(
+
+        telegramId,
+
+      ) as
+
+      | Record<
+
+          string,
+
+          unknown
+
+        >
+
+      | undefined;
 
   return {
 
     state:
 
-      (row?.state as
+      (
 
-        | TelegramSessionState
+        row?.state as
 
-        | undefined) ?? "menu",
+          | TelegramSessionState
 
-    gameId: row?.game_id
+          | undefined
 
-      ? String(row.game_id)
+      ) ?? "menu",
 
-      : undefined,
+    gameId:
+
+      row?.game_id
+
+        ? String(
+
+            row.game_id,
+
+          )
+
+        : undefined,
 
   };
 
 }
+
+/* =========================================================
+
+   TELEGRAM WALLET
+
+   ========================================================= */
 
 export function getTelegramWallet(
 
@@ -2400,101 +3994,155 @@ export function getTelegramWallet(
 
 ): BingoWallet {
 
-  const wallet = database
+  const wallet =
 
-    .prepare(`
+    database
 
-      SELECT balance, currency
+      .prepare(`
 
-      FROM telegram_wallets
+        SELECT
 
-      WHERE telegram_id = ?
+          balance,
 
-    `)
+          currency
 
-    .get(telegramId) as
+        FROM telegram_wallets
 
-    | Record<string, unknown>
+        WHERE telegram_id = ?
 
-    | undefined;
+      `)
 
-  const entries = database
+      .get(
 
-    .prepare(`
+        telegramId,
 
-      SELECT
+      ) as
 
-        id,
+      | Record<
 
-        type,
+          string,
 
-        amount,
+          unknown
 
-        method,
+        >
 
-        status,
+      | undefined;
 
-        created_at
+  const entries =
 
-      FROM telegram_wallet_entries
+    database
 
-      WHERE telegram_id = ?
+      .prepare(`
 
-      ORDER BY created_at DESC
+        SELECT
 
-    `)
+          id,
 
-    .all(telegramId)
+          type,
 
-    .map((row) => {
+          amount,
 
-      const entry =
+          method,
 
-        row as Record<string, unknown>;
+          status,
 
-      return {
+          created_at
 
-        id: String(entry.id),
+        FROM telegram_wallet_entries
 
-        type: entry.type as
+        WHERE telegram_id = ?
 
-          | "deposit"
+        ORDER BY
 
-          | "withdrawal",
+          created_at DESC
 
-        amount: Number(entry.amount),
+      `)
 
-        method:
+      .all(
 
-          entry.method as WalletMethod,
+        telegramId,
 
-        status: entry.status as
+      )
 
-          | "demo"
+      .map(
 
-          | "pending",
+        (row) => {
 
-        createdAt: String(
+          const entry =
 
-          entry.created_at,
+            row as Record<
 
-        ),
+              string,
 
-      };
+              unknown
 
-    });
+            >;
+
+          return {
+
+            id: String(
+
+              entry.id,
+
+            ),
+
+            type:
+
+              entry.type as
+
+                | "deposit"
+
+                | "withdrawal",
+
+            amount:
+
+              Number(
+
+                entry.amount,
+
+              ),
+
+            method:
+
+              entry.method as WalletMethod,
+
+            status:
+
+              entry.status as
+
+                | "completed"
+
+                | "pending",
+
+            createdAt:
+
+              String(
+
+                entry.created_at,
+
+              ),
+
+          };
+
+        },
+
+      );
 
   return {
 
     balance: Number(
 
-      wallet?.balance ?? 2500,
+      wallet?.balance ??
+
+        2500,
 
     ),
 
     currency: String(
 
-      wallet?.currency ?? "ETB",
+      wallet?.currency ??
+
+        "ETB",
 
     ),
 
@@ -2508,7 +4156,11 @@ export function telegramWalletAction(
 
   telegramId: string,
 
-  type: "deposit" | "withdrawal",
+  type:
+
+    | "deposit"
+
+    | "withdrawal",
 
   amount: number,
 
@@ -2516,7 +4168,17 @@ export function telegramWalletAction(
 
 ): BingoWallet {
 
-  if (!Number.isFinite(amount) || amount <= 0) {
+  if (
+
+    !Number.isFinite(
+
+      amount,
+
+    ) ||
+
+    amount <= 0
+
+  ) {
 
     throw new Error(
 
@@ -2528,21 +4190,33 @@ export function telegramWalletAction(
 
   const wallet =
 
-    getTelegramWallet(telegramId);
+    getTelegramWallet(
+
+      telegramId,
+
+    );
 
   const nextBalance =
 
     type === "deposit"
 
-      ? wallet.balance + amount
+      ? wallet.balance +
 
-      : wallet.balance - amount;
+        amount
 
-  if (nextBalance < 0) {
+      : wallet.balance -
+
+        amount;
+
+  if (
+
+    nextBalance < 0
+
+  ) {
 
     throw new Error(
 
-      "Demo balance is too low for this withdrawal",
+      "Insufficient balance for this withdrawal",
 
     );
 
@@ -2552,9 +4226,19 @@ export function telegramWalletAction(
 
     .prepare(`
 
-      INSERT OR IGNORE INTO telegram_wallets
+      INSERT OR IGNORE INTO
 
-        (telegram_id, balance, currency)
+        telegram_wallets
+
+        (
+
+          telegram_id,
+
+          balance,
+
+          currency
+
+        )
 
       VALUES
 
@@ -2594,7 +4278,9 @@ export function telegramWalletAction(
 
     .prepare(`
 
-      INSERT INTO telegram_wallet_entries
+      INSERT INTO
+
+        telegram_wallet_entries
 
         (
 
@@ -2616,13 +4302,17 @@ export function telegramWalletAction(
 
       VALUES
 
-        (?, ?, ?, ?, ?, 'demo', ?)
+        (?, ?, ?, ?, ?, 'completed', ?)
 
     `)
 
     .run(
 
-      randomId("wallet"),
+      randomId(
+
+        "wallet",
+
+      ),
 
       telegramId,
 
@@ -2644,27 +4334,11 @@ export function telegramWalletAction(
 
 }
 
-/**
+/* =========================================================
 
- * Start:
+   GAME ADVANCE
 
- * 45-second lobby/countdown.
-
- *
-
- * Once live:
-
- * every call uses the real 3.5-second interval.
-
- *
-
- * IMPORTANT:
-
- * nextCallIn exposed to the API is kept integer-safe
-
- * for the current generated Zod schema.
-
- */
+   ========================================================= */
 
 export function advanceGame(
 
@@ -2674,7 +4348,9 @@ export function advanceGame(
 
 ): BingoGame | undefined {
 
-  const game = getGame(id);
+  const game =
+
+    getGame(id);
 
   if (!game) {
 
@@ -2682,47 +4358,65 @@ export function advanceGame(
 
   }
 
-  if (action === "start") {
+  /* -------------------------------------------------------
 
-    if (game.status === "waiting") {
+     START
 
-      /*
+     ------------------------------------------------------- */
 
-       * First start opens the 45-second lobby.
+  if (
 
-       * A second start after the lobby can begin the live phase.
+    action === "start" &&
 
-       */
+    game.status ===
+
+      "waiting"
+
+  ) {
+
+    if (
+
+      game.calledNumbers
+
+        .length === 0
+
+    ) {
+
+      const elapsed =
+
+        (
+
+          Date.now() -
+
+          new Date(
+
+            game.startedAt,
+
+          ).getTime()
+
+        ) / 1000;
 
       if (
 
-        game.calledNumbers.length === 0 &&
+        elapsed >=
 
-        game.nextCallIn > CALL_INTERVAL_SECONDS
+        LOBBY_SECONDS
 
       ) {
 
-        game.nextCallIn =
+        game.status =
 
-          LOBBY_SECONDS;
-
-      } else {
-
-        game.status = "live";
-
-        /*
-
-         * API-safe integer display value.
-
-         * Real calling remains 3.5 seconds in telegram-bot.ts.
-
-         */
+          "live";
 
         game.nextCallIn =
 
           DISPLAY_CALL_INTERVAL_SECONDS;
 
-        game.players.forEach((player) => {
+        for (
+
+          const player of game.players
+
+        ) {
 
           database
 
@@ -2740,15 +4434,43 @@ export function advanceGame(
 
             `)
 
-            .run(player.cardLabel);
+            .run(
 
-        });
+              player.cardLabel,
+
+            );
+
+        }
+
+      } else {
+
+        game.nextCallIn =
+
+          Math.max(
+
+            1,
+
+            Math.ceil(
+
+              LOBBY_SECONDS -
+
+                elapsed,
+
+            ),
+
+          );
 
       }
 
     }
 
   }
+
+  /* -------------------------------------------------------
+
+     PAUSE
+
+     ------------------------------------------------------- */
 
   if (
 
@@ -2758,21 +4480,43 @@ export function advanceGame(
 
   ) {
 
-    game.status = "waiting";
+    game.status =
+
+      "waiting";
 
   }
 
-  if (action === "reset") {
+  /* -------------------------------------------------------
 
-    game.status = "waiting";
+     RESET
 
-    game.calledNumbers = [];
+     ------------------------------------------------------- */
 
-    game.currentNumber = 0;
+  if (
 
-    game.nextCallIn = LOBBY_SECONDS;
+    action === "reset"
 
-    game.winnerCount = 0;
+  ) {
+
+    game.status =
+
+      "waiting";
+
+    game.calledNumbers =
+
+      [];
+
+    game.currentNumber =
+
+      0;
+
+    game.nextCallIn =
+
+      LOBBY_SECONDS;
+
+    game.winnerCount =
+
+      0;
 
     database
 
@@ -2784,9 +4528,21 @@ export function advanceGame(
 
       `)
 
-      .run(game.id);
+      .run(
 
-    game.players.forEach((player) => {
+        game.id,
+
+      );
+
+    game.startedAt =
+
+      now();
+
+    for (
+
+      const player of game.players
+
+    ) {
 
       database
 
@@ -2804,11 +4560,21 @@ export function advanceGame(
 
         `)
 
-        .run(player.cardLabel);
+        .run(
 
-    });
+          player.cardLabel,
+
+        );
+
+    }
 
   }
+
+  /* -------------------------------------------------------
+
+     CALL
+
+     ------------------------------------------------------- */
 
   if (
 
@@ -2822,9 +4588,17 @@ export function advanceGame(
 
       Array.from(
 
-        { length: 75 },
+        {
 
-        (_, index) => index + 1,
+          length:
+
+            TOTAL_NUMBERS,
+
+        },
+
+        (_, index) =>
+
+          index + 1,
 
       ).filter(
 
@@ -2840,63 +4614,99 @@ export function advanceGame(
 
     const number =
 
-      shuffle(uncalled)[0];
+      shuffle(
 
-    if (number) {
+        uncalled,
 
-      game.calledNumbers.push(number);
+      )[0];
 
-      game.currentNumber = number;
+    if (
 
-      /*
+      number !== undefined
 
-       * Keep API response integer-safe.
+    ) {
 
-       * Telegram bot still uses 3500ms.
+      game.calledNumbers.push(
 
-       */
+        number,
+
+      );
+
+      game.currentNumber =
+
+        number;
 
       game.nextCallIn =
 
         DISPLAY_CALL_INTERVAL_SECONDS;
 
-      game.players.forEach((player) => {
+      for (
 
-        const cardRow = database
+        const player of game.players
 
-          .prepare(`
+      ) {
 
-            SELECT *
+        const cardRow =
 
-            FROM cards
+          database
 
-            WHERE label = ?
+            .prepare(`
 
-          `)
+              SELECT *
 
-          .get(player.cardLabel);
+              FROM cards
+
+              WHERE label = ?
+
+            `)
+
+            .get(
+
+              player.cardLabel,
+
+            );
 
         if (!cardRow) {
 
-          return;
+          continue;
 
         }
 
-        const card = readCard(
+        const card =
 
-          cardRow as Record<string, unknown>,
+          readCard(
 
-        );
+            cardRow as Record<
+
+              string,
+
+              unknown
+
+            >,
+
+          );
 
         if (
 
-          !card.marked.includes(number) &&
+          card.numbers.includes(
 
-          card.numbers.includes(number)
+            number,
+
+          ) &&
+
+          !card.marked.includes(
+
+            number,
+
+          )
 
         ) {
 
-          card.marked.push(number);
+          card.marked.push(
+
+            number,
+
+          );
 
           database
 
@@ -2916,7 +4726,11 @@ export function advanceGame(
 
             .run(
 
-              JSON.stringify(card.marked),
+              JSON.stringify(
+
+                card.marked,
+
+              ),
 
               card.id,
 
@@ -2924,13 +4738,21 @@ export function advanceGame(
 
         }
 
-      });
+      }
 
       const winners =
 
-        settleWinners(game);
+        settleWinners(
 
-      if (winners.length > 0) {
+          game,
+
+        );
+
+      if (
+
+        winners.length > 0
+
+      ) {
 
         game.winnerCount =
 
@@ -2940,27 +4762,55 @@ export function advanceGame(
 
           "completed";
 
-        game.nextCallIn = 0;
+        game.nextCallIn =
 
-        game.players.forEach(
+          0;
 
-          (player) => {
+        releasePlayerCards(
 
-            database
+          game,
 
-              .prepare(`
+        );
 
-                UPDATE cards
+      }
 
-                SET status = 'available'
+      /*
 
-                WHERE label = ?
+       * If all 75 numbers were called
 
-              `)
+       * without a winner, complete this
 
-              .run(player.cardLabel);
+       * round so the next automatic lobby
 
-          },
+       * can begin.
+
+       */
+
+      if (
+
+        game.calledNumbers
+
+          .length >=
+
+          TOTAL_NUMBERS &&
+
+        game.status !==
+
+          "completed"
+
+      ) {
+
+        game.status =
+
+          "completed";
+
+        game.nextCallIn =
+
+          0;
+
+        releasePlayerCards(
+
+          game,
 
         );
 
@@ -2970,29 +4820,51 @@ export function advanceGame(
 
   }
 
-  if (action === "claim") {
+  /* -------------------------------------------------------
+
+     CLAIM
+
+     ------------------------------------------------------- */
+
+  if (
+
+    action === "claim"
+
+  ) {
 
     const winners =
 
-      settleWinners(game);
+      settleWinners(
 
-    if (winners.length > 0) {
+        game,
+
+      );
+
+    if (
+
+      winners.length > 0
+
+    ) {
 
       game.winnerCount =
 
         winners.length;
 
-    } else {
-
-      game.winnerCount =
-
-        Math.max(1, game.winnerCount);
-
     }
 
-    game.status = "completed";
+    game.status =
 
-    game.nextCallIn = 0;
+      "completed";
+
+    game.nextCallIn =
+
+      0;
+
+    releasePlayerCards(
+
+      game,
+
+    );
 
   }
 
@@ -3002,77 +4874,227 @@ export function advanceGame(
 
 }
 
+/* =========================================================
+
+   AUTOMATIC ROUND SUPPORT
+
+   ========================================================= */
+
+export function ensureNextAutomaticGame(
+
+  completedGameId?: string,
+
+): BingoGame {
+
+  const active =
+
+    getGames().find(
+
+      (game) =>
+
+        game.status !==
+
+        "completed",
+
+    );
+
+  if (active) {
+
+    return active;
+
+  }
+
+  return createLobbyGame();
+
+}
+
+export function advanceAutomaticGame(
+
+  gameId: string,
+
+): BingoGame | undefined {
+
+  const game =
+
+    getGame(gameId);
+
+  if (!game) {
+
+    return undefined;
+
+  }
+
+  if (
+
+    game.status ===
+
+    "waiting"
+
+  ) {
+
+    const updated =
+
+      advanceGame(
+
+        game.id,
+
+        "start",
+
+      );
+
+    return updated;
+
+  }
+
+  if (
+
+    game.status ===
+
+    "completed"
+
+  ) {
+
+    return ensureNextAutomaticGame(
+
+      game.id,
+
+    );
+
+  }
+
+  return advanceGame(
+
+    game.id,
+
+    "call",
+
+  );
+
+}
+
+/* =========================================================
+
+   GLOBAL WALLET
+
+   ========================================================= */
+
 export function getWallet(): BingoWallet {
 
-  const wallet = database
+  const wallet =
 
-    .prepare(
+    database
 
-      "SELECT * FROM wallet WHERE id = 1",
+      .prepare(
 
-    )
+        "SELECT * FROM wallet WHERE id = 1",
 
-    .get() as Record<string, unknown>;
+      )
 
-  const entries = database
+      .get() as Record<
 
-    .prepare(`
+      string,
 
-      SELECT *
+      unknown
 
-      FROM wallet_entries
+    >;
 
-      ORDER BY created_at DESC
+  const entries =
 
-    `)
+    database
 
-    .all()
+      .prepare(`
 
-    .map((row) => {
+        SELECT *
 
-      const entry =
+        FROM wallet_entries
 
-        row as Record<string, unknown>;
+        ORDER BY created_at DESC
 
-      return {
+      `)
 
-        id: String(entry.id),
+      .all()
 
-        type: entry.type as
+      .map(
 
-          | "deposit"
+        (row) => {
 
-          | "withdrawal",
+          const entry =
 
-        amount: Number(entry.amount),
+            row as Record<
 
-        method:
+              string,
 
-          entry.method as WalletMethod,
+              unknown
 
-        status:
+            >;
 
-          entry.status as
+          return {
 
-            | "demo"
+            id: String(
 
-            | "pending",
+              entry.id,
 
-        createdAt: String(
+            ),
 
-          entry.created_at,
+            type:
 
-        ),
+              entry.type as
 
-      };
+                | "deposit"
 
-    });
+                | "withdrawal",
+
+            amount:
+
+              Number(
+
+                entry.amount,
+
+              ),
+
+            method:
+
+              entry.method as WalletMethod,
+
+            status:
+
+              entry.status as
+
+                | "completed"
+
+                | "pending",
+
+            createdAt:
+
+              String(
+
+                entry.created_at,
+
+              ),
+
+          };
+
+        },
+
+      );
 
   return {
 
-    balance: Number(wallet.balance),
+    balance:
 
-    currency: String(wallet.currency),
+      Number(
+
+        wallet.balance,
+
+      ),
+
+    currency:
+
+      String(
+
+        wallet.currency,
+
+      ),
 
     entries,
 
@@ -3082,7 +5104,11 @@ export function getWallet(): BingoWallet {
 
 export function walletAction(
 
-  type: "deposit" | "withdrawal",
+  type:
+
+    | "deposit"
+
+    | "withdrawal",
 
   amount: number,
 
@@ -3090,7 +5116,17 @@ export function walletAction(
 
 ): BingoWallet {
 
-  if (!Number.isFinite(amount) || amount <= 0) {
+  if (
+
+    !Number.isFinite(
+
+      amount,
+
+    ) ||
+
+    amount <= 0
+
+  ) {
 
     throw new Error(
 
@@ -3100,21 +5136,31 @@ export function walletAction(
 
   }
 
-  const wallet = getWallet();
+  const wallet =
+
+    getWallet();
 
   const nextBalance =
 
     type === "deposit"
 
-      ? wallet.balance + amount
+      ? wallet.balance +
 
-      : wallet.balance - amount;
+        amount
 
-  if (nextBalance < 0) {
+      : wallet.balance -
+
+        amount;
+
+  if (
+
+    nextBalance < 0
+
+  ) {
 
     throw new Error(
 
-      "Demo balance is too low for this withdrawal",
+      "Insufficient balance for this withdrawal",
 
     );
 
@@ -3132,13 +5178,19 @@ export function walletAction(
 
     `)
 
-    .run(nextBalance);
+    .run(
+
+      nextBalance,
+
+    );
 
   database
 
     .prepare(`
 
-      INSERT INTO wallet_entries
+      INSERT INTO
+
+        wallet_entries
 
         (
 
@@ -3158,13 +5210,31 @@ export function walletAction(
 
       VALUES
 
-        (?, ?, ?, ?, 'demo', ?)
+        (
+
+          ?,
+
+          ?,
+
+          ?,
+
+          ?,
+
+          'completed',
+
+          ?
+
+        )
 
     `)
 
     .run(
 
-      randomId("wallet"),
+      randomId(
+
+        "wallet",
+
+      ),
 
       type,
 
@@ -3180,7 +5250,15 @@ export function walletAction(
 
 }
 
-export function getActivities(): BingoActivity[] {
+/* =========================================================
+
+   ACTIVITIES
+
+   ========================================================= */
+
+export function getActivities():
+
+  BingoActivity[] {
 
   return database
 
@@ -3196,65 +5274,99 @@ export function getActivities(): BingoActivity[] {
 
     .all()
 
-    .map((row) => {
+    .map(
 
-      const activity =
+      (row) => {
 
-        row as Record<string, unknown>;
+        const activity =
 
-      return {
+          row as Record<
 
-        id: String(activity.id),
+            string,
 
-        title: String(activity.title),
+            unknown
 
-        detail: String(activity.detail),
+          >;
 
-        time: String(activity.time),
+        return {
 
-        tone:
+          id: String(
 
-          activity.tone as BingoActivity["tone"],
+            activity.id,
 
-      };
+          ),
 
-    });
+          title: String(
+
+            activity.title,
+
+          ),
+
+          detail: String(
+
+            activity.detail,
+
+          ),
+
+          time: String(
+
+            activity.time,
+
+          ),
+
+          tone:
+
+            activity.tone as BingoActivity["tone"],
+
+        };
+
+      },
+
+    );
 
 }
 
-/**
+/* =========================================================
 
- * Useful game constants for the API/bot.
+   CONFIG
 
- */
+   ========================================================= */
 
 export function getBingoConfig() {
 
   return {
 
-    cardPrice: CARD_PRICE,
+    cardPrice:
 
-    prizePerCard: PRIZE_PER_CARD,
+      CARD_PRICE,
 
-    lobbySeconds: LOBBY_SECONDS,
+    prizePerCard:
 
-    /*
+      PRIZE_PER_CARD,
 
-     * Keep the actual configuration at 3.5 seconds.
+    lobbySeconds:
 
-     * Telegram bot uses 3500ms.
-
-     */
+      LOBBY_SECONDS,
 
     callIntervalSeconds:
 
       CALL_INTERVAL_SECONDS,
 
-    totalCards: 400,
+    totalCards:
 
-    totalNumbers: 75,
+      TOTAL_CARDS,
 
-    winningLines: 2,
+    totalNumbers:
+
+      TOTAL_NUMBERS,
+
+    winningLines:
+
+      WINNING_LINES,
+
+    maxCardsPerUser:
+
+      MAX_CARDS_PER_USER,
 
   };
 
@@ -3266,7 +5378,9 @@ export function getGamePrizePool(
 
 ): number {
 
-  const game = getGame(gameId);
+  const game =
+
+    getGame(gameId);
 
   if (!game) {
 
@@ -3274,7 +5388,11 @@ export function getGamePrizePool(
 
   }
 
-  return getPrizePool(game);
+  return getPrizePool(
+
+    game,
+
+  );
 
 }
 
@@ -3284,7 +5402,9 @@ export function getGameCardCount(
 
 ): number {
 
-  const game = getGame(gameId);
+  const game =
+
+    getGame(gameId);
 
   if (!game) {
 
@@ -3292,7 +5412,11 @@ export function getGameCardCount(
 
   }
 
-  return getCardCount(game);
+  return getCardCount(
+
+    game,
+
+  );
 
 }
 
@@ -3336,36 +5460,58 @@ export function getGameWinners(
 
     .all(gameId)
 
-    .map((row) => {
+    .map(
 
-      const item =
+      (row) => {
 
-        row as Record<string, unknown>;
+        const item =
 
-      return {
+          row as Record<
 
-        telegramId: String(
+            string,
 
-          item.telegram_id,
+            unknown
 
-        ),
+          >;
 
-        playerId: String(
+        return {
 
-          item.player_id,
+          telegramId:
 
-        ),
+            String(
 
-        prize: Number(item.prize),
+              item.telegram_id,
 
-        createdAt: String(
+            ),
 
-          item.created_at,
+          playerId:
 
-        ),
+            String(
 
-      };
+              item.player_id,
 
-    });
+            ),
+
+          prize:
+
+            Number(
+
+              item.prize,
+
+            ),
+
+          createdAt:
+
+            String(
+
+              item.created_at,
+
+            ),
+
+        };
+
+      },
+
+    );
 
 }
