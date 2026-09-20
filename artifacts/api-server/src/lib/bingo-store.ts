@@ -114,7 +114,35 @@ const PRIZE_PER_CARD = 8;
 
 const LOBBY_SECONDS = 45;
 
+/*
+
+ * REAL game calling interval.
+
+ *
+
+ * The Telegram bot continues to call every 3500ms.
+
+ */
+
 const CALL_INTERVAL_SECONDS = 3.5;
+
+/*
+
+ * The generated API Zod schema currently expects
+
+ * nextCallIn to be an integer.
+
+ *
+
+ * Keep the real game interval at 3.5 seconds,
+
+ * but expose 3 seconds to the API to avoid
+
+ * Zod validation errors in the Mini App.
+
+ */
+
+const DISPLAY_CALL_INTERVAL_SECONDS = 3;
 
 const dataDir = path.resolve(process.cwd(), "data");
 
@@ -1140,7 +1168,17 @@ function seedGame(): void {
 
     currentNumber: 69,
 
-    nextCallIn: CALL_INTERVAL_SECONDS,
+    /*
+
+     * IMPORTANT:
+
+     * Keep this integer for the generated Zod API schema.
+
+     * The real Telegram calling interval remains 3.5 seconds.
+
+     */
+
+    nextCallIn: DISPLAY_CALL_INTERVAL_SECONDS,
 
     shareCode: "FB-7K2P",
 
@@ -2616,7 +2654,15 @@ export function telegramWalletAction(
 
  * Once live:
 
- * every call uses a 3.5-second interval.
+ * every call uses the real 3.5-second interval.
+
+ *
+
+ * IMPORTANT:
+
+ * nextCallIn exposed to the API is kept integer-safe
+
+ * for the current generated Zod schema.
 
  */
 
@@ -2664,9 +2710,17 @@ export function advanceGame(
 
         game.status = "live";
 
+        /*
+
+         * API-safe integer display value.
+
+         * Real calling remains 3.5 seconds in telegram-bot.ts.
+
+         */
+
         game.nextCallIn =
 
-          CALL_INTERVAL_SECONDS;
+          DISPLAY_CALL_INTERVAL_SECONDS;
 
         game.players.forEach((player) => {
 
@@ -2794,9 +2848,17 @@ export function advanceGame(
 
       game.currentNumber = number;
 
+      /*
+
+       * Keep API response integer-safe.
+
+       * Telegram bot still uses 3500ms.
+
+       */
+
       game.nextCallIn =
 
-        CALL_INTERVAL_SECONDS;
+        DISPLAY_CALL_INTERVAL_SECONDS;
 
       game.players.forEach((player) => {
 
@@ -3175,6 +3237,14 @@ export function getBingoConfig() {
     prizePerCard: PRIZE_PER_CARD,
 
     lobbySeconds: LOBBY_SECONDS,
+
+    /*
+
+     * Keep the actual configuration at 3.5 seconds.
+
+     * Telegram bot uses 3500ms.
+
+     */
 
     callIntervalSeconds:
 
