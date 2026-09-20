@@ -54,6 +54,7 @@ type TelegramUpdate = {
 const botToken = process.env.BOT_TOKEN;
 const apiBase = botToken ? `https://api.telegram.org/bot${botToken}` : undefined;
 const telegramMiniAppUrl = process.env.TELEGRAM_MINI_APP_URL;
+const telegramPollingEnabled = process.env.NODE_ENV === "production";
 const activeCallSnapshots = new Map<string, number>();
 const pendingRoomNames = new Map<string, string>();
 let polling = false;
@@ -512,6 +513,13 @@ async function automaticCalls(): Promise<void> {
 export function startTelegramBot(): void {
   if (!botToken) {
     logger.warn("BOT_TOKEN is missing; Telegram bot integration is disabled");
+    return;
+  }
+  if (!telegramPollingEnabled) {
+    logger.info(
+      { nodeEnv: process.env.NODE_ENV ?? "unset" },
+      "Telegram bot integration is disabled outside production",
+    );
     return;
   }
   void poll();
