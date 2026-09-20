@@ -21,3 +21,8 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+TELEGRAM_MINI_APP_URL = "https://fast-bingo-telegram-bot–dagnaeli21.replit.app"
