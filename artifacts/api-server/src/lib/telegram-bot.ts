@@ -2,47 +2,27 @@ import { logger } from "./logger";
 
 import {
 
-  advanceGame,
+  advanceAutomaticGame,
 
-  createTelegramGame,
-
-  getGame,
-
-  getGameByShareCode,
-
-  getGames,
-
-  getTelegramCard,
-
-  getTelegramGame,
-
-  getTelegramHost,
+  getOrCreateAutomaticGame,
 
   getTelegramLanguage,
 
   getTelegramParticipants,
 
-  getTelegramSession,
-
   getTelegramWallet,
 
   hasTelegramUser,
 
-  joinTelegramGame,
-
   setTelegramLanguage,
+
+  setTelegramPhone,
 
   setTelegramSession,
 
   telegramWalletAction,
 
   upsertTelegramUser,
-
-  type BingoCategory,
-
-  type BingoGame,
-
-  type WalletMethod,
 
 } from "./bingo-store";
 
@@ -56,11 +36,29 @@ type TelegramButton = {
 
   web_app?: { url: string };
 
+  request_contact?: boolean;
+
 };
 
 type TelegramKeyboard = {
 
-  inline_keyboard: Array<Array<TelegramButton>>;
+  inline_keyboard?: Array<Array<TelegramButton>>;
+
+  keyboard?: Array<Array<TelegramButton>>;
+
+  resize_keyboard?: boolean;
+
+  one_time_keyboard?: boolean;
+
+};
+
+type TelegramContact = {
+
+  phone_number: string;
+
+  first_name?: string;
+
+  user_id?: number;
 
 };
 
@@ -71,6 +69,8 @@ type TelegramMessage = {
   chat: { id: number };
 
   text?: string;
+
+  contact?: TelegramContact;
 
   from?: {
 
@@ -122,71 +122,151 @@ const apiBase = botToken
 
   : undefined;
 
-const telegramMiniAppUrl = process.env.TELEGRAM_MINI_APP_URL;
+const telegramMiniAppUrl =
 
-const telegramPollingEnabled = process.env.NODE_ENV === "production";
+  process.env.TELEGRAM_MINI_APP_URL;
 
-const activeCallSnapshots = new Map<string, number>();
+const telegramPollingEnabled =
 
-const pendingRoomNames = new Map<string, string>();
+  process.env.NODE_ENV === "production";
 
-let polling = false;
+const LOBBY_SECONDS = 45;
 
 const CALL_INTERVAL_MS = 3500;
 
-const copy: Record<Language, Record<string, string>> = {
+let polling = false;
+
+let lastAutomaticStatus:
+
+  | "waiting"
+
+  | "live"
+
+  | "completed"
+
+  | undefined;
+
+let lastAutomaticNumber = 0;
+
+let lastAutomaticGameId = "";
+
+const copy: Record<
+
+  Language,
+
+  Record<string, string>
+
+> = {
 
   en: {
 
-    welcome: "Welcome to Fast Bingo. Choose your language.",
+    welcome:
 
-    menu:
+      "Welcome to Fast Bingo ❤️\n\nChoose your language to continue.",
 
-      "Fast Bingo main menu\n\nClassic 75-ball bingo. Demo mode only: no real money or gambling.",
+    main:
 
-    create: "Send a room name, then choose a room category.",
+      "Welcome to Fast Bingo ❤️\n\nChoose an option below.",
 
-    join: "Send a room code such as FB-7K2P.",
+    gameInProgress:
 
-    category: "Choose a card category.",
+      "🎱 GAME IN PROGRESS\n\nPlease wait for the next round to start.",
 
-    created: "Room created. Share this code with your players:",
+    lobby:
 
-    joined: "You joined the room.",
+      "🎫 NEW ROUND\n\nChoose your cartela(s) before the countdown ends.\n\nYou can select up to 4 cartelas.",
 
-    noRoom: "That room was not found or has already finished.",
+    lobbyEnded:
 
-    noGame: "You are not in an active game yet.",
+      "The round has started.\n\nCartela selection is now closed.",
 
-    wallet: "Demo wallet only\nBalance:",
+    roundStarted:
 
-    card: "Your bingo card",
+      "🎱 ROUND STARTED!\n\nNumbers are now being called automatically.",
 
-    liveRooms: "Live rooms",
+    roundFinished:
 
-    noLiveRooms: "There are no live rooms right now.",
+      "🏆 ROUND COMPLETE!\n\nThe next round will start automatically.",
 
-    hostOnly: "Only the room host can use this control.",
+    phone:
 
-    started: "Round started. Numbers will be called automatically.",
+      "📱 Please share your phone number to continue.",
 
-    paused: "Round paused.",
+    phoneSaved:
 
-    reset: "Round reset.",
+      "✅ Phone number saved.",
 
-    bingo: "BINGO verified. The round is complete.",
+    balance:
 
-    invalid: "I did not understand that. Use the menu below.",
+      "💵 Your balance",
 
-    demo: "Demo only",
+    help:
 
-    room: "Room",
+      "📲 Fast Bingo Help\n\nOpen the game with 🎮 Play.\n\nDuring the 45-second lobby you can select up to 4 cartelas.\n\nWhen the round starts, selection closes and numbers are called automatically.",
 
-    players: "players",
+    language:
 
-    current: "Current call",
+      "Choose your language.",
 
-    called: "Called",
+    walletUpdated:
+
+      "Balance updated.",
+
+    walletError:
+
+      "Wallet action could not be completed.",
+
+    invalid:
+
+      "Please use the buttons below.",
+
+    play:
+
+      "🎮 Play",
+
+    balanceButton:
+
+      "💵 Balance",
+
+    languageButton:
+
+      "🌐 Language",
+
+    helpButton:
+
+      "📲 Help",
+
+    sharePhone:
+
+      "📱 Share phone number",
+
+    back:
+
+      "⬅️ Back",
+
+    deposit:
+
+      "📥 Deposit",
+
+    withdraw:
+
+      "📤 Withdraw",
+
+    telebirr:
+
+      "Telebirr",
+
+    ebirr:
+
+      "eBirr",
+
+    mpesa:
+
+      "M-PESA",
+
+    saved:
+
+      "Saved",
 
   },
 
@@ -194,67 +274,145 @@ const copy: Record<Language, Record<string, string>> = {
 
     welcome:
 
-      "እንኳን ወደ Fast Bingo በደህና መጡ። ቋንቋዎን ይምረጡ።",
+      "እንኳን ወደ Fast ቢንጎ በደህና መጡ ❤️\n\nቋንቋዎን ይምረጡ።",
 
-    menu:
+    main:
 
-      "እንኳን ወደ Fast ቢንጎ በደህና መጡ ❤️\n\nFast ቢንጎ እያዝናና መሸለሙን ቀጥሏል!\n\nእየተዝናኑ ያሸንፉ 🎉",
+      "እንኳን ወደ Fast ቢንጎ በደህና መጡ ❤️\n\nከታች ያለውን አማራጭ ይምረጡ።",
 
-    create: "የክፍሉን ስም ይላኩ፣ ከዚያ የክፍል ምድብ ይምረጡ።",
+    gameInProgress:
 
-    join: "እንደ FB-7K2P ያለ የክፍል ኮድ ይላኩ።",
+      "🎱 GAME IN PROGRESS\n\nእባኮትን ቀጣይ ዙር እስከሚጀምር ይጠብቁ!",
 
-    category: "የካርድ ምድብ ይምረጡ።",
+    lobby:
 
-    created: "ክፍሉ ተፈጥሯል። ይህን ኮድ ለተጫዋቾች ያጋሩ፦",
+      "🎫 አዲስ ዙር\n\nየሚፈልጉትን ካርቴላ ይምረጡ።\n\nእስከ 4 ካርቴላ መምረጥ ይችላሉ።",
 
-    joined: "ክፍሉን ተቀላቅለዋል።",
+    lobbyEnded:
 
-    noRoom: "ይህ ክፍል አልተገኘም ወይም ተጠናቋል።",
+      "ዙሩ ተጀምሯል።\n\nየካርቴላ ምርጫ አሁን ተዘግቷል።",
 
-    noGame: "እስካሁን በንቁ ጨዋታ ውስጥ አይደሉም።",
+    roundStarted:
 
-    wallet: "የሙከራ ቦርሳ ብቻ\nቀሪ ሂሳብ፦",
+      "🎱 ዙሩ ተጀምሯል!\n\nቁጥሮች አሁን በራስ-ሰር ይጠራሉ።",
 
-    card: "የእርስዎ ቢንጎ ካርድ",
+    roundFinished:
 
-    liveRooms: "የቀጥታ ክፍሎች",
+      "🏆 ዙሩ ተጠናቋል!\n\nቀጣዩ ዙር በራስ-ሰር ይጀምራል።",
 
-    noLiveRooms: "አሁን የቀጥታ ክፍል የለም።",
+    phone:
 
-    hostOnly: "ይህን መቆጣጠሪያ የክፍሉ አስተናጋጅ ብቻ ሊጠቀምበት ይችላል።",
+      "📱 ለመቀጠል የስልክ ቁጥርዎን ያጋሩ።",
 
-    started: "ዙሩ ተጀምሯል። ቁጥሮች በራስ-ሰር ይጠራሉ።",
+    phoneSaved:
 
-    paused: "ዙሩ ቆሟል።",
+      "✅ የስልክ ቁጥርዎ ተመዝግቧል።",
 
-    reset: "ዙሩ እንደገና ተጀምሯል።",
+    balance:
 
-    bingo: "ቢንጎ ተረጋግጧል። ዙሩ ተጠናቋል።",
+      "💵 የእርስዎ ሂሳብ",
 
-    invalid: "ያ አልገባኝም። ከታች ያለውን ምናሌ ይጠቀሙ።",
+    help:
 
-    demo: "የሙከራ ብቻ",
+      "📲 Fast Bingo እርዳታ\n\n🎮 ይጫወቱ የሚለውን በመንካት ጨዋታውን ይክፈቱ።\n\nበ45 ሰከንድ የሎቢ ጊዜ እስከ 4 ካርቴላ መምረጥ ይችላሉ።\n\nዙሩ ሲጀምር ምርጫው ይዘጋል እና ቁጥሮች በራስ-ሰር ይጠራሉ።",
 
-    room: "ክፍል",
+    language:
 
-    players: "ተጫዋቾች",
+      "ቋንቋዎን ይምረጡ።",
 
-    current: "የአሁኑ ጥሪ",
+    walletUpdated:
 
-    called: "የተጠሩ",
+      "ሂሳቡ ተስተካክሏል።",
+
+    walletError:
+
+      "የሂሳብ ለውጡ አልተሳካም።",
+
+    invalid:
+
+      "ከታች ያሉትን አዝራሮች ይጠቀሙ።",
+
+    play:
+
+      "🎮 ይጫወቱ",
+
+    balanceButton:
+
+      "💵 ሂሳብ",
+
+    languageButton:
+
+      "🌐 ቋንቋ",
+
+    helpButton:
+
+      "📲 እርዳታ",
+
+    sharePhone:
+
+      "📱 ስልክ ቁጥሬን አጋራ",
+
+    back:
+
+      "⬅️ ተመለስ",
+
+    deposit:
+
+      "📥 ገቢ",
+
+    withdraw:
+
+      "📤 ወጪ",
+
+    telebirr:
+
+      "Telebirr",
+
+    ebirr:
+
+      "eBirr",
+
+    mpesa:
+
+      "M-PESA",
+
+    saved:
+
+      "ተቀምጧል",
 
   },
 
 };
 
-function t(language: Language, key: string): string {
+function t(
 
-  return copy[language][key] ?? copy.en[key];
+  language: Language,
+
+  key: string,
+
+): string {
+
+  return (
+
+    copy[language][key] ??
+
+    copy.en[key] ??
+
+    key
+
+  );
 
 }
 
-function nameOf(message: TelegramMessage | TelegramCallback): string {
+function nameOf(
+
+  message:
+
+    | TelegramMessage
+
+    | TelegramCallback,
+
+): string {
 
   const user = message.from;
 
@@ -270,9 +428,133 @@ function nameOf(message: TelegramMessage | TelegramCallback): string {
 
 }
 
-function categoryButtons(
+function mainKeyboard(
 
-  prefix: "create" | "join",
+  language: Language,
+
+): TelegramKeyboard {
+
+  const rows: TelegramButton[][] = [];
+
+  if (telegramMiniAppUrl) {
+
+    rows.push([
+
+      {
+
+        text: t(language, "play"),
+
+        web_app: {
+
+          url: telegramMiniAppUrl,
+
+        },
+
+      },
+
+    ]);
+
+  }
+
+  rows.push([
+
+    {
+
+      text: t(
+
+        language,
+
+        "balanceButton",
+
+      ),
+
+      callback_data: "menu:balance",
+
+    },
+
+    {
+
+      text: t(
+
+        language,
+
+        "languageButton",
+
+      ),
+
+      callback_data: "menu:language",
+
+    },
+
+  ]);
+
+  rows.push([
+
+    {
+
+      text: t(
+
+        language,
+
+        "helpButton",
+
+      ),
+
+      callback_data: "menu:help",
+
+    },
+
+  ]);
+
+  return {
+
+    inline_keyboard: rows,
+
+  };
+
+}
+
+function phoneKeyboard(
+
+  language: Language,
+
+): TelegramKeyboard {
+
+  return {
+
+    keyboard: [
+
+      [
+
+        {
+
+          text: t(
+
+            language,
+
+            "sharePhone",
+
+          ),
+
+          request_contact: true,
+
+        },
+
+      ],
+
+    ],
+
+    resize_keyboard: true,
+
+    one_time_keyboard: true,
+
+  };
+
+}
+
+function walletKeyboard(
+
+  language: Language,
 
 ): TelegramKeyboard {
 
@@ -284,25 +566,53 @@ function categoryButtons(
 
         {
 
-          text: "Normal",
+          text: t(
 
-          callback_data: `category:${prefix}:normal`,
+            language,
+
+            "deposit",
+
+          ),
+
+          callback_data:
+
+            "wallet:deposit",
 
         },
 
         {
 
-          text: "VIP",
+          text: t(
 
-          callback_data: `category:${prefix}:vip`,
+            language,
+
+            "withdraw",
+
+          ),
+
+          callback_data:
+
+            "wallet:withdraw",
 
         },
 
+      ],
+
+      [
+
         {
 
-          text: "VVIP",
+          text: t(
 
-          callback_data: `category:${prefix}:vvip`,
+            language,
+
+            "back",
+
+          ),
+
+          callback_data:
+
+            "menu:home",
 
         },
 
@@ -314,139 +624,17 @@ function categoryButtons(
 
 }
 
-function menuKeyboard(language: Language): TelegramKeyboard {
+function walletMethodKeyboard(
 
-  if (language === "am") {
+  language: Language,
 
-    const keyboard: TelegramKeyboard = {
+  action:
 
-      inline_keyboard: [
+    | "deposit"
 
-        [
+    | "withdraw",
 
-          telegramMiniAppUrl
-
-            ? {
-
-                text: "🎮 ይጫወቱ",
-
-                web_app: { url: telegramMiniAppUrl },
-
-              }
-
-            : {
-
-                text: "🎮 ይጫወቱ",
-
-                callback_data: "menu:create",
-
-              },
-
-          {
-
-            text: "💵 ሂሳብ",
-
-            callback_data: "menu:wallet",
-
-          },
-
-        ],
-
-        [
-
-          {
-
-            text: "📤 ገቢ ለማድረግ",
-
-            callback_data: "menu:wallet",
-
-          },
-
-          {
-
-            text: "📤 ወጪ ለማድረግ",
-
-            callback_data: "menu:wallet",
-
-          },
-
-        ],
-
-        [
-
-          {
-
-            text: "🔗 ጋብዝ & አግኝ",
-
-            callback_data: "menu:home",
-
-          },
-
-          {
-
-            text: "💎 VIP ክፍል",
-
-            callback_data: "menu:create",
-
-          },
-
-        ],
-
-        [
-
-          {
-
-            text: "📢 Special promoter",
-
-            callback_data: "menu:home",
-
-          },
-
-          {
-
-            text: "📲 እርዳታ",
-
-            callback_data: "menu:home",
-
-          },
-
-        ],
-
-        [
-
-          {
-
-            text: "⚖️ ደንቦች",
-
-            callback_data: "menu:home",
-
-          },
-
-        ],
-
-      ],
-
-    };
-
-    if (telegramMiniAppUrl) {
-
-      keyboard.inline_keyboard.push([
-
-        {
-
-          text: "🚀 Fast Bingo ክፈት",
-
-          web_app: { url: telegramMiniAppUrl },
-
-        },
-
-      ]);
-
-    }
-
-    return keyboard;
-
-  }
+): TelegramKeyboard {
 
   return {
 
@@ -456,37 +644,17 @@ function menuKeyboard(language: Language): TelegramKeyboard {
 
         {
 
-          text: "Create room",
+          text: t(
 
-          callback_data: "menu:create",
+            language,
 
-        },
+            "telebirr",
 
-        {
+          ),
 
-          text: "Join room",
+          callback_data:
 
-          callback_data: "menu:join",
-
-        },
-
-      ],
-
-      [
-
-        {
-
-          text: "My card",
-
-          callback_data: "menu:card",
-
-        },
-
-        {
-
-          text: "Live rooms",
-
-          callback_data: "menu:rooms",
+            `wallet:${action}:telebirr`,
 
         },
 
@@ -496,17 +664,57 @@ function menuKeyboard(language: Language): TelegramKeyboard {
 
         {
 
-          text: "Demo wallet",
+          text: t(
 
-          callback_data: "menu:wallet",
+            language,
+
+            "ebirr",
+
+          ),
+
+          callback_data:
+
+            `wallet:${action}:ebirr`,
 
         },
 
+      ],
+
+      [
+
         {
 
-          text: "Language",
+          text: t(
 
-          callback_data: "menu:language",
+            language,
+
+            "mpesa",
+
+          ),
+
+          callback_data:
+
+            `wallet:${action}:mpesa`,
+
+        },
+
+      ],
+
+      [
+
+        {
+
+          text: t(
+
+            language,
+
+            "back",
+
+          ),
+
+          callback_data:
+
+            "menu:balance",
 
         },
 
@@ -522,47 +730,75 @@ async function telegramRequest<T>(
 
   method: string,
 
-  body: Record<string, unknown> = {},
+  body: Record<
+
+    string,
+
+    unknown
+
+  > = {},
 
 ): Promise<T> {
 
   if (!apiBase) {
 
-    throw new Error("BOT_TOKEN is not configured");
+    throw new Error(
+
+      "BOT_TOKEN is not configured",
+
+    );
 
   }
 
-  const response = await fetch(`${apiBase}/${method}`, {
+  const response = await fetch(
 
-    method: "POST",
+    `${apiBase}/${method}`,
 
-    headers: {
+    {
 
-      "content-type": "application/json",
+      method: "POST",
+
+      headers: {
+
+        "content-type":
+
+          "application/json",
+
+      },
+
+      body: JSON.stringify(body),
 
     },
 
-    body: JSON.stringify(body),
+  );
 
-  });
+  const payload =
 
-  const payload = (await response.json()) as {
+    (await response.json()) as {
 
-    ok: boolean;
+      ok: boolean;
 
-    result?: T;
+      result?: T;
 
-    description?: string;
+      description?: string;
 
-  };
+    };
 
-  if (!response.ok || !payload.ok) {
+  if (
+
+    !response.ok ||
+
+    !payload.ok
+
+  ) {
 
     throw new Error(
 
       `Telegram ${method} failed: ${
 
-        payload.description ?? response.statusText
+        payload.description ??
+
+        response.statusText
 
       }`,
 
@@ -584,191 +820,61 @@ async function sendMessage(
 
 ): Promise<void> {
 
-  await telegramRequest("sendMessage", {
+  await telegramRequest(
 
-    chat_id: chatId,
+    "sendMessage",
 
-    text,
+    {
 
-    reply_markup: replyMarkup,
+      chat_id: chatId,
 
-    disable_web_page_preview: true,
+      text,
 
-  });
+      reply_markup:
 
-}
+        replyMarkup,
 
-function languageKeyboard(): TelegramKeyboard {
+      disable_web_page_preview:
 
-  return {
+        true,
 
-    inline_keyboard: [
+    },
 
-      [
-
-        {
-
-          text: "English",
-
-          callback_data: "language:en",
-
-        },
-
-        {
-
-          text: "አማርኛ",
-
-          callback_data: "language:am",
-
-        },
-
-      ],
-
-    ],
-
-  };
+  );
 
 }
 
-function gameSummary(
+async function removeKeyboard(
 
-  game: BingoGame,
+  chatId: string,
 
-  language: Language,
+  text: string,
 
-): string {
+): Promise<void> {
 
-  return `${t(language, "room")}: ${game.name}
+  await telegramRequest(
 
-${game.shareCode}
+    "sendMessage",
 
-${game.players.length} ${t(language, "players")}
+    {
 
-${t(language, "current")}: ${game.currentNumber || "—"}
+      chat_id: chatId,
 
-${t(language, "called")}: ${game.calledNumbers.length}/75`;
+      text,
 
-}
+      reply_markup: {
 
-function renderCard(
+        remove_keyboard: true,
 
-  game: BingoGame,
+      },
 
-  telegramId: string,
+    },
 
-  language: Language,
-
-): string {
-
-  const card = getTelegramCard(game.id, telegramId);
-
-  if (!card) {
-
-    return t(language, "noGame");
-
-  }
-
-  const marked = new Set(card.marked);
-
-  const rows: string[] = [];
-
-  for (let row = 0; row < 5; row += 1) {
-
-    const values = card.numbers
-
-      .slice(row * 5, row * 5 + 5)
-
-      .map((value) => {
-
-        if (value === 0) return "FREE";
-
-        return marked.has(value)
-
-          ? `[${String(value).padStart(2, "0")}]`
-
-          : ` ${String(value).padStart(2, "0")} `;
-
-      });
-
-    rows.push(values.join(" | "));
-
-  }
-
-  return `${t(language, "card")} · ${card.label}
-
-B   I   N   G   O
-
-${rows.join("\n")}
-
-${gameSummary(game, language)}`;
+  );
 
 }
 
-function hostKeyboard(
-
-  game: BingoGame,
-
-): TelegramKeyboard {
-
-  return {
-
-    inline_keyboard: [
-
-      [
-
-        {
-
-          text: "Start",
-
-          callback_data: `host:start:${game.id}`,
-
-        },
-
-        {
-
-          text: "Call now",
-
-          callback_data: `host:call:${game.id}`,
-
-        },
-
-      ],
-
-      [
-
-        {
-
-          text: "Pause",
-
-          callback_data: `host:pause:${game.id}`,
-
-        },
-
-        {
-
-          text: "Reset",
-
-          callback_data: `host:reset:${game.id}`,
-
-        },
-
-        {
-
-          text: "Claim",
-
-          callback_data: `host:claim:${game.id}`,
-
-        },
-
-      ],
-
-    ],
-
-  };
-
-}
-
-async function showMenu(
+async function showMainMenu(
 
   chatId: string,
 
@@ -780,9 +886,29 @@ async function showMenu(
 
     chatId,
 
-    t(language, "menu"),
+    t(language, "main"),
 
-    menuKeyboard(language),
+    mainKeyboard(language),
+
+  );
+
+}
+
+async function showPhoneRequest(
+
+  chatId: string,
+
+  language: Language,
+
+): Promise<void> {
+
+  await sendMessage(
+
+    chatId,
+
+    t(language, "phone"),
+
+    phoneKeyboard(language),
 
   );
 
@@ -792,157 +918,71 @@ async function showWallet(
 
   chatId: string,
 
-  language: Language,
-
   telegramId: string,
 
-): Promise<void> {
-
-  const wallet = getTelegramWallet(telegramId);
-
-  await sendMessage(
-
-    chatId,
-
-    `${t(language, "wallet")} ETB ${wallet.balance.toFixed(2)}
-
-Telebirr · Demo only
-
-eBirr · Demo only
-
-M-PESA · Demo only`,
-
-    {
-
-      inline_keyboard: [
-
-        [
-
-          {
-
-            text: "+100 Telebirr",
-
-            callback_data: "wallet:deposit:telebirr",
-
-          },
-
-          {
-
-            text: "+100 eBirr",
-
-            callback_data: "wallet:deposit:ebirr",
-
-          },
-
-        ],
-
-        [
-
-          {
-
-            text: "+100 M-PESA",
-
-            callback_data: "wallet:deposit:mpesa",
-
-          },
-
-          {
-
-            text: "Withdraw demo",
-
-            callback_data: "wallet:withdraw:telebirr",
-
-          },
-
-        ],
-
-        [
-
-          {
-
-            text: "Main menu",
-
-            callback_data: "menu:home",
-
-          },
-
-        ],
-
-      ],
-
-    },
-
-  );
-
-}
-
-async function showLiveRooms(
-
-  chatId: string,
-
   language: Language,
 
 ): Promise<void> {
 
-  const games = getGames().filter(
+  const wallet =
 
-    (game) => game.status !== "completed",
+    getTelegramWallet(
 
-  );
-
-  if (games.length === 0) {
-
-    await sendMessage(
-
-      chatId,
-
-      t(language, "noLiveRooms"),
-
-      menuKeyboard(language),
+      telegramId,
 
     );
 
-    return;
+  await sendMessage(
 
-  }
+    chatId,
 
-  const keyboard = games.slice(0, 8).map((game) => [
+    `${t(language, "balance")}
 
-    {
+ETB ${wallet.balance.toFixed(2)}`,
 
-      text: `${game.name} · ${game.shareCode}`,
+    walletKeyboard(language),
 
-      callback_data: `room:${game.id}`,
+  );
 
-    },
+}
 
-  ]);
+async function showLanguage(
+
+  chatId: string,
+
+  language: Language,
+
+): Promise<void> {
 
   await sendMessage(
 
     chatId,
 
-    `${t(language, "liveRooms")}
-
-${games
-
-  .map((game) => gameSummary(game, language))
-
-  .join("\n\n")}`,
+    t(language, "language"),
 
     {
 
       inline_keyboard: [
 
-        ...keyboard,
-
         [
 
           {
 
-            text: "Main menu",
+            text: "English",
 
-            callback_data: "menu:home",
+            callback_data:
+
+              "language:en",
+
+          },
+
+          {
+
+            text: "አማርኛ",
+
+            callback_data:
+
+              "language:am",
 
           },
 
@@ -956,75 +996,61 @@ ${games
 
 }
 
-async function showGame(
+async function notifyParticipants(
 
-  chatId: string,
+  gameId: string,
 
-  telegramId: string,
+  textEn: string,
 
-  game: BingoGame,
-
-): Promise<void> {
-
-  const language = getTelegramLanguage(telegramId);
-
-  const isHost = getTelegramHost(game.id) === telegramId;
-
-  await sendMessage(
-
-    chatId,
-
-    `${gameSummary(game, language)}
-
-${renderCard(game, telegramId, language)}`,
-
-    isHost
-
-      ? hostKeyboard(game)
-
-      : menuKeyboard(language),
-
-  );
-
-}
-
-async function broadcastGame(
-
-  game: BingoGame,
-
-  previousNumber: number,
+  textAm: string,
 
 ): Promise<void> {
 
-  const participants = getTelegramParticipants(game.id);
+  const participants =
+
+    getTelegramParticipants(
+
+      gameId,
+
+    );
 
   for (const telegramId of participants) {
 
-    const language = getTelegramLanguage(telegramId);
-
-    const text =
-
-      game.status === "completed"
-
-        ? `${t(language, "bingo")}
-
-${gameSummary(game, language)}`
-
-        : `${game.name}
-
-${t(language, "current")}: ${game.currentNumber || "—"}
-
-${t(language, "called")}: ${game.calledNumbers.length}/75`;
-
     try {
 
-      await sendMessage(telegramId, text);
+      const language =
+
+        getTelegramLanguage(
+
+          telegramId,
+
+        );
+
+      await sendMessage(
+
+        telegramId,
+
+        language === "am"
+
+          ? textAm
+
+          : textEn,
+
+        mainKeyboard(language),
+
+      );
 
     } catch (error) {
 
       logger.warn(
 
-        { error, telegramId },
+        {
+
+          error,
+
+          telegramId,
+
+        },
 
         "Could not notify Telegram player",
 
@@ -1034,17 +1060,93 @@ ${t(language, "called")}: ${game.calledNumbers.length}/75`;
 
   }
 
+}
+
+async function handlePhone(
+
+  message: TelegramMessage,
+
+): Promise<void> {
+
   if (
 
-    previousNumber === game.currentNumber &&
+    !message.from ||
 
-    game.status !== "completed"
+    !message.contact
 
   ) {
 
     return;
 
   }
+
+  const telegramId =
+
+    String(message.from.id);
+
+  const language =
+
+    getTelegramLanguage(
+
+      telegramId,
+
+    );
+
+  if (
+
+    message.contact.user_id &&
+
+    message.contact.user_id !==
+
+      message.from.id
+
+  ) {
+
+    await sendMessage(
+
+      String(message.chat.id),
+
+      t(language, "phone"),
+
+      phoneKeyboard(language),
+
+    );
+
+    return;
+
+  }
+
+  setTelegramPhone(
+
+    telegramId,
+
+    message.contact.phone_number,
+
+  );
+
+  setTelegramSession(
+
+    telegramId,
+
+    "menu",
+
+  );
+
+  await removeKeyboard(
+
+    String(message.chat.id),
+
+    t(language, "phoneSaved"),
+
+  );
+
+  await showMainMenu(
+
+    String(message.chat.id),
+
+    language,
+
+  );
 
 }
 
@@ -1054,13 +1156,19 @@ async function handleMessage(
 
 ): Promise<void> {
 
-  if (!message.from || !message.text) return;
+  if (!message.from) {
 
-  const telegramId = String(message.from.id);
+    return;
 
-  const chatId = String(message.chat.id);
+  }
 
-  const known = hasTelegramUser(telegramId);
+  const telegramId =
+
+    String(message.from.id);
+
+  const chatId =
+
+    String(message.chat.id);
 
   upsertTelegramUser(
 
@@ -1072,99 +1180,43 @@ async function handleMessage(
 
   );
 
-  const language = getTelegramLanguage(telegramId);
+  if (message.contact) {
 
-  const text = message.text.trim();
-
-  if (text === "/start") {
-
-    if (!known) {
-
-      await sendMessage(
-
-        chatId,
-
-        t("en", "welcome"),
-
-        languageKeyboard(),
-
-      );
-
-    } else {
-
-      setTelegramSession(telegramId, "menu");
-
-      await showMenu(chatId, language);
-
-    }
+    await handlePhone(message);
 
     return;
 
   }
 
-  if (text === "/menu" || text === "/help") {
+  const text =
 
-    setTelegramSession(telegramId, "menu");
+    message.text?.trim() ?? "";
 
-    await showMenu(chatId, language);
+  const language =
 
-    return;
-
-  }
-
-  const session = getTelegramSession(telegramId);
-
-  if (session.state === "create_name") {
-
-    pendingRoomNames.set(
+    getTelegramLanguage(
 
       telegramId,
 
-      text.slice(0, 40),
-
     );
+
+  if (text === "/start") {
 
     setTelegramSession(
 
       telegramId,
 
-      "create_category",
+      "menu",
 
     );
 
-    await sendMessage(
+    if (!hasTelegramUser(telegramId)) {
 
-      chatId,
-
-      `${t(language, "category")}
-
-${text.slice(0, 40)}`,
-
-      categoryButtons("create"),
-
-    );
-
-    return;
-
-  }
-
-  if (session.state === "join_code") {
-
-    const game = getGameByShareCode(
-
-      text.toUpperCase(),
-
-    );
-
-    if (!game) {
-
-      await sendMessage(
+      await showLanguage(
 
         chatId,
 
-        t(language, "noRoom"),
-
-        menuKeyboard(language),
+        language,
 
       );
 
@@ -1172,25 +1224,75 @@ ${text.slice(0, 40)}`,
 
     }
 
+    await showMainMenu(
+
+      chatId,
+
+      language,
+
+    );
+
+    return;
+
+  }
+
+  if (
+
+    text === "/menu" ||
+
+    text === "/help"
+
+  ) {
+
     setTelegramSession(
 
       telegramId,
 
-      "join_category",
-
-      game.id,
+      "menu",
 
     );
 
-    await sendMessage(
+    if (text === "/help") {
+
+      await sendMessage(
+
+        chatId,
+
+        t(language, "help"),
+
+        mainKeyboard(language),
+
+      );
+
+    } else {
+
+      await showMainMenu(
+
+        chatId,
+
+        language,
+
+      );
+
+    }
+
+    return;
+
+  }
+
+  if (
+
+    text === "/phone" ||
+
+    text === "/login"
+
+  ) {
+
+    await showPhoneRequest(
 
       chatId,
 
-      `${gameSummary(game, language)}
-
-${t(language, "category")}`,
-
-      categoryButtons("join"),
+      language,
 
     );
 
@@ -1204,7 +1306,7 @@ ${t(language, "category")}`,
 
     t(language, "invalid"),
 
-    menuKeyboard(language),
+    mainKeyboard(language),
 
   );
 
@@ -1216,11 +1318,29 @@ async function handleCallback(
 
 ): Promise<void> {
 
-  if (!callback.message || !callback.data) return;
+  if (
 
-  const telegramId = String(callback.from.id);
+    !callback.message ||
 
-  const chatId = String(callback.message.chat.id);
+    !callback.data
+
+  ) {
+
+    return;
+
+  }
+
+  const telegramId =
+
+    String(callback.from.id);
+
+  const chatId =
+
+    String(
+
+      callback.message.chat.id,
+
+    );
 
   upsertTelegramUser(
 
@@ -1238,21 +1358,39 @@ async function handleCallback(
 
     {
 
-      callback_query_id: callback.id,
+      callback_query_id:
+
+        callback.id,
 
     },
 
   );
 
-  const [scope, action, value] =
+  const parts =
 
     callback.data.split(":");
+
+  const scope = parts[0];
+
+  const action = parts[1];
+
+  const value = parts[2];
+
+  const language =
+
+    getTelegramLanguage(
+
+      telegramId,
+
+    );
 
   if (
 
     scope === "language" &&
 
-    (action === "en" || action === "am")
+    (action === "en" ||
+
+      action === "am")
 
   ) {
 
@@ -1272,301 +1410,27 @@ async function handleCallback(
 
     );
 
-    await showMenu(chatId, action);
+    await showMainMenu(
+
+      chatId,
+
+      action,
+
+    );
 
     return;
 
   }
-
-  const language =
-
-    getTelegramLanguage(telegramId);
 
   if (scope === "menu") {
 
     if (action === "home") {
 
-      setTelegramSession(
-
-        telegramId,
-
-        "menu",
-
-      );
-
-      await showMenu(
+      await showMainMenu(
 
         chatId,
 
         language,
-
-      );
-
-    } else if (action === "create") {
-
-      setTelegramSession(
-
-        telegramId,
-
-        "create_name",
-
-      );
-
-      await sendMessage(
-
-        chatId,
-
-        t(language, "create"),
-
-      );
-
-    } else if (action === "join") {
-
-      setTelegramSession(
-
-        telegramId,
-
-        "join_code",
-
-      );
-
-      await sendMessage(
-
-        chatId,
-
-        t(language, "join"),
-
-      );
-
-    } else if (action === "card") {
-
-      const game =
-
-        getTelegramGame(telegramId);
-
-      if (!game) {
-
-        await sendMessage(
-
-          chatId,
-
-          t(language, "noGame"),
-
-          menuKeyboard(language),
-
-        );
-
-      } else {
-
-        await showGame(
-
-          chatId,
-
-          telegramId,
-
-          game,
-
-        );
-
-      }
-
-    } else if (action === "rooms") {
-
-      await showLiveRooms(
-
-        chatId,
-
-        language,
-
-      );
-
-    } else if (action === "wallet") {
-
-      await showWallet(
-
-        chatId,
-
-        language,
-
-        telegramId,
-
-      );
-
-    } else if (action === "language") {
-
-      await sendMessage(
-
-        chatId,
-
-        t(language, "welcome"),
-
-        languageKeyboard(),
-
-      );
-
-    }
-
-    return;
-
-  }
-
-  if (
-
-    scope === "category" &&
-
-    (action === "create" || action === "join")
-
-  ) {
-
-    const category =
-
-      value as BingoCategory;
-
-    const session =
-
-      getTelegramSession(telegramId);
-
-    if (
-
-      action === "create" &&
-
-      session.state === "create_category"
-
-    ) {
-
-      const game = createTelegramGame(
-
-        pendingRoomNames.get(
-
-          telegramId,
-
-        ) || "Fast Bingo room",
-
-        category,
-
-        telegramId,
-
-        nameOf(callback),
-
-      );
-
-      pendingRoomNames.delete(
-
-        telegramId,
-
-      );
-
-      setTelegramSession(
-
-        telegramId,
-
-        "menu",
-
-        game.id,
-
-      );
-
-      await sendMessage(
-
-        chatId,
-
-        `${t(language, "created")} ${game.shareCode}
-
-${gameSummary(game, language)}`,
-
-        hostKeyboard(game),
-
-      );
-
-    } else if (
-
-      action === "join" &&
-
-      session.state === "join_category" &&
-
-      session.gameId
-
-    ) {
-
-      const game =
-
-        joinTelegramGame(
-
-          session.gameId,
-
-          telegramId,
-
-          nameOf(callback),
-
-          category,
-
-        );
-
-      if (!game) {
-
-        await sendMessage(
-
-          chatId,
-
-          t(language, "noRoom"),
-
-          menuKeyboard(language),
-
-        );
-
-      } else {
-
-        setTelegramSession(
-
-          telegramId,
-
-          "menu",
-
-          game.id,
-
-        );
-
-        await sendMessage(
-
-          chatId,
-
-          `${t(language, "joined")}
-
-${gameSummary(game, language)}`,
-
-        );
-
-        await showGame(
-
-          chatId,
-
-          telegramId,
-
-          game,
-
-        );
-
-      }
-
-    }
-
-    return;
-
-  }
-
-  if (scope === "room" && action) {
-
-    const game = getGame(action);
-
-    if (!game) {
-
-      await sendMessage(
-
-        chatId,
-
-        t(language, "noRoom"),
-
-        menuKeyboard(language),
 
       );
 
@@ -1574,27 +1438,51 @@ ${gameSummary(game, language)}`,
 
     }
 
-    setTelegramSession(
+    if (action === "language") {
 
-      telegramId,
+      await showLanguage(
 
-      "join_category",
+        chatId,
 
-      game.id,
+        language,
 
-    );
+      );
 
-    await sendMessage(
+      return;
 
-      chatId,
+    }
 
-      `${gameSummary(game, language)}
+    if (action === "help") {
 
-${t(language, "category")}`,
+      await sendMessage(
 
-      categoryButtons("join"),
+        chatId,
 
-    );
+        t(language, "help"),
+
+        mainKeyboard(language),
+
+      );
+
+      return;
+
+    }
+
+    if (action === "balance") {
+
+      await showWallet(
+
+        chatId,
+
+        telegramId,
+
+        language,
+
+      );
+
+      return;
+
+    }
 
     return;
 
@@ -1604,11 +1492,31 @@ ${t(language, "category")}`,
 
     scope === "wallet" &&
 
-    (action === "deposit" ||
-
-      action === "withdraw")
+    action === "deposit"
 
   ) {
+
+    if (!value) {
+
+      await sendMessage(
+
+        chatId,
+
+        t(language, "deposit"),
+
+        walletMethodKeyboard(
+
+          language,
+
+          "deposit",
+
+        ),
+
+      );
+
+      return;
+
+    }
 
     try {
 
@@ -1618,15 +1526,17 @@ ${t(language, "category")}`,
 
           telegramId,
 
-          action === "withdraw"
-
-            ? "withdrawal"
-
-            : "deposit",
+          "deposit",
 
           100,
 
-          value as WalletMethod,
+          value as
+
+            | "telebirr"
+
+            | "ebirr"
+
+            | "mpesa",
 
         );
 
@@ -1634,27 +1544,35 @@ ${t(language, "category")}`,
 
         chatId,
 
-        `${t(language, "wallet")} ETB ${wallet.balance.toFixed(2)}
+        `${t(
 
-${t(language, "demo")}`,
+          language,
 
-        menuKeyboard(language),
+          "walletUpdated",
+
+        )}
+
+ETB ${wallet.balance.toFixed(2)}`,
+
+        mainKeyboard(language),
 
       );
 
-    } catch (error) {
+    } catch {
 
       await sendMessage(
 
         chatId,
 
-        error instanceof Error
+        t(
 
-          ? error.message
+          language,
 
-          : "Wallet action failed",
+          "walletError",
 
-        menuKeyboard(language),
+        ),
+
+        mainKeyboard(language),
 
       );
 
@@ -1666,31 +1584,27 @@ ${t(language, "demo")}`,
 
   if (
 
-    scope === "host" &&
+    scope === "wallet" &&
 
-    action &&
-
-    value
+    action === "withdraw"
 
   ) {
 
-    const game = getGame(value);
-
-    if (!game) return;
-
-    if (
-
-      getTelegramHost(game.id) !==
-
-      telegramId
-
-    ) {
+    if (!value) {
 
       await sendMessage(
 
         chatId,
 
-        t(language, "hostOnly"),
+        t(language, "withdraw"),
+
+        walletMethodKeyboard(
+
+          language,
+
+          "withdraw",
+
+        ),
 
       );
 
@@ -1698,79 +1612,67 @@ ${t(language, "demo")}`,
 
     }
 
-    const updated = advanceGame(
+    try {
 
-      game.id,
+      const wallet =
 
-      action as
+        telegramWalletAction(
 
-        | "start"
+          telegramId,
 
-        | "call"
+          "withdrawal",
 
-        | "pause"
+          100,
 
-        | "reset"
+          value as
 
-        | "claim",
+            | "telebirr"
 
-    );
+            | "ebirr"
 
-    if (!updated) return;
+            | "mpesa",
 
-    if (action === "start") {
-
-      await sendMessage(
-
-        chatId,
-
-        t(language, "started"),
-
-      );
-
-    }
-
-    if (action === "pause") {
+        );
 
       await sendMessage(
 
         chatId,
 
-        t(language, "paused"),
+        `${t(
+
+          language,
+
+          "walletUpdated",
+
+        )}
+
+ETB ${wallet.balance.toFixed(2)}`,
+
+        mainKeyboard(language),
 
       );
 
-    }
-
-    if (action === "reset") {
+    } catch {
 
       await sendMessage(
 
         chatId,
 
-        t(language, "reset"),
+        t(
+
+          language,
+
+          "walletError",
+
+        ),
+
+        mainKeyboard(language),
 
       );
 
     }
 
-    await broadcastGame(
-
-      updated,
-
-      game.currentNumber,
-
-    );
-
-    await showGame(
-
-      chatId,
-
-      telegramId,
-
-      updated,
-
-    );
+    return;
 
   }
 
@@ -1778,7 +1680,11 @@ ${t(language, "demo")}`,
 
 async function poll(): Promise<void> {
 
-  if (!apiBase || polling) return;
+  if (!apiBase || polling) {
+
+    return;
+
+  }
 
   polling = true;
 
@@ -1792,7 +1698,9 @@ async function poll(): Promise<void> {
 
       {
 
-        drop_pending_updates: false,
+        drop_pending_updates:
+
+          false,
 
       },
 
@@ -1830,7 +1738,13 @@ async function poll(): Promise<void> {
 
           });
 
-        for (const update of updates ?? []) {
+        for (
+
+          const update of
+
+            updates ?? []
+
+        ) {
 
           offset =
 
@@ -1866,7 +1780,11 @@ async function poll(): Promise<void> {
 
         logger.error(
 
-          { error },
+          {
+
+            error,
+
+          },
 
           "Telegram polling error",
 
@@ -1876,7 +1794,13 @@ async function poll(): Promise<void> {
 
           (resolve) =>
 
-            setTimeout(resolve, 3000),
+            setTimeout(
+
+              resolve,
+
+              3000,
+
+            ),
 
         );
 
@@ -1888,7 +1812,11 @@ async function poll(): Promise<void> {
 
     logger.error(
 
-      { error },
+      {
+
+        error,
+
+      },
 
       "Telegram bot could not start",
 
@@ -1898,57 +1826,251 @@ async function poll(): Promise<void> {
 
 }
 
-async function automaticCalls(): Promise<void> {
+/**
 
-  for (const game of getGames().filter(
+ * 24/7 automatic Bingo engine.
 
-    (item) => item.status === "live",
+ *
 
-  )) {
+ * The store controls:
+
+ * - 45 second lobby
+
+ * - live transition
+
+ * - 3.5 second number calls
+
+ * - winner detection
+
+ * - completion
+
+ * - next automatic lobby
+
+ */
+
+async function automaticRounds(): Promise<void> {
+
+  try {
+
+    const before =
+
+      getOrCreateAutomaticGame();
+
+    const previousStatus =
+
+      lastAutomaticGameId ===
+
+      before.id
+
+        ? lastAutomaticStatus
+
+        : undefined;
 
     const previousNumber =
 
-      activeCallSnapshots.get(
+      lastAutomaticGameId ===
 
-        game.id,
+      before.id
 
-      ) ?? game.currentNumber;
+        ? lastAutomaticNumber
 
-    const updated = advanceGame(
+        : before.currentNumber;
 
-      game.id,
+    const updated =
 
-      "call",
+      advanceAutomaticGame(
 
-    );
+        before.id,
+
+      );
+
+    if (!updated) {
+
+      return;
+
+    }
+
+    const gameChanged =
+
+      lastAutomaticGameId !==
+
+      updated.id;
+
+    lastAutomaticGameId =
+
+      updated.id;
+
+    lastAutomaticStatus =
+
+      updated.status;
+
+    lastAutomaticNumber =
+
+      updated.currentNumber;
 
     if (
 
-      !updated ||
+      gameChanged &&
 
-      updated.currentNumber ===
+      updated.status ===
+
+        "waiting"
+
+    ) {
+
+      logger.info(
+
+        {
+
+          gameId: updated.id,
+
+          nextCallIn:
+
+            updated.nextCallIn,
+
+        },
+
+        "Automatic Bingo lobby started",
+
+      );
+
+      return;
+
+    }
+
+    if (
+
+      previousStatus !==
+
+        "live" &&
+
+      updated.status ===
+
+        "live"
+
+    ) {
+
+      await notifyParticipants(
+
+        updated.id,
+
+        "🎱 ROUND STARTED!\n\nNumbers are now being called automatically.",
+
+        "🎱 ዙሩ ተጀምሯል!\n\nቁጥሮች አሁን በራስ-ሰር ይጠራሉ።",
+
+      );
+
+      logger.info(
+
+        {
+
+          gameId: updated.id,
+
+        },
+
+        "Automatic Bingo round started",
+
+      );
+
+      return;
+
+    }
+
+    if (
+
+      updated.status ===
+
+        "live" &&
+
+      updated.currentNumber !==
 
         previousNumber
 
     ) {
 
-      continue;
+      await notifyParticipants(
+
+        updated.id,
+
+        `🎱 NUMBER CALLED: ${updated.currentNumber}\n\nCalled: ${updated.calledNumbers.length}/75`,
+
+        `🎱 የተጠራው ቁጥር: ${updated.currentNumber}\n\nየተጠሩ: ${updated.calledNumbers.length}/75`,
+
+      );
+
+      logger.info(
+
+        {
+
+          gameId: updated.id,
+
+          number:
+
+            updated.currentNumber,
+
+          called:
+
+            updated.calledNumbers.length,
+
+        },
+
+        "Automatic Bingo number called",
+
+      );
+
+      return;
 
     }
 
-    activeCallSnapshots.set(
+    if (
 
-      game.id,
+      previousStatus ===
 
-      updated.currentNumber,
+        "live" &&
 
-    );
+      updated.status ===
 
-    await broadcastGame(
+        "completed"
 
-      updated,
+    ) {
 
-      previousNumber,
+      await notifyParticipants(
+
+        updated.id,
+
+        "🏆 ROUND COMPLETE!\n\nThe next round will start automatically.",
+
+        "🏆 ዙሩ ተጠናቋል!\n\nቀጣዩ ዙር በራስ-ሰር ይጀምራል።",
+
+      );
+
+      logger.info(
+
+        {
+
+          gameId: updated.id,
+
+        },
+
+        "Automatic Bingo round completed",
+
+      );
+
+      return;
+
+    }
+
+  } catch (error) {
+
+    logger.error(
+
+      {
+
+        error,
+
+      },
+
+      "Automatic Bingo round failed",
 
     );
 
@@ -1994,28 +2116,32 @@ export function startTelegramBot(): void {
 
   void poll();
 
-  // Bingo calls are processed every 3.5 seconds.
+  /*
+
+   * Run the automatic game engine
+
+   * continuously.
+
+   *
+
+   * The store decides whether:
+
+   * - lobby is still counting down
+
+   * - round should start
+
+   * - next ball should be called
+
+   * - winner has completed the round
+
+   * - next lobby should be created
+
+   */
 
   setInterval(() => {
 
-    void automaticCalls().catch(
+    void automaticRounds();
 
-      (error) =>
-
-        logger.error(
-
-          {
-
-            error,
-
-          },
-
-          "Automatic bingo call failed",
-
-        ),
-
-    );
-
-  }, CALL_INTERVAL_MS);
+  }, 500);
 
 }
