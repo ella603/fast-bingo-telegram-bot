@@ -86,10 +86,6 @@ function makeCard(number) {
 
   const seed = 100000 + number * 7919;
 
-  const pool = Array.from({ length: 75 }, (_, i) => i + 1);
-
-  const card = [];
-
   const ranges = [
 
     [1, 15],
@@ -104,29 +100,45 @@ function makeCard(number) {
 
   ];
 
+  const columns = [];
+
   for (let c = 0; c < 5; c++) {
 
-    const [from, to] = ranges[c];
+    const from = ranges[c][0];
+
+    const to = ranges[c][1];
 
     const values = shuffle(
 
-      pool.filter((n) => n >= from && n <= to),
+      Array.from(
+
+        { length: to - from + 1 },
+
+        (_, i) => from + i
+
+      ),
 
       seed + c * 97
 
     ).slice(0, 5);
 
-    card.push(values);
+    columns.push(values);
 
   }
 
-  const grid = Array.from({ length: 5 }, () => Array(5).fill(null));
+  const grid = Array.from(
+
+    { length: 5 },
+
+    () => Array(5).fill(null)
+
+  );
 
   for (let c = 0; c < 5; c++) {
 
     for (let r = 0; r < 5; r++) {
 
-      grid[r][c] = card[c][r];
+      grid[r][c] = columns[c][r];
 
     }
 
@@ -148,7 +160,13 @@ function makeBallOrder(gameNumber) {
 
   return shuffle(
 
-    Array.from({ length: TOTAL_BALLS }, (_, i) => i + 1),
+    Array.from(
+
+      { length: TOTAL_BALLS },
+
+      (_, i) => i + 1
+
+    ),
 
     50000 + gameNumber * 9176
 
@@ -160,13 +178,21 @@ function hasTwoLines(card, called) {
 
   const calledSet = new Set(called);
 
-  const marked = (value) => value === "FREE" || calledSet.has(value);
+  const marked = (value) => {
+
+    return value === "FREE" || calledSet.has(value);
+
+  };
 
   let lines = 0;
 
   for (let r = 0; r < 5; r++) {
 
-    if (card.grid[r].every(marked)) lines++;
+    if (card.grid[r].every(marked)) {
+
+      lines++;
+
+    }
 
   }
 
@@ -186,25 +212,37 @@ function hasTwoLines(card, called) {
 
     }
 
-    if (complete) lines++;
+    if (complete) {
+
+      lines++;
+
+    }
 
   }
 
-  let d1 = true;
+  let diagonal1 = true;
 
-  let d2 = true;
+  let diagonal2 = true;
 
   for (let i = 0; i < 5; i++) {
 
-    if (!marked(card.grid[i][i])) d1 = false;
+    if (!marked(card.grid[i][i])) {
 
-    if (!marked(card.grid[i][4 - i])) d2 = false;
+      diagonal1 = false;
+
+    }
+
+    if (!marked(card.grid[i][4 - i])) {
+
+      diagonal2 = false;
+
+    }
 
   }
 
-  if (d1) lines++;
+  if (diagonal1) lines++;
 
-  if (d2) lines++;
+  if (diagonal2) lines++;
 
   return lines >= 2;
 
@@ -212,7 +250,11 @@ function hasTwoLines(card, called) {
 
 function cardNumberValid(n) {
 
-  return Number.isInteger(n) && n >= 1 && n <= CARD_COUNT;
+  return Number.isInteger(n) &&
+
+    n >= 1 &&
+
+    n <= CARD_COUNT;
 
 }
 
@@ -346,7 +388,15 @@ class GameScheduler extends DurableObject {
 
     `);
 
-    const rows = [...sql.exec("SELECT * FROM state WHERE id = 1")];
+    const rows = [
+
+      ...sql.exec(
+
+        "SELECT * FROM state WHERE id = 1"
+
+      ),
+
+    ];
 
     if (!rows.length) {
 
@@ -358,9 +408,9 @@ class GameScheduler extends DurableObject {
 
         `INSERT INTO state
 
-          (id, game_number, status, started_at, ball_index, ball_order)
+        (id, game_number, status, started_at, ball_index, ball_order)
 
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, ?)`,
 
         1,
 
@@ -372,11 +422,19 @@ class GameScheduler extends DurableObject {
 
         -1,
 
-        JSON.stringify(makeBallOrder(gameNumber))
+        JSON.stringify(
+
+          makeBallOrder(gameNumber)
+
+        )
 
       );
 
-      await this.ctx.storage.setAlarm(now + LOBBY_SECONDS * 1000);
+      await this.ctx.storage.setAlarm(
+
+        now + LOBBY_SECONDS * 1000
+
+      );
 
     } else {
 
@@ -384,7 +442,9 @@ class GameScheduler extends DurableObject {
 
       if (state.status === "lobby") {
 
-        const elapsed = Date.now() - state.started_at;
+        const elapsed =
+
+          Date.now() - state.started_at;
 
         const remaining = Math.max(
 
@@ -394,7 +454,11 @@ class GameScheduler extends DurableObject {
 
         );
 
-        await this.ctx.storage.setAlarm(Date.now() + remaining);
+        await this.ctx.storage.setAlarm(
+
+          Date.now() + remaining
+
+        );
 
       } else if (state.status === "live") {
 
@@ -422,7 +486,11 @@ class GameScheduler extends DurableObject {
 
     ];
 
-    if (!rows.length) return null;
+    if (!rows.length) {
+
+      return null;
+
+    }
 
     const state = rows[0];
 
@@ -430,7 +498,11 @@ class GameScheduler extends DurableObject {
 
       ...state,
 
-      ball_order: JSON.parse(state.ball_order),
+      ball_order: JSON.parse(
+
+        state.ball_order
+
+      ),
 
     };
 
@@ -438,9 +510,19 @@ class GameScheduler extends DurableObject {
 
   getCalledBalls(state) {
 
-    if (!state || state.ball_index < 0) return [];
+    if (!state || state.ball_index < 0) {
 
-    return state.ball_order.slice(0, state.ball_index + 1);
+      return [];
+
+    }
+
+    return state.ball_order.slice(
+
+      0,
+
+      state.ball_index + 1
+
+    );
 
   }
 
@@ -474,9 +556,13 @@ class GameScheduler extends DurableObject {
 
         `UPDATE state
 
-         SET status = ?, started_at = ?, ball_index = ?
+        SET status = ?,
 
-         WHERE id = 1`,
+            started_at = ?,
+
+            ball_index = ?
+
+        WHERE id = 1`,
 
         "live",
 
@@ -486,7 +572,11 @@ class GameScheduler extends DurableObject {
 
       );
 
-      await this.scheduleNext(BALL_INTERVAL);
+      await this.scheduleNext(
+
+        BALL_INTERVAL
+
+      );
 
       return;
 
@@ -494,7 +584,9 @@ class GameScheduler extends DurableObject {
 
     if (state.status === "live") {
 
-      const nextIndex = state.ball_index + 1;
+      const nextIndex =
+
+        state.ball_index + 1;
 
       if (nextIndex >= TOTAL_BALLS) {
 
@@ -508,15 +600,19 @@ class GameScheduler extends DurableObject {
 
         `UPDATE state
 
-         SET ball_index = ?
+        SET ball_index = ?
 
-         WHERE id = 1`,
+        WHERE id = 1`,
 
         nextIndex
 
       );
 
-      await this.scheduleNext(BALL_INTERVAL);
+      await this.scheduleNext(
+
+        BALL_INTERVAL
+
+      );
 
     }
 
@@ -526,7 +622,9 @@ class GameScheduler extends DurableObject {
 
     const oldState = this.getState();
 
-    const gameNumber = Number(oldState.game_number) + 1;
+    const gameNumber =
+
+      Number(oldState.game_number) + 1;
 
     const now = Date.now();
 
@@ -564,11 +662,19 @@ class GameScheduler extends DurableObject {
 
       -1,
 
-      JSON.stringify(makeBallOrder(gameNumber))
+      JSON.stringify(
+
+        makeBallOrder(gameNumber)
+
+      )
 
     );
 
-    await this.scheduleNext(LOBBY_SECONDS * 1000);
+    await this.scheduleNext(
+
+      LOBBY_SECONDS * 1000
+
+    );
 
   }
 
@@ -598,7 +704,9 @@ class GameScheduler extends DurableObject {
 
     }
 
-    const calledBalls = this.getCalledBalls(state);
+    const calledBalls =
+
+      this.getCalledBalls(state);
 
     let lobbyRemaining = 0;
 
@@ -610,7 +718,13 @@ class GameScheduler extends DurableObject {
 
         LOBBY_SECONDS -
 
-          Math.floor((Date.now() - state.started_at) / 1000)
+          Math.floor(
+
+            (Date.now() - state.started_at) /
+
+              1000
+
+          )
 
       );
 
@@ -618,9 +732,15 @@ class GameScheduler extends DurableObject {
 
     const currentBall =
 
-      state.status === "live" && state.ball_index >= 0
+      state.status === "live" &&
 
-        ? state.ball_order[state.ball_index]
+      state.ball_index >= 0
+
+        ? state.ball_order[
+
+            state.ball_index
+
+          ]
 
         : null;
 
@@ -652,7 +772,15 @@ class GameScheduler extends DurableObject {
 
     const cards = [];
 
-    for (let i = 1; i <= CARD_COUNT; i++) {
+    for (
+
+      let i = 1;
+
+      i <= CARD_COUNT;
+
+      i++
+
+    ) {
 
       cards.push({
 
@@ -718,7 +846,13 @@ class GameScheduler extends DurableObject {
 
       ),
 
-    ].slice(0, MAX_CARDS_PER_PLAYER);
+    ].slice(
+
+      0,
+
+      MAX_CARDS_PER_PLAYER
+
+    );
 
     const sql = this.ctx.storage.sql;
 
@@ -726,7 +860,9 @@ class GameScheduler extends DurableObject {
 
       `DELETE FROM selected_cards
 
-       WHERE user_id = ? AND game_number = ?`,
+       WHERE user_id = ?
+
+       AND game_number = ?`,
 
       userId,
 
@@ -788,7 +924,9 @@ class GameScheduler extends DurableObject {
 
          FROM selected_cards
 
-         WHERE user_id = ? AND game_number = ?
+         WHERE user_id = ?
+
+         AND game_number = ?
 
          ORDER BY card_number`,
 
@@ -802,7 +940,11 @@ class GameScheduler extends DurableObject {
 
     return {
 
-      selected: rows.map((r) => Number(r.card_number)),
+      selected: rows.map(
+
+        (r) => Number(r.card_number)
+
+      ),
 
       gameNumber: state.game_number,
 
@@ -834,7 +976,9 @@ class GameScheduler extends DurableObject {
 
       sql.exec(
 
-        `INSERT INTO balances(user_id, balance)
+        `INSERT INTO balances
+
+         (user_id, balance)
 
          VALUES (?, ?)`,
 
@@ -854,13 +998,27 @@ class GameScheduler extends DurableObject {
 
     return {
 
-      balance: Number(rows[0].balance),
+      balance: Number(
+
+        rows[0].balance
+
+      ),
 
     };
 
   }
 
-  async walletRequest(userId, method, type, amount) {
+  async walletRequest(
+
+    userId,
+
+    method,
+
+    type,
+
+    amount
+
+  ) {
 
     const allowedMethods = [
 
@@ -872,7 +1030,11 @@ class GameScheduler extends DurableObject {
 
     ];
 
-    if (!allowedMethods.includes(method)) {
+    if (
+
+      !allowedMethods.includes(method)
+
+    ) {
 
       return {
 
@@ -884,7 +1046,9 @@ class GameScheduler extends DurableObject {
 
     }
 
-    const cleanAmount = Math.floor(Number(amount));
+    const cleanAmount =
+
+      Math.floor(Number(amount));
 
     if (
 
@@ -908,9 +1072,13 @@ class GameScheduler extends DurableObject {
 
     const sql = this.ctx.storage.sql;
 
-    const current = await this.balance(userId);
+    const current =
 
-    let newBalance = current.balance;
+      await this.balance(userId);
+
+    let newBalance =
+
+      current.balance;
 
     if (type === "deposit") {
 
@@ -918,15 +1086,25 @@ class GameScheduler extends DurableObject {
 
     } else if (type === "withdraw") {
 
-      if (cleanAmount > current.balance) {
+      if (
+
+        cleanAmount >
+
+        current.balance
+
+      ) {
 
         return {
 
           ok: false,
 
-          error: "INSUFFICIENT_BALANCE",
+          error:
 
-          balance: current.balance,
+            "INSUFFICIENT_BALANCE",
+
+          balance:
+
+            current.balance,
 
         };
 
@@ -1022,7 +1200,9 @@ class GameScheduler extends DurableObject {
 
          FROM selected_cards
 
-         WHERE user_id = ? AND game_number = ?
+         WHERE user_id = ?
+
+         AND game_number = ?
 
          ORDER BY card_number`,
 
@@ -1034,19 +1214,39 @@ class GameScheduler extends DurableObject {
 
     ];
 
-    const called = this.getCalledBalls(state);
+    const called =
+
+      this.getCalledBalls(state);
 
     const winners = [];
 
     for (const row of rows) {
 
-      const cardNumber = Number(row.card_number);
+      const cardNumber =
 
-      const card = makeCard(cardNumber);
+        Number(row.card_number);
 
-      if (hasTwoLines(card, called)) {
+      const card =
 
-        winners.push(cardNumber);
+        makeCard(cardNumber);
+
+      if (
+
+        hasTwoLines(
+
+          card,
+
+          called
+
+        )
+
+      ) {
+
+        winners.push(
+
+          cardNumber
+
+        );
 
       }
 
@@ -1056,11 +1256,15 @@ class GameScheduler extends DurableObject {
 
       ok: true,
 
-      winner: winners.length > 0,
+      winner:
+
+        winners.length > 0,
 
       cards: winners,
 
-      gameNumber: state.game_number,
+      gameNumber:
+
+        state.game_number,
 
     };
 
@@ -1072,35 +1276,71 @@ class GameScheduler extends DurableObject {
 
     const path = url.pathname;
 
-    const user = getTelegramUser(request);
+    const user =
+
+      getTelegramUser(request);
 
     try {
 
       if (path === "/do/game") {
 
-        return json(await this.game());
+        return json(
+
+          await this.game()
+
+        );
 
       }
 
       if (path === "/do/cards") {
 
-        return json(await this.cards());
+        return json(
+
+          await this.cards()
+
+        );
 
       }
 
-      if (path === "/do/user-cards") {
+      if (
 
-        return json(await this.userCards(user.id));
+        path === "/do/user-cards"
+
+      ) {
+
+        return json(
+
+          await this.userCards(
+
+            user.id
+
+          )
+
+        );
 
       }
 
-      if (path === "/do/select-cards") {
+      if (
 
-        if (request.method !== "POST") {
+        path === "/do/select-cards"
+
+      ) {
+
+        if (
+
+          request.method !== "POST"
+
+        ) {
 
           return json(
 
-            { error: "METHOD_NOT_ALLOWED" },
+            {
+
+              error:
+
+                "METHOD_NOT_ALLOWED",
+
+            },
 
             405
 
@@ -1108,7 +1348,9 @@ class GameScheduler extends DurableObject {
 
         }
 
-        const body = await request.json();
+        const body =
+
+          await request.json();
 
         return json(
 
@@ -1124,19 +1366,45 @@ class GameScheduler extends DurableObject {
 
       }
 
-      if (path === "/do/balance") {
+      if (
 
-        return json(await this.balance(user.id));
+        path === "/do/balance"
+
+      ) {
+
+        return json(
+
+          await this.balance(
+
+            user.id
+
+          )
+
+        );
 
       }
 
-      if (path === "/do/wallet") {
+      if (
 
-        if (request.method !== "POST") {
+        path === "/do/wallet"
+
+      ) {
+
+        if (
+
+          request.method !== "POST"
+
+        ) {
 
           return json(
 
-            { error: "METHOD_NOT_ALLOWED" },
+            {
+
+              error:
+
+                "METHOD_NOT_ALLOWED",
+
+            },
 
             405
 
@@ -1144,7 +1412,9 @@ class GameScheduler extends DurableObject {
 
         }
 
-        const body = await request.json();
+        const body =
+
+          await request.json();
 
         return json(
 
@@ -1168,7 +1438,11 @@ class GameScheduler extends DurableObject {
 
         return json(
 
-          await this.checkWinners(user.id)
+          await this.checkWinners(
+
+            user.id
+
+          )
 
         );
 
@@ -1194,7 +1468,11 @@ class GameScheduler extends DurableObject {
 
           error: "SERVER_ERROR",
 
-          message: error?.message || String(error),
+          message:
+
+            error?.message ||
+
+            String(error),
 
         },
 
@@ -1216,2395 +1494,2113 @@ function pageHtml() {
 
 <head>
 
-  <meta charset="UTF-8">
+<meta charset="UTF-8">
 
-  <meta
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 
-    name="viewport"
+<meta name="theme-color" content="#07090d">
 
-    content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
+<title>Fast Bingo</title>
 
-  >
+<style>
 
-  <meta
+:root{
 
-    name="theme-color"
+  --bg:#07090d;
 
-    content="#07090d"
+  --surface:#10141c;
 
-  >
+  --surface2:#151b25;
 
-  <title>Fast Bingo</title>
+  --surface3:#1b2230;
 
-  <style>
+  --line:#293243;
 
-    :root{
+  --text:#fff;
 
-      --bg:#07090d;
+  --muted:#8993a4;
 
-      --surface:#10141c;
+  --red:#e50914;
 
-      --surface2:#151b25;
+  --red2:#ff3038;
 
-      --surface3:#1b2230;
+  --green:#26d07c;
 
-      --line:#293243;
+  --gold:#ffc857;
 
-      --text:#ffffff;
+}
 
-      --muted:#8993a4;
+*{
 
-      --red:#e50914;
+  box-sizing:border-box;
 
-      --red2:#ff3038;
+  -webkit-tap-highlight-color:transparent;
 
-      --green:#26d07c;
+}
 
-      --gold:#ffc857;
+html,body{
 
-      --blue:#4c8dff;
+  margin:0;
 
-      --shadow:0 12px 35px rgba(0,0,0,.28);
+  padding:0;
 
-    }
+  background:var(--bg);
 
-    *{
+  color:var(--text);
 
-      box-sizing:border-box;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
 
-      -webkit-tap-highlight-color:transparent;
+}
 
-    }
+body{
 
-    html{
+  min-height:100vh;
 
-      background:var(--bg);
+  padding-bottom:92px;
 
-      scroll-behavior:smooth;
+  background:
 
-    }
+    radial-gradient(
 
-    body{
+      circle at 50% -10%,
 
-      margin:0;
+      rgba(229,9,20,.14),
 
-      background:
+      transparent 38%
 
-        radial-gradient(
+    ),
 
-          circle at 50% -10%,
+    var(--bg);
 
-          rgba(229,9,20,.13),
+}
 
-          transparent 38%
+button,input,select{
 
-        ),
+  font:inherit;
 
-        var(--bg);
+}
 
-      color:var(--text);
+button{
 
-      font-family:
+  cursor:pointer;
 
-        -apple-system,
+}
 
-        BlinkMacSystemFont,
+.app{
 
-        "Segoe UI",
+  width:100%;
 
-        Roboto,
+  max-width:760px;
 
-        Arial,
+  margin:auto;
 
-        sans-serif;
+}
 
-      min-height:100vh;
+.topbar{
 
-      padding-bottom:92px;
+  position:sticky;
 
-    }
+  top:0;
 
-    button,
+  z-index:20;
 
-    input,
+  display:flex;
 
-    select{
+  align-items:center;
 
-      font:inherit;
+  justify-content:space-between;
 
-    }
+  gap:10px;
 
-    button{
+  padding:
 
-      cursor:pointer;
+    calc(10px + env(safe-area-inset-top))
 
-    }
+    14px
 
-    .app{
+    10px;
 
-      width:100%;
+  background:rgba(7,9,13,.94);
 
-      max-width:760px;
+  backdrop-filter:blur(18px);
 
-      margin:0 auto;
+  border-bottom:1px solid rgba(255,255,255,.06);
 
-      padding-bottom:30px;
+}
 
-    }
+.brand{
 
-    .topbar{
+  display:flex;
 
-      position:sticky;
+  align-items:center;
 
-      top:0;
+  gap:9px;
 
-      z-index:30;
+  min-width:0;
 
-      display:flex;
+}
 
-      align-items:center;
+.brand-ball{
 
-      justify-content:space-between;
+  width:38px;
 
-      gap:10px;
+  height:38px;
 
-      padding:
+  border-radius:50%;
 
-        calc(10px + env(safe-area-inset-top))
+  display:grid;
 
-        14px
+  place-items:center;
 
-        10px;
+  background:
 
-      background:rgba(7,9,13,.92);
+    radial-gradient(
 
-      backdrop-filter:blur(18px);
+      circle at 32% 25%,
 
-      border-bottom:1px solid rgba(255,255,255,.06);
+      #ff5960,
 
-    }
+      var(--red) 50%,
 
-    .brand{
+      #a50009
 
-      display:flex;
+    );
 
-      align-items:center;
+  box-shadow:0 5px 18px rgba(229,9,20,.32);
 
-      gap:9px;
+  font-size:18px;
 
-      min-width:0;
+}
 
-    }
+.brand-name{
 
-    .brand-ball{
+  font-size:15px;
 
-      width:38px;
+  font-weight:950;
 
-      height:38px;
+  letter-spacing:.7px;
 
-      border-radius:50%;
+}
 
-      display:grid;
+.brand-sub{
 
-      place-items:center;
+  margin-top:3px;
 
-      background:
+  color:var(--muted);
 
-        radial-gradient(
+  font-size:9px;
 
-          circle at 32% 25%,
+}
 
-          #ff5960,
+.balance-pill{
 
-          var(--red) 50%,
+  border:1px solid var(--line);
 
-          #a50009
+  background:var(--surface);
 
-        );
+  border-radius:999px;
 
-      box-shadow:
+  padding:8px 11px;
 
-        0 5px 18px rgba(229,9,20,.32);
+  font-size:11px;
 
-      font-size:19px;
+  font-weight:900;
 
-      flex:none;
+  white-space:nowrap;
 
-    }
+}
 
-    .brand-text{
+.balance-pill span{
 
-      min-width:0;
+  color:var(--gold);
 
-    }
+}
 
-    .brand-name{
+.hero{
 
-      font-weight:900;
+  padding:18px 14px 8px;
 
-      letter-spacing:.7px;
+}
 
-      font-size:15px;
+.status-row{
 
-      line-height:1.1;
+  display:flex;
 
-    }
+  align-items:center;
 
-    .brand-sub{
+  justify-content:space-between;
 
-      color:var(--muted);
+  margin-bottom:12px;
 
-      font-size:10px;
+}
 
-      margin-top:3px;
+.status-badge{
 
-      white-space:nowrap;
+  display:flex;
 
-    }
+  align-items:center;
 
-    .balance-pill{
+  gap:7px;
 
-      display:flex;
+  border-radius:999px;
 
-      align-items:center;
+  padding:7px 10px;
 
-      gap:6px;
+  color:var(--green);
 
-      border:1px solid var(--line);
+  background:rgba(38,208,124,.1);
 
-      background:var(--surface);
+  border:1px solid rgba(38,208,124,.25);
 
-      border-radius:999px;
+  font-size:10px;
 
-      padding:8px 11px;
+  font-weight:950;
 
-      font-size:12px;
+}
 
-      font-weight:800;
+.status-dot{
 
-      white-space:nowrap;
+  width:7px;
 
-    }
+  height:7px;
 
-    .balance-pill span{
+  border-radius:50%;
 
-      color:var(--gold);
+  background:currentColor;
 
-    }
+  box-shadow:0 0 10px currentColor;
 
-    .hero{
+}
 
-      padding:18px 14px 8px;
+.game-number{
 
-    }
+  color:var(--muted);
 
-    .status-row{
+  font-size:10px;
 
-      display:flex;
+  font-weight:800;
 
-      justify-content:space-between;
+}
 
-      align-items:center;
+.hero-card{
 
-      gap:10px;
+  position:relative;
 
-      margin-bottom:12px;
+  overflow:hidden;
 
-    }
+  padding:17px;
 
-    .status-badge{
+  border:1px solid var(--line);
 
-      display:inline-flex;
+  border-radius:24px;
 
-      align-items:center;
+  background:
 
-      gap:7px;
+    linear-gradient(
 
-      border-radius:999px;
+      145deg,
 
-      padding:7px 10px;
+      rgba(255,255,255,.055),
 
-      background:rgba(38,208,124,.10);
+      rgba(255,255,255,.015)
 
-      border:1px solid rgba(38,208,124,.25);
+    ),
 
-      color:var(--green);
+    var(--surface);
 
-      font-size:11px;
+  box-shadow:0 15px 40px rgba(0,0,0,.3);
 
-      font-weight:900;
+}
 
-    }
+.hero-title{
 
-    .status-dot{
+  text-align:center;
 
-      width:7px;
+  font-size:13px;
 
-      height:7px;
+  font-weight:950;
 
-      border-radius:50%;
+}
 
-      background:currentColor;
+.hero-message{
 
-      box-shadow:0 0 10px currentColor;
+  margin-top:6px;
 
-    }
+  min-height:18px;
 
-    .game-number{
+  text-align:center;
 
-      color:var(--muted);
+  color:var(--muted);
 
-      font-size:11px;
+  font-size:11px;
 
-      font-weight:700;
+  line-height:1.5;
 
-    }
+}
 
-    .hero-card{
+.countdown{
 
-      position:relative;
+  margin:10px 0;
 
-      overflow:hidden;
+  text-align:center;
 
-      border:1px solid var(--line);
+  color:var(--gold);
 
-      border-radius:24px;
+  font-size:13px;
 
-      background:
+  font-weight:900;
 
-        linear-gradient(
+}
 
-          145deg,
+.countdown strong{
 
-          rgba(255,255,255,.055),
+  font-size:22px;
 
-          rgba(255,255,255,.015)
+}
 
-        ),
+.ball-area{
 
-        var(--surface);
+  display:flex;
 
-      box-shadow:var(--shadow);
+  justify-content:center;
 
-      padding:18px;
+  padding:8px 0 14px;
 
-    }
+}
 
-    .hero-card::before{
+.current-ball{
 
-      content:"";
+  width:140px;
 
-      position:absolute;
+  height:140px;
 
-      width:190px;
+  border-radius:50%;
 
-      height:190px;
+  display:flex;
 
-      border-radius:50%;
+  flex-direction:column;
 
-      background:rgba(229,9,20,.08);
+  justify-content:center;
 
-      filter:blur(4px);
+  align-items:center;
 
-      right:-90px;
+  background:
 
-      top:-90px;
+    radial-gradient(
 
-    }
+      circle at 32% 22%,
 
-    .hero-title{
+      #fff,
 
-      position:relative;
+      #eee 18%,
 
-      text-align:center;
+      #d0d3d8 52%,
 
-      font-size:13px;
+      #92969d
 
-      font-weight:900;
+    );
 
-      color:#f1f3f6;
+  color:#090b10;
 
-      margin-bottom:14px;
+  border:8px solid #272c34;
 
-    }
+  box-shadow:
 
-    .hero-message{
+    0 0 0 5px rgba(229,9,20,.13),
 
-      position:relative;
+    0 20px 45px rgba(0,0,0,.45);
 
-      text-align:center;
+}
 
-      color:var(--muted);
+.current-ball-letter{
 
-      font-size:12px;
+  color:var(--red);
 
-      line-height:1.6;
+  font-size:18px;
 
-      min-height:20px;
+  font-weight:1000;
 
-    }
+}
 
-    .countdown{
+.current-ball-number{
 
-      position:relative;
+  margin-top:3px;
 
-      display:flex;
+  font-size:50px;
 
-      align-items:center;
+  line-height:1;
 
-      justify-content:center;
+  font-weight:1000;
 
-      gap:7px;
+}
 
-      margin:12px 0 14px;
+.ball-caption{
 
-      color:var(--gold);
+  margin-top:5px;
 
-      font-size:15px;
+  color:#626a77;
 
-      font-weight:950;
+  font-size:8px;
 
-    }
+  font-weight:900;
 
-    .countdown strong{
+  letter-spacing:.7px;
 
-      font-size:22px;
+}
 
-    }
+.recent-row{
 
-    .ball-area{
+  display:flex;
 
-      position:relative;
+  gap:6px;
 
-      display:flex;
+  overflow-x:auto;
 
-      justify-content:center;
+  scrollbar-width:none;
 
-      align-items:center;
+}
 
-      padding:8px 0 13px;
+.recent-row::-webkit-scrollbar{
 
-    }
+  display:none;
 
-    .current-ball{
+}
 
-      width:146px;
+.mini-ball{
 
-      height:146px;
+  width:31px;
 
-      border-radius:50%;
+  height:31px;
 
-      display:flex;
+  flex:none;
 
-      flex-direction:column;
+  display:grid;
 
-      align-items:center;
+  place-items:center;
 
-      justify-content:center;
+  border-radius:50%;
 
-      background:
+  background:var(--surface3);
 
-        radial-gradient(
+  border:1px solid var(--line);
 
-          circle at 32% 22%,
+  font-size:9px;
 
-          #ffffff,
+  font-weight:900;
 
-          #f0f1f4 16%,
+}
 
-          #d7d9de 44%,
+.mini-ball.latest{
 
-          #9da1a8 100%
+  background:var(--red);
 
-        );
+  border-color:var(--red);
 
-      color:#090b10;
+}
 
-      border:8px solid #272c34;
+.stats{
 
-      box-shadow:
+  display:grid;
 
-        0 0 0 5px rgba(229,9,20,.13),
+  grid-template-columns:repeat(3,1fr);
 
-        0 20px 45px rgba(0,0,0,.45);
+  gap:8px;
 
-    }
+  padding:8px 14px 14px;
 
-    .current-ball-letter{
+}
 
-      font-size:19px;
+.stat{
 
-      font-weight:1000;
+  padding:11px 7px;
 
-      color:var(--red);
+  text-align:center;
 
-      line-height:1;
+  background:var(--surface);
 
-    }
+  border:1px solid var(--line);
 
-    .current-ball-number{
+  border-radius:15px;
 
-      font-size:52px;
+}
 
-      line-height:1;
+.stat-value{
 
-      font-weight:1000;
+  font-size:17px;
 
-      letter-spacing:-2px;
+  font-weight:950;
 
-      margin-top:4px;
+}
 
-    }
+.stat-label{
 
-    .ball-caption{
+  margin-top:4px;
 
-      margin-top:6px;
+  color:var(--muted);
 
-      color:#626a77;
+  font-size:8px;
 
-      font-size:9px;
+  font-weight:700;
 
-      font-weight:900;
+}
 
-      letter-spacing:.8px;
+.tabs{
 
-    }
+  display:grid;
 
-    .recent-row{
+  grid-template-columns:repeat(3,1fr);
 
-      position:relative;
+  gap:5px;
 
-      display:flex;
+  margin:0 14px 14px;
 
-      align-items:center;
+  padding:5px;
 
-      gap:7px;
+  background:var(--surface);
 
-      overflow-x:auto;
+  border:1px solid var(--line);
 
-      padding:7px 2px 2px;
+  border-radius:16px;
 
-      scrollbar-width:none;
+}
 
-    }
+.tab{
 
-    .recent-row::-webkit-scrollbar{
+  border:0;
 
-      display:none;
+  border-radius:11px;
 
-    }
+  padding:10px 5px;
 
-    .mini-ball{
+  background:transparent;
 
-      width:31px;
+  color:var(--muted);
 
-      height:31px;
+  font-size:10px;
 
-      flex:none;
+  font-weight:900;
 
-      display:grid;
+}
 
-      place-items:center;
+.tab.active{
 
-      border-radius:50%;
+  background:var(--surface3);
 
-      background:var(--surface3);
+  color:#fff;
 
-      border:1px solid var(--line);
+}
 
-      color:#fff;
+.section{
 
-      font-size:10px;
+  display:none;
 
-      font-weight:900;
+  padding:0 14px;
 
-    }
+}
 
-    .mini-ball.latest{
+.section.active{
 
-      background:var(--red);
+  display:block;
 
-      border-color:var(--red);
+}
 
-    }
+.panel{
 
-    .stats{
+  margin-bottom:12px;
 
-      display:grid;
+  padding:15px;
 
-      grid-template-columns:repeat(3,1fr);
+  background:var(--surface);
 
-      gap:8px;
+  border:1px solid var(--line);
 
-      padding:8px 14px 14px;
+  border-radius:19px;
 
-    }
+}
 
-    .stat{
+.panel-title{
 
-      background:var(--surface);
+  font-size:13px;
 
-      border:1px solid var(--line);
+  font-weight:950;
 
-      border-radius:15px;
+}
 
-      padding:11px 8px;
+.panel-sub{
 
-      text-align:center;
+  margin:4px 0 13px;
 
-    }
+  color:var(--muted);
 
-    .stat-value{
+  font-size:10px;
 
-      font-size:17px;
+  line-height:1.6;
 
-      font-weight:950;
+}
 
-      line-height:1;
+.info-grid{
 
-    }
+  display:grid;
 
-    .stat-label{
+  grid-template-columns:repeat(2,1fr);
 
-      color:var(--muted);
+  gap:8px;
 
-      font-size:9px;
+}
 
-      margin-top:5px;
+.info-box{
 
-      font-weight:700;
+  padding:12px;
 
-    }
+  background:var(--surface2);
 
-    .tabs{
+  border:1px solid var(--line);
 
-      display:grid;
+  border-radius:13px;
 
-      grid-template-columns:repeat(3,1fr);
+}
 
-      gap:6px;
+.info-box-title{
 
-      margin:0 14px 14px;
+  font-size:10px;
 
-      padding:5px;
+  font-weight:900;
 
-      background:var(--surface);
+}
 
-      border:1px solid var(--line);
+.info-box-text{
 
-      border-radius:16px;
+  margin-top:4px;
 
-    }
+  color:var(--muted);
 
-    .tab{
+  font-size:9px;
 
-      border:0;
+  line-height:1.5;
 
-      background:transparent;
+}
 
-      color:var(--muted);
+.bingo-card{
 
-      padding:10px 7px;
+  margin-bottom:10px;
 
-      border-radius:11px;
+  padding:11px;
 
-      font-size:11px;
+  background:var(--surface2);
 
-      font-weight:900;
+  border:1px solid var(--line);
 
-    }
+  border-radius:16px;
 
-    .tab.active{
+}
 
-      color:#fff;
+.bingo-card-head{
 
-      background:var(--surface3);
+  display:flex;
 
-      box-shadow:0 2px 8px rgba(0,0,0,.2);
+  justify-content:space-between;
 
-    }
+  margin-bottom:8px;
 
-    .section{
+}
 
-      display:none;
+.card-number-label{
 
-      padding:0 14px;
+  font-size:10px;
 
-    }
+  font-weight:950;
 
-    .section.active{
+}
 
-      display:block;
+.card-state{
 
-    }
+  color:var(--green);
 
-    .panel{
+  font-size:8px;
 
-      background:var(--surface);
+  font-weight:900;
 
-      border:1px solid var(--line);
+}
 
-      border-radius:19px;
+.bingo-grid{
 
-      padding:15px;
+  display:grid;
 
-      margin-bottom:12px;
+  grid-template-columns:repeat(5,1fr);
 
-    }
+  gap:4px;
 
-    .panel-title{
+}
 
-      font-size:13px;
+.bingo-cell{
 
-      font-weight:950;
+  min-height:36px;
 
-      margin-bottom:4px;
+  display:grid;
 
-    }
+  place-items:center;
 
-    .panel-sub{
+  background:#0e131b;
 
-      color:var(--muted);
+  border:1px solid #242d3b;
 
-      font-size:10px;
+  border-radius:6px;
 
-      line-height:1.6;
+  font-size:10px;
 
-      margin-bottom:13px;
+  font-weight:850;
 
-    }
+}
 
-    .info-grid{
+.bingo-cell.called{
 
-      display:grid;
+  background:var(--red);
 
-      grid-template-columns:repeat(2,1fr);
+  border-color:var(--red);
 
-      gap:8px;
+}
 
-    }
+.bingo-cell.free{
 
-    .info-box{
+  color:var(--gold);
 
-      background:var(--surface2);
+  background:rgba(255,200,87,.12);
 
-      border:1px solid var(--line);
+  border-color:rgba(255,200,87,.3);
 
-      border-radius:13px;
+  font-size:7px;
 
-      padding:12px;
+}
 
-    }
+.primary-btn,
 
-    .info-box-title{
+.secondary-btn{
 
-      font-size:11px;
+  width:100%;
 
-      font-weight:900;
+  border-radius:13px;
 
-    }
+  padding:12px;
 
-    .info-box-text{
+  font-size:11px;
 
-      color:var(--muted);
+  font-weight:950;
 
-      font-size:9px;
+}
 
-      margin-top:4px;
+.primary-btn{
 
-      line-height:1.5;
+  border:0;
 
-    }
+  background:linear-gradient(
 
-    .my-cards{
+    135deg,
 
-      display:grid;
+    var(--red),
 
-      gap:10px;
+    var(--red2)
 
-    }
+  );
 
-    .bingo-card{
+  color:#fff;
 
-      background:var(--surface2);
+}
 
-      border:1px solid var(--line);
+.secondary-btn{
 
-      border-radius:16px;
+  border:1px solid var(--line);
 
-      padding:11px;
+  background:var(--surface2);
 
-    }
+  color:#fff;
 
-    .bingo-card-head{
+}
 
-      display:flex;
+.btn-row{
 
-      justify-content:space-between;
+  display:grid;
 
-      align-items:center;
+  grid-template-columns:1fr 1fr;
 
-      margin-bottom:8px;
+  gap:8px;
 
-    }
+}
 
-    .card-number-label{
+.called-grid{
 
-      font-size:11px;
+  display:grid;
 
-      font-weight:950;
+  grid-template-columns:repeat(10,1fr);
 
-    }
+  gap:4px;
 
-    .card-state{
+}
 
-      color:var(--green);
+.called-number{
 
-      font-size:9px;
+  aspect-ratio:1;
 
-      font-weight:900;
+  display:grid;
 
-    }
+  place-items:center;
 
-    .bingo-grid{
+  border-radius:6px;
 
-      display:grid;
+  background:var(--surface2);
 
-      grid-template-columns:repeat(5,1fr);
+  border:1px solid var(--line);
 
-      gap:4px;
+  color:var(--muted);
 
-    }
+  font-size:8px;
 
-    .bingo-cell{
+  font-weight:900;
 
-      min-height:36px;
+}
 
-      display:grid;
+.called-number.active{
 
-      place-items:center;
+  background:var(--red);
 
-      background:#0e131b;
+  border-color:var(--red);
 
-      border:1px solid #242d3b;
+  color:#fff;
 
-      border-radius:6px;
+}
 
-      color:#f7f8fa;
+.letter-heading{
 
-      font-size:11px;
+  display:grid;
 
-      font-weight:850;
+  grid-template-columns:repeat(5,1fr);
 
-    }
+  gap:4px;
 
-    .bingo-cell.called{
+  margin-bottom:5px;
 
-      background:rgba(229,9,20,.9);
+}
 
-      border-color:var(--red);
+.letter-heading div{
 
-      color:#fff;
+  text-align:center;
 
-    }
+  color:var(--red);
 
-    .bingo-cell.free{
+  font-size:9px;
 
-      background:rgba(255,200,87,.13);
+  font-weight:1000;
 
-      border-color:rgba(255,200,87,.35);
+}
 
-      color:var(--gold);
+.selected-list{
 
-      font-size:8px;
+  display:flex;
 
-    }
+  flex-wrap:wrap;
 
-    .primary-btn{
+  gap:5px;
 
-      width:100%;
+  margin-bottom:11px;
 
-      border:0;
+}
 
-      border-radius:13px;
+.selected-pill{
 
-      padding:13px 15px;
+  padding:6px 8px;
 
-      background:linear-gradient(
+  border-radius:999px;
 
-        135deg,
+  color:var(--green);
 
-        var(--red),
+  background:rgba(38,208,124,.09);
 
-        var(--red2)
+  border:1px solid rgba(38,208,124,.28);
 
-      );
+  font-size:9px;
 
-      color:#fff;
+  font-weight:900;
 
-      font-weight:950;
+}
 
-      font-size:12px;
+.card-grid{
 
-      box-shadow:0 8px 20px rgba(229,9,20,.2);
+  display:grid;
 
-    }
+  grid-template-columns:repeat(10,minmax(0,1fr));
 
-    .secondary-btn{
+  gap:4px;
 
-      width:100%;
+}
 
-      border:1px solid var(--line);
+.card-select{
 
-      border-radius:13px;
+  min-width:0;
 
-      padding:12px 15px;
+  aspect-ratio:1;
 
-      background:var(--surface2);
+  padding:0;
 
-      color:#fff;
+  border:1px solid var(--line);
 
-      font-weight:900;
+  border-radius:6px;
 
-      font-size:11px;
+  background:#0d1219;
 
-    }
+  color:#dfe3e9;
 
-    .btn-row{
+  font-size:8px;
 
-      display:grid;
+  font-weight:950;
 
-      grid-template-columns:1fr 1fr;
+}
 
-      gap:8px;
+.card-select.selected{
 
-    }
+  background:var(--red);
 
-    .called-grid{
+  border-color:var(--red);
 
-      display:grid;
+  color:#fff;
 
-      grid-template-columns:repeat(10,1fr);
+}
 
-      gap:5px;
+.wallet-balance{
 
-    }
+  display:flex;
 
-    .called-number{
+  justify-content:space-between;
 
-      aspect-ratio:1;
+  align-items:center;
 
-      display:grid;
+  margin-bottom:12px;
 
-      place-items:center;
+  padding:14px;
 
-      border-radius:7px;
+  border:1px solid var(--line);
 
-      background:var(--surface2);
+  border-radius:15px;
 
-      border:1px solid var(--line);
+  background:var(--surface2);
 
-      color:var(--muted);
+}
 
-      font-size:9px;
+.wallet-label{
 
-      font-weight:850;
+  color:var(--muted);
 
-    }
+  font-size:9px;
 
-    .called-number.active{
+}
 
-      background:var(--red);
+.wallet-value{
 
-      border-color:var(--red);
+  margin-top:2px;
 
-      color:#fff;
+  color:var(--gold);
 
-    }
+  font-size:22px;
 
-    .letter-heading{
+  font-weight:1000;
 
-      display:grid;
+}
 
-      grid-template-columns:repeat(5,1fr);
+.type-toggle{
 
-      gap:5px;
+  display:grid;
 
-      margin-bottom:5px;
+  grid-template-columns:1fr 1fr;
 
-    }
+  gap:5px;
 
-    .letter-heading div{
+  margin-bottom:10px;
 
-      text-align:center;
+  padding:4px;
 
-      color:var(--red);
+  border:1px solid var(--line);
 
-      font-size:10px;
+  border-radius:12px;
 
-      font-weight:1000;
+  background:var(--surface2);
 
-    }
+}
 
-    .selected-list{
+.type-btn{
 
-      display:flex;
+  border:0;
 
-      flex-wrap:wrap;
+  border-radius:9px;
 
-      gap:6px;
+  padding:10px;
 
-      margin-bottom:12px;
+  background:transparent;
 
-    }
+  color:var(--muted);
 
-    .selected-pill{
+  font-size:10px;
 
-      border:1px solid rgba(38,208,124,.28);
+  font-weight:900;
 
-      background:rgba(38,208,124,.09);
+}
 
-      color:var(--green);
+.type-btn.active{
 
-      border-radius:999px;
+  background:var(--surface3);
 
-      padding:6px 9px;
+  color:#fff;
 
-      font-size:10px;
+}
 
-      font-weight:900;
+.field{
 
-    }
+  margin-bottom:9px;
 
-    .card-grid{
+}
 
-      display:grid;
+.field label{
 
-      grid-template-columns:repeat(10,minmax(0,1fr));
+  display:block;
 
-      gap:4px;
+  margin:0 0 5px 3px;
 
-    }
+  color:var(--muted);
 
-    .card-select{
+  font-size:9px;
 
-      min-width:0;
+  font-weight:800;
 
-      aspect-ratio:1;
+}
 
-      border:1px solid var(--line);
+.field input,
 
-      background:#0d1219;
+.field select{
 
-      color:#dfe3e9;
+  width:100%;
 
-      border-radius:6px;
+  padding:11px;
 
-      font-size:8px;
+  outline:none;
 
-      font-weight:950;
+  border:1px solid var(--line);
 
-      padding:0;
+  border-radius:11px;
 
-    }
+  background:#0c1118;
 
-    .card-select.selected{
+  color:#fff;
 
-      background:var(--red);
+  font-size:12px;
 
-      color:#fff;
+}
 
-      border-color:var(--red);
+.language-buttons{
 
-      box-shadow:0 0 0 1px rgba(255,255,255,.08);
+  display:grid;
 
-    }
+  grid-template-columns:1fr 1fr;
 
-    .card-select:disabled{
+  gap:7px;
 
-      opacity:.35;
+}
 
-    }
+.language-btn{
 
-    .wallet-balance{
+  border:1px solid var(--line);
 
-      display:flex;
+  border-radius:11px;
 
-      align-items:center;
+  padding:10px;
 
-      justify-content:space-between;
+  background:var(--surface2);
 
-      background:var(--surface2);
+  color:var(--muted);
 
-      border:1px solid var(--line);
+  font-size:10px;
 
-      border-radius:15px;
+  font-weight:900;
 
-      padding:14px;
+}
 
-      margin-bottom:12px;
+.language-btn.active{
 
-    }
+  border-color:var(--red);
 
-    .wallet-label{
+  background:rgba(229,9,20,.12);
 
-      color:var(--muted);
+  color:#fff;
 
-      font-size:10px;
+}
 
-    }
+.note{
 
-    .wallet-value{
+  margin-top:10px;
 
-      font-size:22px;
+  color:#727b89;
 
-      font-weight:1000;
+  font-size:8px;
 
-      color:var(--gold);
+  line-height:1.6;
 
-      margin-top:2px;
+  text-align:center;
 
-    }
+}
 
-    .type-toggle{
+.empty{
 
-      display:grid;
+  padding:25px 10px;
 
-      grid-template-columns:1fr 1fr;
+  color:var(--muted);
 
-      gap:5px;
+  text-align:center;
 
-      padding:4px;
+  font-size:10px;
 
-      background:var(--surface2);
+}
 
-      border:1px solid var(--line);
+.bottom-nav{
 
-      border-radius:12px;
+  position:fixed;
 
-      margin-bottom:10px;
+  left:0;
 
-    }
+  right:0;
 
-    .type-btn{
+  bottom:0;
 
-      border:0;
+  z-index:40;
 
-      border-radius:9px;
+  padding:
 
-      padding:10px;
+    8px
 
-      background:transparent;
+    12px
 
-      color:var(--muted);
+    calc(8px + env(safe-area-inset-bottom));
 
-      font-size:10px;
+  background:rgba(7,9,13,.95);
 
-      font-weight:900;
+  backdrop-filter:blur(18px);
 
-    }
+  border-top:1px solid rgba(255,255,255,.07);
 
-    .type-btn.active{
+}
 
-      background:var(--surface3);
+.bottom-inner{
 
-      color:#fff;
+  display:grid;
 
-    }
+  grid-template-columns:repeat(3,1fr);
 
-    .field{
+  gap:6px;
 
-      margin-bottom:9px;
+  max-width:500px;
 
-    }
+  margin:auto;
 
-    .field label{
+}
 
-      display:block;
+.bottom-btn{
 
-      color:var(--muted);
+  border:0;
 
-      font-size:9px;
+  border-radius:11px;
 
-      font-weight:800;
+  padding:8px;
 
-      margin:0 0 5px 3px;
+  background:transparent;
 
-    }
+  color:var(--muted);
 
-    .field input,
+  font-size:9px;
 
-    .field select{
+  font-weight:900;
 
-      width:100%;
+}
 
-      border:1px solid var(--line);
+.bottom-btn.active{
 
-      border-radius:11px;
+  background:var(--surface2);
 
-      background:#0c1118;
+  color:#fff;
 
-      color:#fff;
+}
 
-      padding:11px;
+.toast{
 
-      outline:none;
+  position:fixed;
 
-      font-size:12px;
+  left:50%;
 
-    }
+  bottom:95px;
 
-    .language-buttons{
+  z-index:100;
 
-      display:grid;
+  width:min(92%,420px);
 
-      grid-template-columns:1fr 1fr;
+  transform:translate(-50%,20px);
 
-      gap:7px;
+  padding:12px 14px;
 
-    }
+  border-radius:13px;
 
-    .language-btn{
+  background:#f5f6f8;
 
-      border:1px solid var(--line);
+  color:#090b10;
 
-      background:var(--surface2);
+  text-align:center;
 
-      color:var(--muted);
+  font-size:10px;
 
-      border-radius:11px;
+  font-weight:850;
 
-      padding:10px;
+  opacity:0;
 
-      font-size:11px;
+  pointer-events:none;
 
-      font-weight:900;
+  transition:.22s;
 
-    }
+}
 
-    .language-btn.active{
+.toast.show{
 
-      border-color:var(--red);
+  transform:translate(-50%,0);
 
-      color:#fff;
+  opacity:1;
 
-      background:rgba(229,9,20,.12);
+}
 
-    }
+@media(max-width:480px){
 
-    .note{
+  .current-ball{
 
-      margin-top:10px;
+    width:128px;
 
-      color:#727b89;
+    height:128px;
 
-      font-size:9px;
+  }
 
-      line-height:1.6;
+  .current-ball-number{
 
-      text-align:center;
+    font-size:45px;
 
-    }
+  }
 
-    .bottom-nav{
+  .card-grid{
 
-      position:fixed;
+    gap:3px;
 
-      z-index:50;
+  }
 
-      left:50%;
+  .card-select{
 
-      bottom:0;
+    font-size:7px;
 
-      transform:translateX(-50%);
+  }
 
-      width:min(760px,100%);
+}
 
-      padding:
-
-        8px
-
-        12px
-
-        calc(8px + env(safe-area-inset-bottom));
-
-      background:rgba(7,9,13,.94);
-
-      backdrop-filter:blur(18px);
-
-      border-top:1px solid rgba(255,255,255,.07);
-
-    }
-
-    .bottom-inner{
-
-      display:grid;
-
-      grid-template-columns:repeat(3,1fr);
-
-      gap:6px;
-
-      max-width:500px;
-
-      margin:0 auto;
-
-    }
-
-    .bottom-btn{
-
-      border:0;
-
-      background:transparent;
-
-      color:var(--muted);
-
-      padding:7px 4px;
-
-      border-radius:11px;
-
-      font-size:9px;
-
-      font-weight:900;
-
-    }
-
-    .bottom-btn.active{
-
-      color:#fff;
-
-      background:var(--surface2);
-
-    }
-
-    .toast{
-
-      position:fixed;
-
-      z-index:100;
-
-      left:50%;
-
-      bottom:92px;
-
-      transform:translate(-50%,20px);
-
-      width:min(92%,420px);
-
-      background:#f5f6f8;
-
-      color:#090b10;
-
-      border-radius:13px;
-
-      padding:12px 14px;
-
-      font-size:11px;
-
-      font-weight:850;
-
-      text-align:center;
-
-      opacity:0;
-
-      pointer-events:none;
-
-      transition:.22s ease;
-
-      box-shadow:0 12px 30px rgba(0,0,0,.35);
-
-    }
-
-    .toast.show{
-
-      opacity:1;
-
-      transform:translate(-50%,0);
-
-    }
-
-    .empty{
-
-      padding:25px 10px;
-
-      text-align:center;
-
-      color:var(--muted);
-
-      font-size:11px;
-
-    }
-
-    @media(max-width:480px){
-
-      .current-ball{
-
-        width:128px;
-
-        height:128px;
-
-      }
-
-      .current-ball-number{
-
-        font-size:46px;
-
-      }
-
-      .card-grid{
-
-        gap:3px;
-
-      }
-
-      .card-select{
-
-        border-radius:5px;
-
-        font-size:7px;
-
-      }
-
-      .called-grid{
-
-        gap:4px;
-
-      }
-
-      .called-number{
-
-        font-size:8px;
-
-      }
-
-    }
-
-    @media(max-width:360px){
-
-      .card-grid{
-
-        gap:2px;
-
-      }
-
-      .card-select{
-
-        font-size:6px;
-
-      }
-
-      .brand-sub{
-
-        display:none;
-
-      }
-
-      .balance-pill{
-
-        padding:7px 9px;
-
-        font-size:10px;
-
-      }
-
-    }
-
-  </style>
+</style>
 
 </head>
 
 <body>
 
-  <div class="app">
+<div class="app">
 
-    <header class="topbar">
+<header class="topbar">
 
-      <div class="brand">
+  <div class="brand">
 
-        <div class="brand-ball">🎱</div>
+    <div class="brand-ball">8</div>
 
-        <div class="brand-text">
+    <div>
 
-          <div class="brand-name">
+      <div class="brand-name">
 
-            FAST BINGO
-
-          </div>
-
-          <div class="brand-sub" id="brandSub">
-
-            75 BALL • LIVE BINGO
-
-          </div>
-
-        </div>
+        FAST BINGO
 
       </div>
 
-      <div class="balance-pill">
+      <div
 
-        💵
+        class="brand-sub"
 
-        <span id="topBalance">
+        id="brandSub"
 
-          2,500
+      >
 
-        </span>
+        75 BALL • LIVE BINGO
 
       </div>
 
-    </header>
-
-    <main>
-
-      <section class="hero">
-
-        <div class="status-row">
-
-          <div
-
-            class="status-badge"
-
-            id="statusBadge"
-
-          >
-
-            <span class="status-dot"></span>
-
-            <span id="statusText">
-
-              ሎቢ
-
-            </span>
-
-          </div>
-
-          <div
-
-            class="game-number"
-
-            id="gameNumber"
-
-          >
-
-            Game #1
-
-          </div>
-
-        </div>
-
-        <div class="hero-card">
-
-          <div
-
-            class="hero-title"
-
-            id="heroTitle"
-
-          >
-
-            ለሚቀጥለው ጨዋታ ይዘጋጁ
-
-          </div>
-
-          <div
-
-            class="hero-message"
-
-            id="heroMessage"
-
-          >
-
-            ካርድዎን ይምረጡ። ጨዋታው በቅርቡ ይጀምራል።
-
-          </div>
-
-          <div
-
-            class="countdown"
-
-            id="countdown"
-
-          >
-
-            <span>⏱</span>
-
-            <strong id="countdownValue">
-
-              45
-
-            </strong>
-
-            <span id="countdownLabel">
-
-              ሰከንድ
-
-            </span>
-
-          </div>
-
-          <div class="ball-area">
-
-            <div class="current-ball">
-
-              <div
-
-                class="current-ball-letter"
-
-                id="currentBallLetter"
-
-              >
-
-                B
-
-              </div>
-
-              <div
-
-                class="current-ball-number"
-
-                id="currentBallNumber"
-
-              >
-
-                —
-
-              </div>
-
-              <div
-
-                class="ball-caption"
-
-                id="ballCaption"
-
-              >
-
-                CURRENT BALL
-
-              </div>
-
-            </div>
-
-          </div>
-
-          <div
-
-            class="recent-row"
-
-            id="recentBalls"
-
-          ></div>
-
-        </div>
-
-      </section>
-
-      <section class="stats">
-
-        <div class="stat">
-
-          <div
-
-            class="stat-value"
-
-            id="calledCount"
-
-          >
-
-            0
-
-          </div>
-
-          <div
-
-            class="stat-label"
-
-            id="calledLabel"
-
-          >
-
-            የተጠሩ
-
-          </div>
-
-        </div>
-
-        <div class="stat">
-
-          <div class="stat-value">
-
-            400
-
-          </div>
-
-          <div
-
-            class="stat-label"
-
-            id="cardsLabel"
-
-          >
-
-            ካርዶች
-
-          </div>
-
-        </div>
-
-        <div class="stat">
-
-          <div class="stat-value">
-
-            4
-
-          </div>
-
-          <div
-
-            class="stat-label"
-
-            id="maxLabel"
-
-          >
-
-            ከፍተኛ
-
-          </div>
-
-        </div>
-
-      </section>
-
-      <nav class="tabs">
-
-        <button
-
-          class="tab active"
-
-          id="tabPlay"
-
-          onclick="showSection('play')"
-
-        >
-
-          መጫወት
-
-        </button>
-
-        <button
-
-          class="tab"
-
-          id="tabCards"
-
-          onclick="showSection('cards')"
-
-        >
-
-          ካርዶች
-
-        </button>
-
-        <button
-
-          class="tab"
-
-          id="tabBalance"
-
-          onclick="showSection('balance')"
-
-        >
-
-          ሂሳብ
-
-        </button>
-
-      </nav>
-
-      <!-- PLAY -->
-
-      <section
-
-        class="section active"
-
-        id="sectionPlay"
-
-      >
-
-        <div class="panel">
-
-          <div
-
-            class="panel-title"
-
-            id="yourGameTitle"
-
-          >
-
-            የእርስዎ ጨዋታ
-
-          </div>
-
-          <div
-
-            class="panel-sub"
-
-            id="yourGameSub"
-
-          >
-
-            እስከ 4 ካርድ መምረጥ ይችላሉ።
-
-          </div>
-
-          <div class="info-grid">
-
-            <div class="info-box">
-
-              <div
-
-                class="info-box-title"
-
-                id="rule75Title"
-
-              >
-
-                75 ኳስ
-
-              </div>
-
-              <div
-
-                class="info-box-text"
-
-                id="rule75Text"
-
-              >
-
-                B 1–15 • I 16–30 • N 31–45 • G 46–60 • O 61–75
-
-              </div>
-
-            </div>
-
-            <div class="info-box">
-
-              <div
-
-                class="info-box-title"
-
-                id="ruleLinesTitle"
-
-              >
-
-                2 መስመር
-
-              </div>
-
-              <div
-
-                class="info-box-text"
-
-                id="ruleLinesText"
-
-              >
-
-                ሁለት ሙሉ መስመሮች ሲሞሉ Bingo ነው።
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
-
-        <div class="panel">
-
-          <div
-
-            class="panel-title"
-
-            id="myCardsTitle"
-
-          >
-
-            የእኔ ካርዶች
-
-          </div>
-
-          <div
-
-            class="panel-sub"
-
-            id="myCardsSub"
-
-          >
-
-            በዚህ ጨዋታ የመረጡት ካርዶች።
-
-          </div>
-
-          <div
-
-            class="my-cards"
-
-            id="myCards"
-
-          >
-
-            <div class="empty">
-
-              ካርድ አልመረጡም።
-
-            </div>
-
-          </div>
-
-          <div style="height:10px"></div>
-
-          <div class="btn-row">
-
-            <button
-
-              class="secondary-btn"
-
-              onclick="showSection('cards')"
-
-              id="chooseCardsBtn"
-
-            >
-
-              ካርድ ምረጥ
-
-            </button>
-
-            <button
-
-              class="primary-btn"
-
-              onclick="claim()"
-
-              id="checkBingoBtn"
-
-            >
-
-              CHECK BINGO
-
-            </button>
-
-          </div>
-
-        </div>
-
-        <div class="panel">
-
-          <div
-
-            class="panel-title"
-
-            id="calledTitle"
-
-          >
-
-            የተጠሩ ኳሶች
-
-          </div>
-
-          <div
-
-            class="panel-sub"
-
-            id="calledSub"
-
-          >
-
-            በዚህ ጨዋታ እስካሁን የተጠሩ ቁጥሮች።
-
-          </div>
-
-          <div class="letter-heading">
-
-            <div>B</div>
-
-            <div>I</div>
-
-            <div>N</div>
-
-            <div>G</div>
-
-            <div>O</div>
-
-          </div>
-
-          <div
-
-            class="called-grid"
-
-            id="calledGrid"
-
-          ></div>
-
-        </div>
-
-      </section>
-
-      <!-- CARDS -->
-
-      <section
-
-        class="section"
-
-        id="sectionCards"
-
-      >
-
-        <div class="panel">
-
-          <div
-
-            class="panel-title"
-
-            id="chooseTitle"
-
-          >
-
-            ካርድ ይምረጡ
-
-          </div>
-
-          <div
-
-            class="panel-sub"
-
-            id="chooseSub"
-
-          >
-
-            እስከ 4 ካርድ መምረጥ ይችላሉ።
-
-          </div>
-
-          <div
-
-            class="selected-list"
-
-            id="selectedList"
-
-          ></div>
-
-          <button
-
-            class="primary-btn"
-
-            onclick="saveCards()"
-
-            id="saveCardsBtn"
-
-          >
-
-            የመረጥኩትን አስቀምጥ
-
-          </button>
-
-          <div style="height:14px"></div>
-
-          <div
-
-            class="card-grid"
-
-            id="cardGrid"
-
-          ></div>
-
-        </div>
-
-      </section>
-
-      <!-- BALANCE -->
-
-      <section
-
-        class="section"
-
-        id="sectionBalance"
-
-      >
-
-        <div class="panel">
-
-          <div class="wallet-balance">
-
-            <div>
-
-              <div
-
-                class="wallet-label"
-
-                id="walletLabel"
-
-              >
-
-                የእርስዎ ሂሳብ
-
-              </div>
-
-              <div
-
-                class="wallet-value"
-
-                id="walletBalance"
-
-              >
-
-                2,500 ETB
-
-              </div>
-
-            </div>
-
-            <div style="font-size:26px">
-
-              💵
-
-            </div>
-
-          </div>
-
-          <div
-
-            class="type-toggle"
-
-          >
-
-            <button
-
-              class="type-btn active"
-
-              id="depositBtn"
-
-              onclick="setWalletType('deposit')"
-
-            >
-
-              ገቢ አድርግ
-
-            </button>
-
-            <button
-
-              class="type-btn"
-
-              id="withdrawBtn"
-
-              onclick="setWalletType('withdraw')"
-
-            >
-
-              ወጪ አድርግ
-
-            </button>
-
-          </div>
-
-          <div class="field">
-
-            <label id="methodLabel">
-
-              ዘዴ
-
-            </label>
-
-            <select id="walletMethod">
-
-              <option value="Telebirr">
-
-                Telebirr
-
-              </option>
-
-              <option value="eBirr">
-
-                eBirr
-
-              </option>
-
-              <option value="M-PESA">
-
-                M-PESA
-
-              </option>
-
-            </select>
-
-          </div>
-
-          <div class="field">
-
-            <label id="amountLabel">
-
-              መጠን
-
-            </label>
-
-            <input
-
-              id="walletAmount"
-
-              type="number"
-
-              min="1"
-
-              inputmode="numeric"
-
-              placeholder="100"
-
-            >
-
-          </div>
-
-          <button
-
-            class="primary-btn"
-
-            onclick="walletRequest()"
-
-            id="walletSubmit"
-
-          >
-
-            ገቢ አድርግ
-
-          </button>
-
-          <div
-
-            class="note"
-
-            id="walletNote"
-
-          >
-
-            ይህ የplay-money ሙከራ ሂሳብ ብቻ ነው። ትክክለኛ ገንዘብ አይንቀሳቀስም።
-
-          </div>
-
-        </div>
-
-        <div class="panel">
-
-          <div
-
-            class="panel-title"
-
-            id="languageTitle"
-
-          >
-
-            ቋንቋ
-
-          </div>
-
-          <div
-
-            class="panel-sub"
-
-            id="languageSub"
-
-          >
-
-            የMini App ቋንቋ ይምረጡ።
-
-          </div>
-
-          <div class="language-buttons">
-
-            <button
-
-              class="language-btn active"
-
-              id="amBtn"
-
-              onclick="setLanguage('am')"
-
-            >
-
-              🇪🇹 አማርኛ
-
-            </button>
-
-            <button
-
-              class="language-btn"
-
-              id="enBtn"
-
-              onclick="setLanguage('en')"
-
-            >
-
-              🇬🇧 English
-
-            </button>
-
-          </div>
-
-        </div>
-
-      </section>
-
-    </main>
+    </div>
 
   </div>
 
-  <div class="bottom-nav">
+  <div class="balance-pill">
 
-    <div class="bottom-inner">
+    💰
+
+    <span id="topBalance">
+
+      2,500
+
+    </span>
+
+  </div>
+
+</header>
+
+<main>
+
+<section class="hero">
+
+  <div class="status-row">
+
+    <div
+
+      class="status-badge"
+
+      id="statusBadge"
+
+    >
+
+      <span class="status-dot"></span>
+
+      <span id="statusText">
+
+        በመጠበቅ ላይ
+
+      </span>
+
+    </div>
+
+    <div
+
+      class="game-number"
+
+      id="gameNumber"
+
+    >
+
+      GAME #1
+
+    </div>
+
+  </div>
+
+  <div class="hero-card">
+
+    <div
+
+      class="hero-title"
+
+      id="heroTitle"
+
+    >
+
+      የቀጣዩ ጨዋታ ዝግጁ ነው
+
+    </div>
+
+    <div
+
+      class="hero-message"
+
+      id="heroMessage"
+
+    >
+
+      ካርድዎን ይምረጡ
+
+    </div>
+
+    <div
+
+      class="countdown"
+
+      id="countdown"
+
+    >
+
+      <strong>45</strong>
+
+    </div>
+
+    <div class="ball-area">
+
+      <div class="current-ball">
+
+        <div
+
+          class="current-ball-letter"
+
+          id="ballLetter"
+
+        >
+
+          B
+
+        </div>
+
+        <div
+
+          class="current-ball-number"
+
+          id="ballNumber"
+
+        >
+
+          —
+
+        </div>
+
+        <div
+
+          class="ball-caption"
+
+          id="ballCaption"
+
+        >
+
+          CURRENT BALL
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <div
+
+      class="recent-row"
+
+      id="recentBalls"
+
+    ></div>
+
+  </div>
+
+</section>
+
+<section class="stats">
+
+  <div class="stat">
+
+    <div
+
+      class="stat-value"
+
+      id="calledCount"
+
+    >
+
+      0
+
+    </div>
+
+    <div
+
+      class="stat-label"
+
+      id="calledLabel"
+
+    >
+
+      የተጠሩ
+
+    </div>
+
+  </div>
+
+  <div class="stat">
+
+    <div class="stat-value">
+
+      400
+
+    </div>
+
+    <div
+
+      class="stat-label"
+
+      id="cardsLabel"
+
+    >
+
+      ካርዶች
+
+    </div>
+
+  </div>
+
+  <div class="stat">
+
+    <div class="stat-value">
+
+      4
+
+    </div>
+
+    <div
+
+      class="stat-label"
+
+      id="maxLabel"
+
+    >
+
+      ከፍተኛ
+
+    </div>
+
+  </div>
+
+</section>
+
+<nav class="tabs">
+
+  <button
+
+    class="tab active"
+
+    data-section="play"
+
+  >
+
+    🎮 <span id="tabPlay">ጨዋታ</span>
+
+  </button>
+
+  <button
+
+    class="tab"
+
+    data-section="cards"
+
+  >
+
+    🎫 <span id="tabCards">ካርዶች</span>
+
+  </button>
+
+  <button
+
+    class="tab"
+
+    data-section="balance"
+
+  >
+
+    💰 <span id="tabBalance">ሂሳብ</span>
+
+  </button>
+
+</nav>
+
+<section
+
+  class="section active"
+
+  id="section-play"
+
+>
+
+  <div class="panel">
+
+    <div
+
+      class="panel-title"
+
+      id="yourGameTitle"
+
+    >
+
+      የእርስዎ ጨዋታ
+
+    </div>
+
+    <div
+
+      class="panel-sub"
+
+      id="yourGameSub"
+
+    >
+
+      ካርድዎን ይምረጡና ጨዋታውን ይከታተሉ።
+
+    </div>
+
+    <div class="info-grid">
+
+      <div class="info-box">
+
+        <div
+
+          class="info-box-title"
+
+          id="rule75"
+
+        >
+
+          75 Ball Bingo
+
+        </div>
+
+        <div
+
+          class="info-box-text"
+
+          id="rule75Text"
+
+        >
+
+          B 1–15 • I 16–30 • N 31–45 • G 46–60 • O 61–75
+
+        </div>
+
+      </div>
+
+      <div class="info-box">
+
+        <div
+
+          class="info-box-title"
+
+          id="ruleLines"
+
+        >
+
+          2 Lines
+
+        </div>
+
+        <div
+
+          class="info-box-text"
+
+          id="ruleLinesText"
+
+        >
+
+          ሁለት መስመሮች ሲሞሉ Bingo ይሆናል።
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <div class="panel">
+
+    <div
+
+      class="panel-title"
+
+      id="myCardsTitle"
+
+    >
+
+      የእኔ ካርዶች
+
+    </div>
+
+    <div
+
+      class="panel-sub"
+
+      id="myCardsSub"
+
+    >
+
+      እስከ 4 ካርዶች መምረጥ ይችላሉ።
+
+    </div>
+
+    <div
+
+      class="my-cards"
+
+      id="myCards"
+
+    >
+
+      <div class="empty">
+
+        ካርድ አልመረጡም።
+
+      </div>
+
+    </div>
+
+    <div style="height:8px"></div>
+
+    <button
+
+      class="primary-btn"
+
+      id="claimBtn"
+
+    >
+
+      🏆 BINGO
+
+    </button>
+
+  </div>
+
+  <div class="panel">
+
+    <div
+
+      class="panel-title"
+
+      id="calledTitle"
+
+    >
+
+      የተጠሩ ኳሶች
+
+    </div>
+
+    <div
+
+      class="panel-sub"
+
+      id="calledSub"
+
+    >
+
+      የተጠሩትን ኳሶች እዚህ ይመልከቱ።
+
+    </div>
+
+    <div class="letter-heading">
+
+      <div>B</div>
+
+      <div>I</div>
+
+      <div>N</div>
+
+      <div>G</div>
+
+      <div>O</div>
+
+    </div>
+
+    <div
+
+      class="called-grid"
+
+      id="calledGrid"
+
+    ></div>
+
+  </div>
+
+</section>
+
+<section
+
+  class="section"
+
+  id="section-cards"
+
+>
+
+  <div class="panel">
+
+    <div
+
+      class="panel-title"
+
+      id="chooseTitle"
+
+    >
+
+      ካርድ ይምረጡ
+
+    </div>
+
+    <div
+
+      class="panel-sub"
+
+      id="chooseSub"
+
+    >
+
+      በአንድ ጨዋታ እስከ 4 ካርዶች ይምረጡ።
+
+    </div>
+
+    <div
+
+      class="selected-list"
+
+      id="selectedList"
+
+    ></div>
+
+    <div
+
+      class="card-grid"
+
+      id="cardGrid"
+
+    ></div>
+
+    <div style="height:12px"></div>
+
+    <button
+
+      class="primary-btn"
+
+      id="saveCardsBtn"
+
+    >
+
+      ✓ ካርዶችን አስቀምጥ
+
+    </button>
+
+  </div>
+
+</section>
+
+<section
+
+  class="section"
+
+  id="section-balance"
+
+>
+
+  <div class="panel">
+
+    <div
+
+      class="panel-title"
+
+      id="balanceTitle"
+
+    >
+
+      የእኔ ሂሳብ
+
+    </div>
+
+    <div
+
+      class="panel-sub"
+
+      id="balanceSub"
+
+    >
+
+      ይህ የጨዋታ ሙከራ ሂሳብ ነው።
+
+    </div>
+
+    <div class="wallet-balance">
+
+      <div>
+
+        <div
+
+          class="wallet-label"
+
+          id="walletLabel"
+
+        >
+
+          የጨዋታ ሂሳብ
+
+        </div>
+
+        <div
+
+          class="wallet-value"
+
+          id="walletBalance"
+
+        >
+
+          2,500 ETB
+
+        </div>
+
+      </div>
+
+      <div>💰</div>
+
+    </div>
+
+    <div class="type-toggle">
 
       <button
 
-        class="bottom-btn active"
+        class="type-btn active"
 
-        id="bottomPlay"
-
-        onclick="showSection('play')"
+        id="depositBtn"
 
       >
 
-        🎮<br>
-
-        <span>መጫወት</span>
+        + ገቢ
 
       </button>
 
       <button
 
-        class="bottom-btn"
+        class="type-btn"
 
-        id="bottomCards"
-
-        onclick="showSection('cards')"
+        id="withdrawBtn"
 
       >
 
-        🃏<br>
+        − ወጪ
 
-        <span>ካርዶች</span>
+      </button>
+
+    </div>
+
+    <div class="field">
+
+      <label id="methodLabel">
+
+        ዘዴ
+
+      </label>
+
+      <select id="walletMethod">
+
+        <option value="Telebirr">
+
+          Telebirr
+
+        </option>
+
+        <option value="eBirr">
+
+          eBirr
+
+        </option>
+
+        <option value="M-PESA">
+
+          M-PESA
+
+        </option>
+
+      </select>
+
+    </div>
+
+    <div class="field">
+
+      <label id="amountLabel">
+
+        መጠን
+
+      </label>
+
+      <input
+
+        id="walletAmount"
+
+        type="number"
+
+        min="1"
+
+        max="100000"
+
+        placeholder="100"
+
+      >
+
+    </div>
+
+    <button
+
+      class="primary-btn"
+
+      id="walletSubmit"
+
+    >
+
+      ገቢ አድርግ
+
+    </button>
+
+    <div
+
+      class="note"
+
+      id="walletNote"
+
+    >
+
+      ⚠️ ይህ የሙከራ ሂሳብ ብቻ ነው።
+
+      ትክክለኛ ገንዘብ አይላክም ወይም አይቀበልም።
+
+    </div>
+
+  </div>
+
+  <div class="panel">
+
+    <div
+
+      class="panel-title"
+
+      id="languageTitle"
+
+    >
+
+      ቋንቋ
+
+    </div>
+
+    <div
+
+      class="panel-sub"
+
+      id="languageSub"
+
+    >
+
+      የመተግበሪያውን ቋንቋ ይምረጡ።
+
+    </div>
+
+    <div class="language-buttons">
+
+      <button
+
+        class="language-btn active"
+
+        id="amBtn"
+
+      >
+
+        አማርኛ
 
       </button>
 
       <button
 
-        class="bottom-btn"
+        class="language-btn"
 
-        id="bottomBalance"
-
-        onclick="showSection('balance')"
+        id="enBtn"
 
       >
 
-        💵<br>
-
-        <span>ሂሳብ</span>
+        English
 
       </button>
 
@@ -3612,35 +3608,113 @@ function pageHtml() {
 
   </div>
 
-  <div
+</section>
 
-    class="toast"
+</main>
 
-    id="toast"
+</div>
 
-  ></div>
+<div class="bottom-nav">
+
+  <div class="bottom-inner">
+
+    <button
+
+      class="bottom-btn active"
+
+      data-section="play"
+
+    >
+
+      🎮
+
+      <br>
+
+      <span id="bottomPlay">
+
+        ጨዋታ
+
+      </span>
+
+    </button>
+
+    <button
+
+      class="bottom-btn"
+
+      data-section="cards"
+
+    >
+
+      🎫
+
+      <br>
+
+      <span id="bottomCards">
+
+        ካርዶች
+
+      </span>
+
+    </button>
+
+    <button
+
+      class="bottom-btn"
+
+      data-section="balance"
+
+    >
+
+      💰
+
+      <br>
+
+      <span id="bottomBalance">
+
+        ሂሳብ
+
+      </span>
+
+    </button>
+
+  </div>
+
+</div>
+
+<div
+
+  class="toast"
+
+  id="toast"
+
+></div>
 
 <script>
 
-  const tg =
+(function(){
 
-    window.Telegram &&
+  var tg = window.Telegram &&
 
     window.Telegram.WebApp
 
-      ? window.Telegram.WebApp
+    ? window.Telegram.WebApp
 
-      : null;
+    : null;
 
-  if (tg) {
+  if(tg){
 
-    tg.ready();
+    try{
 
-    tg.expand();
+      tg.ready();
+
+      tg.expand();
+
+    }catch(e){}
 
   }
 
-  const telegramUser =
+  var telegramUser =
 
     tg &&
 
@@ -3652,329 +3726,221 @@ function pageHtml() {
 
       : {
 
-          id: "guest",
+          id:"guest",
 
-          first_name: "Guest"
+          first_name:"Guest",
+
+          username:""
 
         };
 
-  const userHeader =
+  var userHeader =
 
     JSON.stringify(telegramUser);
 
-  let selected = [];
+  var selected = [];
 
-  let currentGame = null;
+  var currentGame = null;
 
-  let walletType = "deposit";
+  var walletType = "deposit";
 
-  let language = "am";
+  var language = "am";
 
-  let refreshBusy = false;
+  var translations = {
 
-  const translations = {
+    am:{
 
-    am: {
+      brandSub:"75 BALL • LIVE BINGO",
 
-      brandSub: "75 ኳስ • የቀጥታ Bingo",
+      lobby:"በመጠበቅ ላይ",
 
-      lobby: "ሎቢ",
+      live:"ጨዋታው ቀጥሏል",
 
-      live: "በመካሄድ ላይ",
+      lobbyTitle:"የቀጣዩ ጨዋታ ዝግጁ ነው",
 
-      game: "ጨዋታ",
+      liveTitle:"GAME IN PROGRESS",
 
-      prepare: "ለሚቀጥለው ጨዋታ ይዘጋጁ",
+      lobbyMessage:"ካርድዎን ይምረጡ",
 
-      lobbyMessage:
+      liveMessage:"ኳሎቹ እየተጠሩ ነው።",
 
-        "ካርድዎን ይምረጡ። ጨዋታው በቅርቡ ይጀምራል።",
+      currentBall:"CURRENT BALL",
 
-      liveMessage:
+      called:"የተጠሩ",
 
-        "ጨዋታው በመካሄድ ላይ ነው። ቀጣዩን ኳስ ይጠብቁ።",
+      cards:"ካርዶች",
 
-      waitMessage:
+      maximum:"ከፍተኛ",
 
-        "🎱 GAME IN PROGRESS • እባክዎ ቀጣዩን ጨዋታ ይጠብቁ።",
+      play:"ጨዋታ",
 
-      seconds: "ሰከንድ",
+      cardsTab:"ካርዶች",
 
-      currentBall: "የአሁኑ ኳስ",
+      balance:"ሂሳብ",
 
-      called: "የተጠሩ",
+      yourGame:"የእርስዎ ጨዋታ",
 
-      cards: "ካርዶች",
+      yourGameSub:"ካርድዎን ይምረጡና ጨዋታውን ይከታተሉ።",
 
-      maximum: "ከፍተኛ",
+      twoLines:"2 Lines",
 
-      play: "መጫወት",
+      twoLinesText:"ሁለት መስመሮች ሲሞሉ Bingo ይሆናል።",
 
-      cardTab: "ካርዶች",
+      myCards:"የእኔ ካርዶች",
 
-      balance: "ሂሳብ",
+      myCardsSub:"እስከ 4 ካርዶች መምረጥ ይችላሉ።",
 
-      yourGame: "የእርስዎ ጨዋታ",
+      noCards:"ካርድ አልመረጡም።",
 
-      yourGameSub:
+      bingo:"🏆 BINGO",
 
-        "እስከ 4 ካርድ መምረጥ ይችላሉ።",
+      calledBalls:"የተጠሩ ኳሶች",
 
-      ball75: "75 ኳስ",
+      calledSub:"የተጠሩትን ኳሶች እዚህ ይመልከቱ።",
 
-      ball75Text:
+      choose:"ካርድ ይምረጡ",
 
-        "B 1–15 • I 16–30 • N 31–45 • G 46–60 • O 61–75",
+      chooseSub:"በአንድ ጨዋታ እስከ 4 ካርዶች ይምረጡ።",
 
-      twoLines: "2 መስመር",
+      save:"✓ ካርዶችን አስቀምጥ",
 
-      twoLinesText:
+      balanceTitle:"የእኔ ሂሳብ",
 
-        "ሁለት ሙሉ መስመሮች ሲሞሉ Bingo ነው።",
+      balanceSub:"ይህ የጨዋታ ሙከራ ሂሳብ ነው።",
 
-      myCards: "የእኔ ካርዶች",
+      wallet:"የጨዋታ ሂሳብ",
 
-      myCardsSub:
+      deposit:"+ ገቢ",
 
-        "በዚህ ጨዋታ የመረጡት ካርዶች።",
+      withdraw:"− ወጪ",
 
-      chooseCard: "ካርድ ምረጥ",
+      method:"ዘዴ",
 
-      checkBingo: "CHECK BINGO",
+      amount:"መጠን",
 
-      calledBalls: "የተጠሩ ኳሶች",
+      depositAction:"ገቢ አድርግ",
 
-      calledBallsSub:
+      withdrawAction:"ወጪ አድርግ",
 
-        "በዚህ ጨዋታ እስካሁን የተጠሩ ቁጥሮች።",
+      walletNote:"⚠️ ይህ የሙከራ ሂሳብ ብቻ ነው። ትክክለኛ ገንዘብ አይላክም ወይም አይቀበልም።",
 
-      chooseCards: "ካርድ ይምረጡ",
+      language:"ቋንቋ",
 
-      chooseCardsSub:
+      languageSub:"የመተግበሪያውን ቋንቋ ይምረጡ።",
 
-        "እስከ 4 ካርድ መምረጥ ይችላሉ።",
+      saved:"ካርዶችዎ ተቀምጠዋል።",
 
-      saveCards: "የመረጥኩትን አስቀምጥ",
+      lobbyOnly:"ካርድ መምረጥ የሚቻለው በLobby ጊዜ ብቻ ነው።",
 
-      wallet: "የእርስዎ ሂሳብ",
+      maxCards:"እስከ 4 ካርዶች ብቻ መምረጥ ይችላሉ።",
 
-      deposit: "ገቢ አድርግ",
+      gameProgress:"ጨዋታው ቀጥሏል። የሚቀጥለውን Lobby ይጠብቁ።",
 
-      withdraw: "ወጪ አድርግ",
+      balanceUpdated:"ሂሳቡ ተዘምኗል።",
 
-      method: "ዘዴ",
+      invalidAmount:"ትክክለኛ መጠን ያስገቡ።",
 
-      amount: "መጠን",
+      winner:"🎉 Bingo! የሚያሸንፉ ካርዶች ተገኝተዋል።",
 
-      submitDeposit: "ገቢ አድርግ",
-
-      submitWithdraw: "ወጪ አድርግ",
-
-      walletNote:
-
-        "ይህ የplay-money ሙከራ ሂሳብ ብቻ ነው። ትክክለኛ ገንዘብ አይንቀሳቀስም።",
-
-      language: "ቋንቋ",
-
-      languageSub:
-
-        "የMini App ቋንቋ ይምረጡ።",
-
-      noCards: "ካርድ አልመረጡም።",
-
-      saved: "ካርዶችዎ ተቀምጠዋል።",
-
-      selectDuringLobby:
-
-        "ካርድ መምረጥ የሚችሉት በLobby ጊዜ ብቻ ነው።",
-
-      maxCards:
-
-        "ከፍተኛው 4 ካርድ ብቻ ነው።",
-
-      gameProgress:
-
-        "ጨዋታው በመካሄድ ላይ ነው። ቀጣዩን ጨዋታ ይጠብቁ።",
-
-      savedSuccess:
-
-        "የመረጧቸው ካርዶች ተቀምጠዋል።",
-
-      bingo:
-
-        "🎉 BINGO! ሁለት መስመሮች ሞልተዋል።",
-
-      noBingo:
-
-        "እስካሁን Bingo አልሞላም።",
-
-      amountInvalid:
-
-        "እባክዎ ትክክለኛ መጠን ያስገቡ።",
-
-      insufficient:
-
-        "በሂሳብዎ ላይ በቂ ቀሪ የለም።",
-
-      walletSuccess:
-
-        "የplay-money ሂሳብዎ ተሻሽሏል።",
-
-      cardSaved: "ተመርጧል",
-
-      free: "FREE"
+      notWinner:"እስካሁን 2 መስመር ያሟላ ካርድ የለም።"
 
     },
 
-    en: {
+    en:{
 
-      brandSub: "75 BALL • LIVE BINGO",
+      brandSub:"75 BALL • LIVE BINGO",
 
-      lobby: "LOBBY",
+      lobby:"LOBBY",
 
-      live: "LIVE",
+      live:"LIVE GAME",
 
-      game: "GAME",
+      lobbyTitle:"Next game is getting ready",
 
-      prepare: "Get ready for the next game",
+      liveTitle:"GAME IN PROGRESS",
 
-      lobbyMessage:
+      lobbyMessage:"Choose your cards",
 
-        "Choose your cards. The game will start soon.",
+      liveMessage:"Balls are being called.",
 
-      liveMessage:
+      currentBall:"CURRENT BALL",
 
-        "The game is live. Wait for the next ball.",
+      called:"Called",
 
-      waitMessage:
+      cards:"Cards",
 
-        "🎱 GAME IN PROGRESS • Please wait for the next game.",
+      maximum:"Maximum",
 
-      seconds: "seconds",
+      play:"PLAY",
 
-      currentBall: "CURRENT BALL",
+      cardsTab:"CARDS",
 
-      called: "CALLED",
+      balance:"BALANCE",
 
-      cards: "CARDS",
+      yourGame:"Your Game",
 
-      maximum: "MAX",
+      yourGameSub:"Choose your cards and follow the live game.",
 
-      play: "PLAY",
+      twoLines:"2 Lines",
 
-      cardTab: "CARDS",
+      twoLinesText:"Bingo is reached when two lines are completed.",
 
-      balance: "BALANCE",
+      myCards:"My Cards",
 
-      yourGame: "Your Game",
+      myCardsSub:"You can select up to 4 cards.",
 
-      yourGameSub:
+      noCards:"No cards selected.",
 
-        "You can select up to 4 cards.",
+      bingo:"🏆 BINGO",
 
-      ball75: "75 BALL",
+      calledBalls:"Called Balls",
 
-      ball75Text:
+      calledSub:"See all called balls here.",
 
-        "B 1–15 • I 16–30 • N 31–45 • G 46–60 • O 61–75",
+      choose:"Choose Cards",
 
-      twoLines: "2 LINES",
+      chooseSub:"Select up to 4 cards for this game.",
 
-      twoLinesText:
+      save:"✓ SAVE SELECTED CARDS",
 
-        "Bingo is reached when two complete lines are marked.",
+      balanceTitle:"My Balance",
 
-      myCards: "My Cards",
+      balanceSub:"This is a simulated play balance.",
 
-      myCardsSub:
+      wallet:"Play Balance",
 
-        "Cards selected for this game.",
+      deposit:"+ DEPOSIT",
 
-      chooseCard: "Choose Cards",
+      withdraw:"− WITHDRAW",
 
-      checkBingo: "CHECK BINGO",
+      method:"Method",
 
-      calledBalls: "Called Balls",
+      amount:"Amount",
 
-      calledBallsSub:
+      depositAction:"ADD BALANCE",
 
-        "Numbers called so far in this game.",
+      withdrawAction:"WITHDRAW",
 
-      chooseCards: "Choose Cards",
+      walletNote:"⚠️ This is a simulated play-money balance only. No real money is sent or received.",
 
-      chooseCardsSub:
+      language:"Language",
 
-        "Select up to 4 cards.",
+      languageSub:"Choose your application language.",
 
-      saveCards: "SAVE SELECTED CARDS",
+      saved:"Your cards have been saved.",
 
-      wallet: "Your Balance",
+      lobbyOnly:"Cards can only be selected during the lobby.",
 
-      deposit: "ADD BALANCE",
+      maxCards:"You can select up to 4 cards.",
 
-      withdraw: "WITHDRAW",
+      gameProgress:"Game is already in progress. Wait for the next lobby.",
 
-      method: "METHOD",
+      balanceUpdated:"Balance updated.",
 
-      amount: "AMOUNT",
+      invalidAmount:"Enter a valid amount.",
 
-      submitDeposit: "ADD BALANCE",
+      winner:"🎉 Bingo! Winning card(s) found.",
 
-      submitWithdraw: "WITHDRAW",
-
-      walletNote:
-
-        "This is a play-money simulation only. No real money is transferred.",
-
-      language: "Language",
-
-      languageSub:
-
-        "Choose the Mini App language.",
-
-      noCards: "No cards selected.",
-
-      saved: "Your cards are saved.",
-
-      selectDuringLobby:
-
-        "Cards can only be selected during the lobby.",
-
-      maxCards:
-
-        "You can select a maximum of 4 cards.",
-
-      gameProgress:
-
-        "The game is in progress. Please wait for the next game.",
-
-      savedSuccess:
-
-        "Your selected cards have been saved.",
-
-      bingo:
-
-        "🎉 BINGO! You have two completed lines.",
-
-      noBingo:
-
-        "No Bingo yet.",
-
-      amountInvalid:
-
-        "Please enter a valid amount.",
-
-      insufficient:
-
-        "Insufficient balance.",
-
-      walletSuccess:
-
-        "Your play-money balance has been updated.",
-
-      cardSaved: "SELECTED",
-
-      free: "FREE"
+      notWinner:"No card has completed 2 lines yet."
 
     }
 
@@ -3982,57 +3948,33 @@ function pageHtml() {
 
   function t(key){
 
-    return (
-
-      translations[language][key] ||
+    return translations[language][key] ||
 
       translations.en[key] ||
 
-      key
-
-    );
+      key;
 
   }
 
-  function showToast(message){
+  function api(path, options){
 
-    const el =
+    options = options || {};
 
-      document.getElementById("toast");
+    var headers =
 
-    el.textContent = message;
+      options.headers || {};
 
-    el.classList.add("show");
+    headers["x-telegram-user"] =
 
-    clearTimeout(window.toastTimer);
+      userHeader;
 
-    window.toastTimer =
-
-      setTimeout(() => {
-
-        el.classList.remove("show");
-
-      }, 2400);
-
-  }
-
-  async function api(path, options = {}){
-
-    const headers = {
-
-      ...(options.headers || {}),
-
-      "x-telegram-user": userHeader
-
-    };
-
-    if (
+    if(
 
       options.body &&
 
       !headers["content-type"]
 
-    ) {
+    ){
 
       headers["content-type"] =
 
@@ -4040,229 +3982,161 @@ function pageHtml() {
 
     }
 
-    const response = await fetch(
+    options.headers = headers;
 
-      path,
+    return fetch(
 
-      {
+      path +
 
-        ...options,
+      (
 
-        headers,
+        path.indexOf("?") >= 0
 
-        cache:"no-store"
+          ? "&"
 
-      }
+          : "?"
+
+      ) +
+
+      "_=" +
+
+      Date.now(),
+
+      options
+
+    ).then(function(response){
+
+      return response.json();
+
+    });
+
+  }
+
+  function showToast(message){
+
+    var toast =
+
+      document.getElementById("toast");
+
+    toast.textContent = message;
+
+    toast.classList.add("show");
+
+    clearTimeout(
+
+      showToast.timer
 
     );
 
-    const text =
+    showToast.timer =
 
-      await response.text();
+      setTimeout(function(){
 
-    let data = {};
+        toast.classList.remove(
 
-    try {
+          "show"
 
-      data = JSON.parse(text);
+        );
 
-    } catch {
+      },2200);
 
-      data = {
+  }
 
-        error: text
+  function showSection(name){
 
-      };
+    document
 
-    }
+      .querySelectorAll(".section")
 
-    if (!response.ok) {
+      .forEach(function(section){
 
-      throw new Error(
+        section.classList.toggle(
 
-        data.error ||
+          "active",
 
-        "Request failed"
+          section.id ===
+
+            "section-" + name
+
+        );
+
+      });
+
+    document
+
+      .querySelectorAll(".tab")
+
+      .forEach(function(button){
+
+        button.classList.toggle(
+
+          "active",
+
+          button.dataset.section === name
+
+        );
+
+      });
+
+    document
+
+      .querySelectorAll(".bottom-btn")
+
+      .forEach(function(button){
+
+        button.classList.toggle(
+
+          "active",
+
+          button.dataset.section === name
+
+        );
+
+      });
+
+    window.scrollTo({
+
+      top:0,
+
+      behavior:"smooth"
+
+    });
+
+  }
+
+  document
+
+    .querySelectorAll("[data-section]")
+
+    .forEach(function(button){
+
+      button.addEventListener(
+
+        "click",
+
+        function(){
+
+          showSection(
+
+            button.dataset.section
+
+          );
+
+        }
 
       );
 
-    }
-
-    return data;
-
-  }
-
-  function showSection(section){
-
-    const sections = {
-
-      play:
-
-        document.getElementById(
-
-          "sectionPlay"
-
-        ),
-
-      cards:
-
-        document.getElementById(
-
-          "sectionCards"
-
-        ),
-
-      balance:
-
-        document.getElementById(
-
-          "sectionBalance"
-
-        )
-
-    };
-
-    Object.values(sections)
-
-      .forEach((el) => {
-
-        el.classList.remove("active");
-
-      });
-
-    sections[section].classList.add(
-
-      "active"
-
-    );
-
-    const tabMap = {
-
-      play:
-
-        document.getElementById("tabPlay"),
-
-      cards:
-
-        document.getElementById("tabCards"),
-
-      balance:
-
-        document.getElementById("tabBalance")
-
-    };
-
-    Object.values(tabMap)
-
-      .forEach((el) => {
-
-        el.classList.remove("active");
-
-      });
-
-    tabMap[section].classList.add(
-
-      "active"
-
-    );
-
-    const bottomMap = {
-
-      play:
-
-        document.getElementById(
-
-          "bottomPlay"
-
-        ),
-
-      cards:
-
-        document.getElementById(
-
-          "bottomCards"
-
-        ),
-
-      balance:
-
-        document.getElementById(
-
-          "bottomBalance"
-
-        )
-
-    };
-
-    Object.values(bottomMap)
-
-      .forEach((el) => {
-
-        el.classList.remove("active");
-
-      });
-
-    bottomMap[section].classList.add(
-
-      "active"
-
-    );
-
-    if (section === "cards") {
-
-      loadCards();
-
-    }
-
-    if (section === "balance") {
-
-      loadBalance();
-
-    }
-
-  }
-
-  function ballLetterClient(n){
-
-    if (n <= 15) return "B";
-
-    if (n <= 30) return "I";
-
-    if (n <= 45) return "N";
-
-    if (n <= 60) return "G";
-
-    return "O";
-
-  }
-
-  function seededShuffle(arr, seed){
-
-    const a = [...arr];
-
-    let s = seed >>> 0;
-
-    for (let i = a.length - 1; i > 0; i--) {
-
-      s =
-
-        (s * 1664525 + 1013904223) >>> 0;
-
-      const j = s % (i + 1);
-
-      [a[i], a[j]] =
-
-        [a[j], a[i]];
-
-    }
-
-    return a;
-
-  }
+    });
 
   function makeClientCard(number){
 
-    const ranges = [
+    var seed =
+
+      100000 +
+
+      number * 7919;
+
+    var ranges = [
 
       [1,15],
 
@@ -4276,201 +4150,341 @@ function pageHtml() {
 
     ];
 
-    const columns = [];
+    var columns = [];
 
-    for(let c = 0; c < 5; c++){
+    for(
 
-      const [from,to] =
+      var c=0;
 
-        ranges[c];
+      c<5;
 
-      const pool =
+      c++
 
-        Array.from(
+    ){
 
-          {length:to-from+1},
+      var from =
 
-          (_,i) => from+i
+        ranges[c][0];
 
-        );
+      var to =
 
-      columns.push(
+        ranges[c][1];
+
+      var values =
+
+        [];
+
+      for(
+
+        var n=from;
+
+        n<=to;
+
+        n++
+
+      ){
+
+        values.push(n);
+
+      }
+
+      values =
 
         seededShuffle(
 
-          pool,
+          values,
 
-          number * 1009 + c * 917
+          seed + c * 97
 
-        ).slice(0,5)
+        ).slice(0,5);
 
-      );
+      columns.push(values);
 
     }
 
-    const grid =
+    var grid =
 
-      Array.from(
+      [];
 
-        {length:5},
+    for(
 
-        () => Array(5).fill(null)
+      var r=0;
 
-      );
+      r<5;
 
-    for(let c = 0; c < 5; c++){
+      r++
 
-      for(let r = 0; r < 5; r++){
+    ){
 
-        grid[r][c] =
+      grid[r]=[];
 
-          columns[c][r];
+      for(
+
+        var cc=0;
+
+        cc<5;
+
+        cc++
+
+      ){
+
+        grid[r][cc] =
+
+          columns[cc][r];
 
       }
 
     }
 
-    grid[2][2] = "FREE";
+    grid[2][2]="FREE";
 
     return {
 
-      number,
+      number:number,
 
-      grid
+      grid:grid
 
     };
 
   }
 
+  function seededShuffle(arr, seed){
+
+    var a =
+
+      arr.slice();
+
+    var s =
+
+      seed >>> 0;
+
+    for(
+
+      var i=a.length-1;
+
+      i>0;
+
+      i--
+
+    ){
+
+      s =
+
+        (s * 1664525 +
+
+        1013904223) >>> 0;
+
+      var j =
+
+        s % (i+1);
+
+      var tmp =
+
+        a[i];
+
+      a[i]=a[j];
+
+      a[j]=tmp;
+
+    }
+
+    return a;
+
+  }
+
   function renderBingoCard(card){
 
-    const state =
+    var html =
 
-      currentGame || {
+      '<div class="bingo-card">' +
 
-        calledBalls:[]
+      '<div class="bingo-card-head">' +
 
-      };
+      '<div class="card-number-label">' +
 
-    const called =
+      'CARD #' + card.number +
 
-      new Set(
+      '</div>' +
 
-        state.calledBalls || []
+      '<div class="card-state">' +
 
-      );
+      '✓' +
 
-    let html = "";
+      '</div>' +
 
-    html += `
+      '</div>' +
 
-      <div class="bingo-card">
+      '<div class="bingo-grid">';
 
-        <div class="bingo-card-head">
+    for(
 
-          <div class="card-number-label">
+      var r=0;
 
-            #${card.number}
+      r<5;
 
-          </div>
+      r++
 
-          <div class="card-state">
+    ){
 
-            ${t("cardSaved")}
+      for(
 
-          </div>
+        var c=0;
 
-        </div>
+        c<5;
 
-        <div class="letter-heading">
+        c++
 
-          <div>B</div>
+      ){
 
-          <div>I</div>
-
-          <div>N</div>
-
-          <div>G</div>
-
-          <div>O</div>
-
-        </div>
-
-        <div class="bingo-grid">
-
-    `;
-
-    for(let r=0;r<5;r++){
-
-      for(let c=0;c<5;c++){
-
-        const value =
+        var value =
 
           card.grid[r][c];
 
-        const isFree =
+        var called =
 
-          value === "FREE";
+          currentGame &&
 
-        const isCalled =
+          currentGame.calledBalls &&
 
-          !isFree &&
+          currentGame.calledBalls.indexOf(
 
-          called.has(value);
+            value
 
-        let classes =
+          ) !== -1;
+
+        var classes =
 
           "bingo-cell";
 
-        if(isFree){
+        if(value === "FREE"){
 
           classes += " free";
 
-        }
-
-        if(isCalled){
+        }else if(called){
 
           classes += " called";
 
         }
 
-        html += `
+        html +=
 
-          <div class="${classes}">
+          '<div class="' +
 
-            ${
+          classes +
 
-              isFree
+          '">' +
 
-                ? t("free")
+          value +
 
-                : value
-
-            }
-
-          </div>
-
-        `;
+          '</div>';
 
       }
 
     }
 
-    html += `
+    html +=
 
-        </div>
-
-      </div>
-
-    `;
+      "</div></div>";
 
     return html;
 
   }
 
-  async function loadCards(){
+  function renderMyCards(){
 
-    const grid =
+    var container =
+
+      document.getElementById(
+
+        "myCards"
+
+      );
+
+    if(!selected.length){
+
+      container.innerHTML =
+
+        '<div class="empty">' +
+
+        t("noCards") +
+
+        "</div>";
+
+      return;
+
+    }
+
+    var html="";
+
+    selected.forEach(
+
+      function(number){
+
+        html +=
+
+          renderBingoCard(
+
+            makeClientCard(
+
+              number
+
+            )
+
+          );
+
+      }
+
+    );
+
+    container.innerHTML =
+
+      html;
+
+  }
+
+  function renderSelected(){
+
+    var list =
+
+      document.getElementById(
+
+        "selectedList"
+
+      );
+
+    if(!selected.length){
+
+      list.innerHTML="";
+
+      return;
+
+    }
+
+    var html="";
+
+    selected.forEach(
+
+      function(number){
+
+        html +=
+
+          '<div class="selected-pill">' +
+
+          "#" + number +
+
+          "</div>";
+
+      }
+
+    );
+
+    list.innerHTML=html;
+
+  }
+
+  function loadCards(){
+
+    var grid =
 
       document.getElementById(
 
@@ -4478,49 +4492,81 @@ function pageHtml() {
 
       );
 
-    if(grid.dataset.loaded === "1"){
+    var html="";
 
-      renderSelected();
+    for(
 
-      return;
+      var i=1;
+
+      i<=400;
+
+      i++
+
+    ){
+
+      var isSelected =
+
+        selected.indexOf(i) !== -1;
+
+      html +=
+
+        '<button class="card-select' +
+
+        (
+
+          isSelected
+
+            ? " selected"
+
+            : ""
+
+        ) +
+
+        '" data-card="' +
+
+        i +
+
+        '">' +
+
+        i +
+
+        "</button>";
 
     }
 
-    grid.innerHTML = "";
+    grid.innerHTML=html;
 
-    for(let i=1;i<=CARD_COUNT;i++){
+    grid
 
-      const button =
+      .querySelectorAll(
 
-        document.createElement(
+        ".card-select"
 
-          "button"
+      )
+
+      .forEach(function(button){
+
+        button.addEventListener(
+
+          "click",
+
+          function(){
+
+            toggleCard(
+
+              Number(
+
+                button.dataset.card
+
+              )
+
+            );
+
+          }
 
         );
 
-      button.className =
-
-        "card-select";
-
-      button.textContent =
-
-        i;
-
-      button.dataset.number =
-
-        i;
-
-      button.onclick =
-
-        () => toggleCard(i);
-
-      grid.appendChild(button);
-
-    }
-
-    grid.dataset.loaded = "1";
-
-    renderSelected();
+      });
 
   }
 
@@ -4528,7 +4574,7 @@ function pageHtml() {
 
     if(
 
-      currentGame &&
+      !currentGame ||
 
       currentGame.status !== "lobby"
 
@@ -4536,7 +4582,7 @@ function pageHtml() {
 
       showToast(
 
-        t("selectDuringLobby")
+        t("lobbyOnly")
 
       );
 
@@ -4544,13 +4590,19 @@ function pageHtml() {
 
     }
 
-    const index =
+    var index =
 
       selected.indexOf(number);
 
     if(index >= 0){
 
-      selected.splice(index,1);
+      selected.splice(
+
+        index,
+
+        1
+
+      );
 
     }else{
 
@@ -4558,7 +4610,7 @@ function pageHtml() {
 
         selected.length >=
 
-        MAX_CARDS_PER_PLAYER
+        4
 
       ){
 
@@ -4574,101 +4626,27 @@ function pageHtml() {
 
       selected.push(number);
 
+      selected.sort(
+
+        function(a,b){
+
+          return a-b;
+
+        }
+
+      );
+
     }
-
-    selected.sort(
-
-      (a,b) => a-b
-
-    );
 
     renderSelected();
 
-  }
+    loadCards();
 
-  function renderSelected(){
-
-    const list =
-
-      document.getElementById(
-
-        "selectedList"
-
-      );
-
-    const grid =
-
-      document.getElementById(
-
-        "cardGrid"
-
-      );
-
-    list.innerHTML = "";
-
-    selected.forEach((number) => {
-
-      const pill =
-
-        document.createElement(
-
-          "div"
-
-        );
-
-      pill.className =
-
-        "selected-pill";
-
-      pill.textContent =
-
-        "#" + number;
-
-      list.appendChild(pill);
-
-    });
-
-    if(!selected.length){
-
-      list.innerHTML = "";
-
-    }
-
-    if(grid){
-
-      grid
-
-        .querySelectorAll(
-
-          ".card-select"
-
-        )
-
-        .forEach((button) => {
-
-          const number =
-
-            Number(
-
-              button.dataset.number
-
-            );
-
-          button.classList.toggle(
-
-            "selected",
-
-            selected.includes(number)
-
-          );
-
-        });
-
-    }
+    renderMyCards();
 
   }
 
-  async function saveCards(){
+  function saveCards(){
 
     if(
 
@@ -4680,7 +4658,7 @@ function pageHtml() {
 
       showToast(
 
-        t("selectDuringLobby")
+        t("gameProgress")
 
       );
 
@@ -4688,77 +4666,89 @@ function pageHtml() {
 
     }
 
-    try{
+    api(
 
-      const result =
+      "/api/select-cards",
 
-        await api(
+      {
 
-          "/api/select-cards",
+        method:"POST",
 
-          {
+        body:JSON.stringify({
 
-            method:"POST",
+          cards:selected
 
-            body:JSON.stringify({
+        })
 
-              cards:selected
+      }
 
-            })
+    ).then(function(data){
 
-          }
+      if(data.ok){
+
+        selected =
+
+          data.selected || [];
+
+        renderSelected();
+
+        loadCards();
+
+        renderMyCards();
+
+        showToast(
+
+          t("saved")
 
         );
 
-      selected =
+      }else{
 
-        Array.isArray(
+        if(
 
-          result.selected
+          data.error ===
 
-        )
+          "GAME_IN_PROGRESS"
 
-          ? result.selected
+        ){
 
-          : [];
+          showToast(
 
-      renderSelected();
+            t("gameProgress")
 
-      await loadMyCards();
+          );
+
+        }else{
+
+          showToast(
+
+            "Error"
+
+          );
+
+        }
+
+      }
+
+    }).catch(function(){
 
       showToast(
 
-        t("savedSuccess")
+        "Connection error"
 
       );
 
-      showSection("play");
-
-    }catch(error){
-
-      showToast(
-
-        error.message ||
-
-        "Error"
-
-      );
-
-    }
+    });
 
   }
 
-  async function loadMyCards(){
+  function loadMyCards(){
 
-    try{
+    return api(
 
-      const data =
+      "/api/user-cards"
 
-        await api(
-
-          "/api/user-cards"
-
-        );
+    ).then(function(data){
 
       selected =
 
@@ -4768,69 +4758,27 @@ function pageHtml() {
 
         )
 
-          ? data.selected
+          ? data.selected.map(
+
+              Number
+
+            )
 
           : [];
 
       renderSelected();
 
-      renderMyCards();
-
-    }catch{
+      loadCards();
 
       renderMyCards();
 
-    }
-
-  }
-
-  function renderMyCards(){
-
-    const container =
-
-      document.getElementById(
-
-        "myCards"
-
-      );
-
-    if(!selected.length){
-
-      container.innerHTML = `
-
-        <div class="empty">
-
-          ${t("noCards")}
-
-        </div>
-
-      `;
-
-      return;
-
-    }
-
-    container.innerHTML =
-
-      selected
-
-        .map((number) =>
-
-          renderBingoCard(
-
-            makeClientCard(number)
-
-          )
-
-        )
-
-        .join("");
+    });
 
   }
 
   function renderCalledBalls(){
 
-    const grid =
+    var grid =
 
       document.getElementById(
 
@@ -4838,127 +4786,73 @@ function pageHtml() {
 
       );
 
-    if(!currentGame){
+    var called =
 
-      grid.innerHTML = "";
+      currentGame &&
 
-      return;
+      currentGame.calledBalls
 
-    }
+        ? currentGame.calledBalls
 
-    const called =
+        : [];
 
-      new Set(
-
-        currentGame.calledBalls || []
-
-      );
-
-    let html = "";
+    var html="";
 
     for(
 
-      let number = 1;
+      var i=1;
 
-      number <= TOTAL_BALLS;
+      i<=75;
 
-      number++
+      i++
 
     ){
 
-      html += `
+      var active =
 
-        <div
+        called.indexOf(i) >= 0;
 
-          class="called-number ${
+      html +=
 
-            called.has(number)
+        '<div class="called-number' +
 
-              ? "active"
+        (
 
-              : ""
+          active
 
-          }"
+            ? " active"
 
-        >
+            : ""
 
-          ${number}
+        ) +
 
-        </div>
+        '">' +
 
-      `;
+        i +
 
-    }
-
-    grid.innerHTML = html;
-
-  }
-
-  function renderRecentBalls(){
-
-    const container =
-
-      document.getElementById(
-
-        "recentBalls"
-
-      );
-
-    if(!currentGame){
-
-      container.innerHTML = "";
-
-      return;
+        "</div>";
 
     }
 
-    const called =
-
-      currentGame.calledBalls || [];
-
-    const recent =
-
-      called.slice(-12).reverse();
-
-    container.innerHTML =
-
-      recent
-
-        .map((number,index) => `
-
-          <div
-
-            class="mini-ball ${
-
-              index === 0
-
-                ? "latest"
-
-                : ""
-
-            }"
-
-          >
-
-            ${number}
-
-          </div>
-
-        `)
-
-        .join("");
+    grid.innerHTML=html;
 
   }
 
   function updateGameUI(){
 
-    if(!currentGame) return;
+    if(!currentGame){
 
-    const live =
+      return;
 
-      currentGame.status === "live";
+    }
 
-    const statusText =
+    var live =
+
+      currentGame.status ===
+
+      "live";
+
+    var statusText =
 
       document.getElementById(
 
@@ -4966,7 +4860,7 @@ function pageHtml() {
 
       );
 
-    const statusBadge =
+    var statusBadge =
 
       document.getElementById(
 
@@ -4990,31 +4884,13 @@ function pageHtml() {
 
         : "#ffc857";
 
-    statusBadge.style.background =
-
-      live
-
-        ? "rgba(38,208,124,.10)"
-
-        : "rgba(255,200,87,.10)";
-
-    statusBadge.style.borderColor =
-
-      live
-
-        ? "rgba(38,208,124,.25)"
-
-        : "rgba(255,200,87,.25)";
-
     document.getElementById(
 
       "gameNumber"
 
     ).textContent =
 
-      t("game") +
-
-      " #" +
+      "GAME #" +
 
       currentGame.gameNumber;
 
@@ -5026,9 +4902,9 @@ function pageHtml() {
 
       live
 
-        ? "🎱 " + t("live")
+        ? t("liveTitle")
 
-        : t("prepare");
+        : t("lobbyTitle");
 
     document.getElementById(
 
@@ -5042,7 +4918,7 @@ function pageHtml() {
 
         : t("lobbyMessage");
 
-    const countdown =
+    var countdown =
 
       document.getElementById(
 
@@ -5052,61 +4928,53 @@ function pageHtml() {
 
     if(live){
 
-      countdown.style.display =
+      countdown.innerHTML =
 
-        "none";
+        '<strong>' +
+
+        currentGame.calledCount +
+
+        "</strong> / 75";
 
     }else{
 
-      countdown.style.display =
+      countdown.innerHTML =
 
-        "flex";
+        '<strong>' +
 
-      document.getElementById(
+        Math.max(
 
-        "countdownValue"
+          0,
 
-      ).textContent =
+          currentGame.lobbyRemaining
 
-        currentGame.lobbyRemaining || 0;
+        ) +
 
-      document.getElementById(
-
-        "countdownLabel"
-
-      ).textContent =
-
-        t("seconds");
+        "</strong> sec";
 
     }
 
-    const currentBall =
+    var ball =
 
       currentGame.currentBall;
 
     document.getElementById(
 
-      "currentBallNumber"
+      "ballLetter"
 
     ).textContent =
 
-      currentBall || "—";
+      currentGame.currentLetter ||
+
+      "B";
 
     document.getElementById(
 
-      "currentBallLetter"
+      "ballNumber"
 
     ).textContent =
 
-      currentBall
-
-        ? ballLetterClient(
-
-            currentBall
-
-          )
-
-        : "B";
+      ball || "—";
 
     document.getElementById(
 
@@ -5122,9 +4990,61 @@ function pageHtml() {
 
     ).textContent =
 
-      currentGame.calledCount || 0;
+      currentGame.calledCount;
 
-    renderRecentBalls();
+    var recent =
+
+      document.getElementById(
+
+        "recentBalls"
+
+      );
+
+    var called =
+
+      currentGame.calledBalls || [];
+
+    var recentBalls =
+
+      called
+
+        .slice(-8)
+
+        .reverse();
+
+    var recentHtml="";
+
+    recentBalls.forEach(
+
+      function(number,index){
+
+        recentHtml +=
+
+          '<div class="mini-ball' +
+
+          (
+
+            index === 0
+
+              ? " latest"
+
+              : ""
+
+          ) +
+
+          '">' +
+
+          number +
+
+          "</div>";
+
+      }
+
+    );
+
+    recent.innerHTML =
+
+      recentHtml;
 
     renderCalledBalls();
 
@@ -5132,49 +5052,37 @@ function pageHtml() {
 
   }
 
-  async function refreshGame(){
+  function refreshGame(){
 
-    if(refreshBusy) return;
+    return api(
 
-    refreshBusy = true;
+      "/api/game"
 
-    try{
+    ).then(function(data){
 
       currentGame =
 
-        await api(
-
-          "/api/game"
-
-        );
+        data;
 
       updateGameUI();
 
-    }catch(error){
+    }).catch(function(){
 
-      console.error(error);
+      return null;
 
-    }finally{
-
-      refreshBusy = false;
-
-    }
+    });
 
   }
 
-  async function loadBalance(){
+  function loadBalance(){
 
-    try{
+    return api(
 
-      const data =
+      "/api/balance"
 
-        await api(
+    ).then(function(data){
 
-          "/api/balance"
-
-        );
-
-      const balance =
+      var balance =
 
         Number(
 
@@ -5200,49 +5108,45 @@ function pageHtml() {
 
         " ETB";
 
-    }catch(error){
-
-      console.error(error);
-
-    }
+    });
 
   }
 
   function setWalletType(type){
 
-    walletType = type;
+    walletType=type;
 
-    const deposit =
+    document
 
-      document.getElementById(
+      .getElementById(
 
         "depositBtn"
 
+      )
+
+      .classList.toggle(
+
+        "active",
+
+        type === "deposit"
+
       );
 
-    const withdraw =
+    document
 
-      document.getElementById(
+      .getElementById(
 
         "withdrawBtn"
 
+      )
+
+      .classList.toggle(
+
+        "active",
+
+        type === "withdraw"
+
       );
-
-    deposit.classList.toggle(
-
-      "active",
-
-      type === "deposit"
-
-    );
-
-    withdraw.classList.toggle(
-
-      "active",
-
-      type === "withdraw"
-
-    );
 
     document.getElementById(
 
@@ -5252,23 +5156,15 @@ function pageHtml() {
 
       type === "deposit"
 
-        ? t("submitDeposit")
+        ? t("depositAction")
 
-        : t("submitWithdraw");
+        : t("withdrawAction");
 
   }
 
-  async function walletRequest(){
+  function walletRequest(){
 
-    const method =
-
-      document.getElementById(
-
-        "walletMethod"
-
-      ).value;
-
-    const amount =
+    var amount =
 
       Number(
 
@@ -5280,6 +5176,14 @@ function pageHtml() {
 
       );
 
+    var method =
+
+      document.getElementById(
+
+        "walletMethod"
+
+      ).value;
+
     if(
 
       !Number.isFinite(amount) ||
@@ -5290,7 +5194,7 @@ function pageHtml() {
 
       showToast(
 
-        t("amountInvalid")
+        t("invalidAmount")
 
       );
 
@@ -5298,145 +5202,129 @@ function pageHtml() {
 
     }
 
-    try{
+    api(
 
-      const result =
+      "/api/wallet",
 
-        await api(
+      {
 
-          "/api/wallet",
+        method:"POST",
 
-          {
+        body:JSON.stringify({
 
-            method:"POST",
+          method:method,
 
-            body:JSON.stringify({
+          type:walletType,
 
-              method,
+          amount:amount
 
-              type:walletType,
-
-              amount
-
-            })
-
-          }
-
-        );
-
-      if(
-
-        result.error ===
-
-        "INSUFFICIENT_BALANCE"
-
-      ){
-
-        showToast(
-
-          t("insufficient")
-
-        );
-
-        return;
+        })
 
       }
 
-      if(!result.ok){
+    ).then(function(data){
+
+      if(data.ok){
+
+        document.getElementById(
+
+          "walletAmount"
+
+        ).value="";
+
+        loadBalance();
 
         showToast(
 
-          result.error ||
-
-          "Error"
-
-        );
-
-        return;
-
-      }
-
-      document.getElementById(
-
-        "walletAmount"
-
-      ).value = "";
-
-      await loadBalance();
-
-      showToast(
-
-        t("walletSuccess")
-
-      );
-
-    }catch(error){
-
-      showToast(
-
-        error.message ||
-
-        "Error"
-
-      );
-
-    }
-
-  }
-
-  async function claim(){
-
-    try{
-
-      const result =
-
-        await api(
-
-          "/api/claim"
-
-        );
-
-      if(result.winner){
-
-        showToast(
-
-          t("bingo") +
-
-          " #" +
-
-          result.cards.join(", #")
+          t("balanceUpdated")
 
         );
 
       }else{
 
-        showToast(
+        if(
 
-          t("noBingo")
+          data.error ===
 
-        );
+          "INSUFFICIENT_BALANCE"
+
+        ){
+
+          showToast(
+
+            language === "am"
+
+              ? "በቂ ሂሳብ የለዎትም።"
+
+              : "Insufficient balance."
+
+          );
+
+        }else{
+
+          showToast(
+
+            "Error"
+
+          );
+
+        }
 
       }
 
-    }catch(error){
+    }).catch(function(){
 
       showToast(
 
-        error.message ||
-
-        "Error"
+        "Connection error"
 
       );
 
-    }
+    });
 
   }
 
-  function applyLanguage(){
+  function claim(){
 
-    document.documentElement
+    api(
 
-      .lang = language;
+      "/api/claim"
+
+    ).then(function(data){
+
+      showToast(
+
+        data.winner
+
+          ? t("winner")
+
+          : t("notWinner")
+
+      );
+
+    }).catch(function(){
+
+      showToast(
+
+        "Connection error"
+
+      );
+
+    });
+
+  }
+
+  function setLanguage(next){
+
+    language=next;
+
+    document.documentElement.lang =
+
+      language;
+
+    var x =
+
+      translations[language];
 
     document.getElementById(
 
@@ -5444,7 +5332,7 @@ function pageHtml() {
 
     ).textContent =
 
-      t("brandSub");
+      x.brandSub;
 
     document.getElementById(
 
@@ -5452,7 +5340,7 @@ function pageHtml() {
 
     ).textContent =
 
-      t("called");
+      x.called;
 
     document.getElementById(
 
@@ -5460,7 +5348,7 @@ function pageHtml() {
 
     ).textContent =
 
-      t("cards");
+      x.cards;
 
     document.getElementById(
 
@@ -5468,7 +5356,7 @@ function pageHtml() {
 
     ).textContent =
 
-      t("maximum");
+      x.maximum;
 
     document.getElementById(
 
@@ -5476,7 +5364,7 @@ function pageHtml() {
 
     ).textContent =
 
-      t("play");
+      x.play;
 
     document.getElementById(
 
@@ -5484,7 +5372,7 @@ function pageHtml() {
 
     ).textContent =
 
-      t("cardTab");
+      x.cardsTab;
 
     document.getElementById(
 
@@ -5492,43 +5380,31 @@ function pageHtml() {
 
     ).textContent =
 
-      t("balance");
+      x.balance;
 
     document.getElementById(
 
       "bottomPlay"
 
-    ).innerHTML =
+    ).textContent =
 
-      "🎮<br><span>" +
-
-      t("play") +
-
-      "</span>";
+      x.play;
 
     document.getElementById(
 
       "bottomCards"
 
-    ).innerHTML =
+    ).textContent =
 
-      "🃏<br><span>" +
-
-      t("cardTab") +
-
-      "</span>";
+      x.cardsTab;
 
     document.getElementById(
 
       "bottomBalance"
 
-    ).innerHTML =
+    ).textContent =
 
-      "💵<br><span>" +
-
-      t("balance") +
-
-      "</span>";
+      x.balance;
 
     document.getElementById(
 
@@ -5536,7 +5412,7 @@ function pageHtml() {
 
     ).textContent =
 
-      t("yourGame");
+      x.yourGame;
 
     document.getElementById(
 
@@ -5544,31 +5420,15 @@ function pageHtml() {
 
     ).textContent =
 
-      t("yourGameSub");
+      x.yourGameSub;
 
     document.getElementById(
 
-      "rule75Title"
+      "ruleLines"
 
     ).textContent =
 
-      t("ball75");
-
-    document.getElementById(
-
-      "rule75Text"
-
-    ).textContent =
-
-      t("ball75Text");
-
-    document.getElementById(
-
-      "ruleLinesTitle"
-
-    ).textContent =
-
-      t("twoLines");
+      x.twoLines;
 
     document.getElementById(
 
@@ -5576,7 +5436,7 @@ function pageHtml() {
 
     ).textContent =
 
-      t("twoLinesText");
+      x.twoLinesText;
 
     document.getElementById(
 
@@ -5584,7 +5444,7 @@ function pageHtml() {
 
     ).textContent =
 
-      t("myCards");
+      x.myCards;
 
     document.getElementById(
 
@@ -5592,23 +5452,15 @@ function pageHtml() {
 
     ).textContent =
 
-      t("myCardsSub");
+      x.myCardsSub;
 
     document.getElementById(
 
-      "chooseCardsBtn"
+      "claimBtn"
 
     ).textContent =
 
-      t("chooseCard");
-
-    document.getElementById(
-
-      "checkBingoBtn"
-
-    ).textContent =
-
-      t("checkBingo");
+      x.bingo;
 
     document.getElementById(
 
@@ -5616,7 +5468,7 @@ function pageHtml() {
 
     ).textContent =
 
-      t("calledBalls");
+      x.calledBalls;
 
     document.getElementById(
 
@@ -5624,7 +5476,7 @@ function pageHtml() {
 
     ).textContent =
 
-      t("calledBallsSub");
+      x.calledSub;
 
     document.getElementById(
 
@@ -5632,7 +5484,7 @@ function pageHtml() {
 
     ).textContent =
 
-      t("chooseCards");
+      x.choose;
 
     document.getElementById(
 
@@ -5640,7 +5492,7 @@ function pageHtml() {
 
     ).textContent =
 
-      t("chooseCardsSub");
+      x.chooseSub;
 
     document.getElementById(
 
@@ -5648,7 +5500,23 @@ function pageHtml() {
 
     ).textContent =
 
-      t("saveCards");
+      x.save;
+
+    document.getElementById(
+
+      "balanceTitle"
+
+    ).textContent =
+
+      x.balanceTitle;
+
+    document.getElementById(
+
+      "balanceSub"
+
+    ).textContent =
+
+      x.balanceSub;
 
     document.getElementById(
 
@@ -5656,7 +5524,7 @@ function pageHtml() {
 
     ).textContent =
 
-      t("wallet");
+      x.wallet;
 
     document.getElementById(
 
@@ -5664,7 +5532,7 @@ function pageHtml() {
 
     ).textContent =
 
-      t("deposit");
+      x.deposit;
 
     document.getElementById(
 
@@ -5672,7 +5540,7 @@ function pageHtml() {
 
     ).textContent =
 
-      t("withdraw");
+      x.withdraw;
 
     document.getElementById(
 
@@ -5680,7 +5548,7 @@ function pageHtml() {
 
     ).textContent =
 
-      t("method");
+      x.method;
 
     document.getElementById(
 
@@ -5688,27 +5556,7 @@ function pageHtml() {
 
     ).textContent =
 
-      t("amount");
-
-    document.getElementById(
-
-      "walletSubmit"
-
-    ).textContent =
-
-      walletType === "deposit"
-
-        ? t("submitDeposit")
-
-        : t("submitWithdraw");
-
-    document.getElementById(
-
-      "walletNote"
-
-    ).textContent =
-
-      t("walletNote");
+      x.amount;
 
     document.getElementById(
 
@@ -5716,7 +5564,7 @@ function pageHtml() {
 
     ).textContent =
 
-      t("language");
+      x.language;
 
     document.getElementById(
 
@@ -5724,7 +5572,15 @@ function pageHtml() {
 
     ).textContent =
 
-      t("languageSub");
+      x.languageSub;
+
+    document.getElementById(
+
+      "walletNote"
+
+    ).textContent =
+
+      x.walletNote;
 
     document.getElementById(
 
@@ -5750,125 +5606,171 @@ function pageHtml() {
 
     );
 
-    setWalletType(walletType);
+    setWalletType(
 
-    updateGameUI();
+      walletType
 
-    renderMyCards();
+    );
 
     renderSelected();
 
+    renderMyCards();
+
+    updateGameUI();
+
   }
 
-  function setLanguage(lang){
+  document.getElementById(
 
-    if(
+    "saveCardsBtn"
 
-      lang !== "am" &&
+  ).addEventListener(
 
-      lang !== "en"
+    "click",
 
-    ){
+    saveCards
 
-      return;
+  );
 
-    }
+  document.getElementById(
 
-    language = lang;
+    "claimBtn"
 
-    try{
+  ).addEventListener(
 
-      localStorage.setItem(
+    "click",
 
-        "fastBingoLanguage",
+    claim
 
-        lang
+  );
+
+  document.getElementById(
+
+    "depositBtn"
+
+  ).addEventListener(
+
+    "click",
+
+    function(){
+
+      setWalletType(
+
+        "deposit"
 
       );
 
-    }catch{}
+    }
 
-    applyLanguage();
+  );
 
-  }
+  document.getElementById(
 
-  async function boot(){
+    "withdrawBtn"
 
-    try{
+  ).addEventListener(
 
-      const savedLanguage =
+    "click",
 
-        localStorage.getItem(
+    function(){
 
-          "fastBingoLanguage"
+      setWalletType(
 
-        );
+        "withdraw"
 
-      if(
-
-        savedLanguage === "am" ||
-
-        savedLanguage === "en"
-
-      ){
-
-        language =
-
-          savedLanguage;
-
-      }else{
-
-        language = "am";
-
-      }
-
-    }catch{
-
-      language = "am";
+      );
 
     }
 
-    applyLanguage();
+  );
 
-    await Promise.all([
+  document.getElementById(
 
-      refreshGame(),
+    "walletSubmit"
+
+  ).addEventListener(
+
+    "click",
+
+    walletRequest
+
+  );
+
+  document.getElementById(
+
+    "amBtn"
+
+  ).addEventListener(
+
+    "click",
+
+    function(){
+
+      setLanguage("am");
+
+    }
+
+  );
+
+  document.getElementById(
+
+    "enBtn"
+
+  ).addEventListener(
+
+    "click",
+
+    function(){
+
+      setLanguage("en");
+
+    }
+
+  );
+
+  function boot(){
+
+    setLanguage("am");
+
+    loadCards();
+
+    Promise.all([
 
       loadBalance(),
 
       loadMyCards(),
 
-      loadCards()
+      refreshGame()
 
-    ]);
+    ]).then(function(){
 
-    setInterval(
+      setInterval(
 
-      refreshGame,
+        refreshGame,
 
-      1000
+        2500
 
-    );
+      );
 
-    setInterval(
+      setInterval(
 
-      loadBalance,
+        loadBalance,
 
-      10000
+        10000
 
-    );
+      );
+
+    });
 
   }
 
   boot();
 
+})();
+
 </script>
 
-<script
-
-  src="https://telegram.org/js/telegram-web-app.js"
-
-></script>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 </body>
 
@@ -5904,11 +5806,21 @@ async function proxyToGame(
 
   url.pathname =
 
-    path.replace(/^\/api/, "/do");
+    path.replace(
+
+      /^\\/api/,
+
+      "/do"
+
+    );
 
   const headers =
 
-    new Headers(request.headers);
+    new Headers(
+
+      request.headers
+
+    );
 
   const telegramUser =
 
@@ -5940,7 +5852,7 @@ async function proxyToGame(
 
         method:request.method,
 
-        headers,
+        headers:headers,
 
         body:
 
@@ -5956,19 +5868,35 @@ async function proxyToGame(
 
     );
 
-  return stub.fetch(proxied);
+  return stub.fetch(
+
+    proxied
+
+  );
 
 }
 
 export default {
 
-  async fetch(request, env){
+  async fetch(
+
+    request,
+
+    env
+
+  ){
 
     const url =
 
       new URL(request.url);
 
-    if(url.pathname === "/health"){
+    if(
+
+      url.pathname ===
+
+      "/health"
+
+    ){
 
       return json({
 
@@ -5976,7 +5904,9 @@ export default {
 
         app:APP_NAME,
 
-        time:new Date().toISOString()
+        time:
+
+          new Date().toISOString()
 
       });
 
@@ -5984,7 +5914,9 @@ export default {
 
     if(
 
-      url.pathname === "/api/game"
+      url.pathname ===
+
+      "/api/game"
 
     ){
 
@@ -6002,7 +5934,9 @@ export default {
 
     if(
 
-      url.pathname === "/api/cards"
+      url.pathname ===
+
+      "/api/cards"
 
     ){
 
@@ -6020,7 +5954,9 @@ export default {
 
     if(
 
-      url.pathname === "/api/user-cards"
+      url.pathname ===
+
+      "/api/user-cards"
 
     ){
 
@@ -6038,7 +5974,9 @@ export default {
 
     if(
 
-      url.pathname === "/api/select-cards"
+      url.pathname ===
+
+      "/api/select-cards"
 
     ){
 
@@ -6056,7 +5994,9 @@ export default {
 
     if(
 
-      url.pathname === "/api/balance"
+      url.pathname ===
+
+      "/api/balance"
 
     ){
 
@@ -6074,7 +6014,9 @@ export default {
 
     if(
 
-      url.pathname === "/api/wallet"
+      url.pathname ===
+
+      "/api/wallet"
 
     ){
 
@@ -6092,7 +6034,9 @@ export default {
 
     if(
 
-      url.pathname === "/api/claim"
+      url.pathname ===
+
+      "/api/claim"
 
     ){
 
@@ -6110,19 +6054,33 @@ export default {
 
     if(
 
-      url.pathname === "/do/game" ||
+      url.pathname ===
 
-      url.pathname === "/do/cards" ||
+      "/do/game" ||
 
-      url.pathname === "/do/user-cards" ||
+      url.pathname ===
 
-      url.pathname === "/do/select-cards" ||
+      "/do/cards" ||
 
-      url.pathname === "/do/balance" ||
+      url.pathname ===
 
-      url.pathname === "/do/wallet" ||
+      "/do/user-cards" ||
 
-      url.pathname === "/do/claim"
+      url.pathname ===
+
+      "/do/select-cards" ||
+
+      url.pathname ===
+
+      "/do/balance" ||
+
+      url.pathname ===
+
+      "/do/wallet" ||
+
+      url.pathname ===
+
+      "/do/claim"
 
     ){
 
@@ -6138,21 +6096,29 @@ export default {
 
         env.GAME_SCHEDULER.get(id);
 
-      return stub.fetch(request);
+      return stub.fetch(
+
+        request
+
+      );
 
     }
 
     if(
 
-      url.pathname === "/favicon.ico"
+      url.pathname ===
+
+      "/favicon.ico"
 
     ){
 
-      return new Response(null,{
+      return new Response(
 
-        status:204
+        null,
 
-      });
+        {status:204}
+
+      );
 
     }
 
