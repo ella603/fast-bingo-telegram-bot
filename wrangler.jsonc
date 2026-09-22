@@ -22,16 +22,16 @@
 
   },
 
-  "migrations": [
+  "exports": {
 
-    {
+    "GameScheduler": {
 
-      "tag": "v1",
+      "type": "durable-object",
 
-      "new_sqlite_classes": ["GameScheduler"]
+      "storage": "sqlite"
 
     }
 
-  ]
+  }
 
 }
