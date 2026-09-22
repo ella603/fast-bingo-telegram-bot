@@ -24,9 +24,9 @@ function json(data, status = 200) {
 
       "content-type": "application/json; charset=UTF-8",
 
-      "cache-control": "no-store"
+      "cache-control": "no-store",
 
-    }
+    },
 
   });
 
@@ -40,9 +40,9 @@ function html(body) {
 
       "content-type": "text/html; charset=UTF-8",
 
-      "cache-control": "no-store"
+      "cache-control": "no-store",
 
-    }
+    },
 
   });
 
@@ -54,17 +54,11 @@ function shuffle(arr, seed) {
 
   let s = seed >>> 0;
 
-  function rnd() {
+  for (let i = a.length - 1; i > 0; i--) {
 
     s = (s * 1664525 + 1013904223) >>> 0;
 
-    return s / 4294967296;
-
-  }
-
-  for (let i = a.length - 1; i > 0; i--) {
-
-    const j = Math.floor(rnd() * (i + 1));
+    const j = s % (i + 1);
 
     [a[i], a[j]] = [a[j], a[i]];
 
@@ -90,61 +84,63 @@ function ballLetter(n) {
 
 function makeCard(number) {
 
-  const seed = number * 9973;
+  const seed = 100000 + number * 7919;
 
-  const B = shuffle(
+  const pool = Array.from({ length: 75 }, (_, i) => i + 1);
 
-    Array.from({ length: 15 }, (_, i) => i + 1),
+  const card = [];
 
-    seed + 1
+  const ranges = [
 
-  ).slice(0, 5);
+    [1, 15],
 
-  const I = shuffle(
+    [16, 30],
 
-    Array.from({ length: 15 }, (_, i) => i + 16),
+    [31, 45],
 
-    seed + 2
+    [46, 60],
 
-  ).slice(0, 5);
-
-  const N = shuffle(
-
-    Array.from({ length: 15 }, (_, i) => i + 31),
-
-    seed + 3
-
-  ).slice(0, 5);
-
-  const G = shuffle(
-
-    Array.from({ length: 15 }, (_, i) => i + 46),
-
-    seed + 4
-
-  ).slice(0, 5);
-
-  const O = shuffle(
-
-    Array.from({ length: 15 }, (_, i) => i + 61),
-
-    seed + 5
-
-  ).slice(0, 5);
-
-  return [
-
-    B[0], I[0], N[0], G[0], O[0],
-
-    B[1], I[1], N[1], G[1], O[1],
-
-    B[2], I[2], "FREE", G[2], O[2],
-
-    B[3], I[3], N[3], G[3], O[3],
-
-    B[4], I[4], N[4], G[4], O[4]
+    [61, 75],
 
   ];
+
+  for (let c = 0; c < 5; c++) {
+
+    const [from, to] = ranges[c];
+
+    const values = shuffle(
+
+      pool.filter((n) => n >= from && n <= to),
+
+      seed + c * 97
+
+    ).slice(0, 5);
+
+    card.push(values);
+
+  }
+
+  const grid = Array.from({ length: 5 }, () => Array(5).fill(null));
+
+  for (let c = 0; c < 5; c++) {
+
+    for (let r = 0; r < 5; r++) {
+
+      grid[r][c] = card[c][r];
+
+    }
+
+  }
+
+  grid[2][2] = "FREE";
+
+  return {
+
+    number,
+
+    grid,
+
+  };
 
 }
 
@@ -154,7 +150,7 @@ function makeBallOrder(gameNumber) {
 
     Array.from({ length: TOTAL_BALLS }, (_, i) => i + 1),
 
-    gameNumber * 7919 + 17
+    50000 + gameNumber * 9176
 
   );
 
@@ -162,41 +158,35 @@ function makeBallOrder(gameNumber) {
 
 function hasTwoLines(card, called) {
 
-  const c = new Set(called);
+  const calledSet = new Set(called);
 
-  function marked(v) {
-
-    return v === "FREE" || c.has(Number(v));
-
-  }
+  const marked = (value) => value === "FREE" || calledSet.has(value);
 
   let lines = 0;
 
   for (let r = 0; r < 5; r++) {
 
-    let ok = true;
-
-    for (let col = 0; col < 5; col++) {
-
-      if (!marked(card[r * 5 + col])) ok = false;
-
-    }
-
-    if (ok) lines++;
+    if (card.grid[r].every(marked)) lines++;
 
   }
 
-  for (let col = 0; col < 5; col++) {
+  for (let c = 0; c < 5; c++) {
 
-    let ok = true;
+    let complete = true;
 
     for (let r = 0; r < 5; r++) {
 
-      if (!marked(card[r * 5 + col])) ok = false;
+      if (!marked(card.grid[r][c])) {
+
+        complete = false;
+
+        break;
+
+      }
 
     }
 
-    if (ok) lines++;
+    if (complete) lines++;
 
   }
 
@@ -206,9 +196,9 @@ function hasTwoLines(card, called) {
 
   for (let i = 0; i < 5; i++) {
 
-    if (!marked(card[i * 5 + i])) d1 = false;
+    if (!marked(card.grid[i][i])) d1 = false;
 
-    if (!marked(card[i * 5 + (4 - i)])) d2 = false;
+    if (!marked(card.grid[i][4 - i])) d2 = false;
 
   }
 
@@ -230,51 +220,43 @@ function getTelegramUser(request) {
 
   const raw = request.headers.get("x-telegram-user");
 
-  if (!raw) {
+  if (raw) {
 
-    return {
+    try {
 
-      id: "guest",
+      const parsed = JSON.parse(raw);
 
-      first_name: "Player",
+      if (parsed && parsed.id) {
 
-      username: ""
+        return {
 
-    };
+          id: String(parsed.id),
 
-  }
+          first_name: parsed.first_name || "",
 
-  try {
+          username: parsed.username || "",
 
-    const u = JSON.parse(raw);
+        };
 
-    return {
+      }
 
-      id: String(u.id || "guest"),
-
-      first_name: String(u.first_name || "Player"),
-
-      username: String(u.username || "")
-
-    };
-
-  } catch {
-
-    return {
-
-      id: "guest",
-
-      first_name: "Player",
-
-      username: ""
-
-    };
+    } catch {}
 
   }
+
+  return {
+
+    id: "guest",
+
+    first_name: "Guest",
+
+    username: "",
+
+  };
 
 }
 
-export class GameScheduler extends DurableObject {
+class GameScheduler extends DurableObject {
 
   constructor(ctx, env) {
 
@@ -294,7 +276,9 @@ export class GameScheduler extends DurableObject {
 
   async init() {
 
-    this.ctx.storage.sql.exec(`
+    const sql = this.ctx.storage.sql;
+
+    sql.exec(`
 
       CREATE TABLE IF NOT EXISTS state (
 
@@ -304,15 +288,9 @@ export class GameScheduler extends DurableObject {
 
         status TEXT NOT NULL,
 
-        lobby_started INTEGER NOT NULL,
+        started_at INTEGER NOT NULL,
 
-        started_at INTEGER,
-
-        ended_at INTEGER,
-
-        current_ball INTEGER,
-
-        called_count INTEGER NOT NULL,
+        ball_index INTEGER NOT NULL,
 
         ball_order TEXT NOT NULL
 
@@ -320,47 +298,47 @@ export class GameScheduler extends DurableObject {
 
     `);
 
-    this.ctx.storage.sql.exec(`
+    sql.exec(`
 
       CREATE TABLE IF NOT EXISTS selected_cards (
 
-        game_number INTEGER NOT NULL,
+        user_id TEXT NOT NULL,
 
-        telegram_id TEXT NOT NULL,
+        game_number INTEGER NOT NULL,
 
         card_number INTEGER NOT NULL,
 
-        PRIMARY KEY(game_number, telegram_id, card_number)
+        PRIMARY KEY(user_id, game_number, card_number)
 
       )
 
     `);
 
-    this.ctx.storage.sql.exec(`
+    sql.exec(`
 
       CREATE TABLE IF NOT EXISTS balances (
 
-        telegram_id TEXT PRIMARY KEY,
+        user_id TEXT PRIMARY KEY,
 
-        balance REAL NOT NULL
+        balance INTEGER NOT NULL
 
       )
 
     `);
 
-    this.ctx.storage.sql.exec(`
+    sql.exec(`
 
       CREATE TABLE IF NOT EXISTS transactions (
 
         id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-        telegram_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
 
         method TEXT NOT NULL,
 
         type TEXT NOT NULL,
 
-        amount REAL NOT NULL,
+        amount INTEGER NOT NULL,
 
         created_at INTEGER NOT NULL
 
@@ -368,67 +346,63 @@ export class GameScheduler extends DurableObject {
 
     `);
 
-    const row = this.ctx.storage.sql
+    const rows = [...sql.exec("SELECT * FROM state WHERE id = 1")];
 
-      .exec(`SELECT * FROM state WHERE id = 1`)
-
-      .toArray()[0];
-
-    if (!row) {
-
-      const t = Date.now();
+    if (!rows.length) {
 
       const gameNumber = 1;
 
-      this.ctx.storage.sql.exec(
+      const now = Date.now();
+
+      sql.exec(
 
         `INSERT INTO state
 
-        (
+          (id, game_number, status, started_at, ball_index, ball_order)
 
-          id,
+         VALUES (?, ?, ?, ?, ?, ?)`,
 
-          game_number,
-
-          status,
-
-          lobby_started,
-
-          started_at,
-
-          ended_at,
-
-          current_ball,
-
-          called_count,
-
-          ball_order
-
-        )
-
-        VALUES (1, ?, 'lobby', ?, NULL, NULL, NULL, 0, ?)`,
+        1,
 
         gameNumber,
 
-        t,
+        "lobby",
+
+        now,
+
+        -1,
 
         JSON.stringify(makeBallOrder(gameNumber))
 
       );
 
-      await this.ctx.storage.setAlarm(
-
-        t + LOBBY_SECONDS * 1000
-
-      );
+      await this.ctx.storage.setAlarm(now + LOBBY_SECONDS * 1000);
 
     } else {
 
-      const alarm = await this.ctx.storage.getAlarm();
+      const state = rows[0];
 
-      if (alarm === null) {
+      if (state.status === "lobby") {
 
-        await this.scheduleNext();
+        const elapsed = Date.now() - state.started_at;
+
+        const remaining = Math.max(
+
+          1000,
+
+          LOBBY_SECONDS * 1000 - elapsed
+
+        );
+
+        await this.ctx.storage.setAlarm(Date.now() + remaining);
+
+      } else if (state.status === "live") {
+
+        await this.ctx.storage.setAlarm(
+
+          Date.now() + BALL_INTERVAL
+
+        );
 
       }
 
@@ -436,45 +410,83 @@ export class GameScheduler extends DurableObject {
 
   }
 
-  async getState() {
+  getState() {
 
-    return this.ctx.storage.sql
+    const rows = [
 
-      .exec(`SELECT * FROM state WHERE id = 1`)
+      ...this.ctx.storage.sql.exec(
 
-      .toArray()[0];
+        "SELECT * FROM state WHERE id = 1"
+
+      ),
+
+    ];
+
+    if (!rows.length) return null;
+
+    const state = rows[0];
+
+    return {
+
+      ...state,
+
+      ball_order: JSON.parse(state.ball_order),
+
+    };
 
   }
 
-  async getCalledBalls(state) {
+  getCalledBalls(state) {
 
-    const order = JSON.parse(state.ball_order);
+    if (!state || state.ball_index < 0) return [];
 
-    return order.slice(0, state.called_count);
+    return state.ball_order.slice(0, state.ball_index + 1);
 
   }
 
-  async scheduleNext() {
+  async scheduleNext(ms) {
 
-    const state = await this.getState();
+    await this.ctx.storage.setAlarm(
 
-    if (!state) return;
+      Date.now() + Math.max(500, ms)
 
-    const t = Date.now();
+    );
+
+  }
+
+  async alarm() {
+
+    const state = this.getState();
+
+    if (!state) {
+
+      await this.init();
+
+      return;
+
+    }
+
+    const sql = this.ctx.storage.sql;
 
     if (state.status === "lobby") {
 
-      const target =
+      sql.exec(
 
-        state.lobby_started +
+        `UPDATE state
 
-        LOBBY_SECONDS * 1000;
+         SET status = ?, started_at = ?, ball_index = ?
 
-      await this.ctx.storage.setAlarm(
+         WHERE id = 1`,
 
-        Math.max(t + 50, target)
+        "live",
+
+        Date.now(),
+
+        0
 
       );
+
+      await this.scheduleNext(BALL_INTERVAL);
 
       return;
 
@@ -482,147 +494,29 @@ export class GameScheduler extends DurableObject {
 
     if (state.status === "live") {
 
-      const target =
+      const nextIndex = state.ball_index + 1;
 
-        (state.started_at || t) +
+      if (nextIndex >= TOTAL_BALLS) {
 
-        (state.called_count + 1) *
-
-        BALL_INTERVAL;
-
-      await this.ctx.storage.setAlarm(
-
-        Math.max(t + 50, target)
-
-      );
-
-    }
-
-  }
-
-  async alarm() {
-
-    try {
-
-      const state = await this.getState();
-
-      if (!state) return;
-
-      const t = Date.now();
-
-      if (state.status === "lobby") {
-
-        if (
-
-          t <
-
-          state.lobby_started +
-
-          LOBBY_SECONDS * 1000
-
-        ) {
-
-          await this.scheduleNext();
-
-          return;
-
-        }
-
-        this.ctx.storage.sql.exec(
-
-          `UPDATE state
-
-           SET
-
-             status='live',
-
-             started_at=?,
-
-             current_ball=NULL,
-
-             called_count=0
-
-           WHERE id=1`,
-
-          t
-
-        );
-
-        await this.scheduleNext();
+        await this.startNextGame();
 
         return;
 
       }
 
-      if (state.status === "live") {
+      sql.exec(
 
-        const order = JSON.parse(
+        `UPDATE state
 
-          state.ball_order
+         SET ball_index = ?
 
-        );
+         WHERE id = 1`,
 
-        if (
-
-          state.called_count >= TOTAL_BALLS
-
-        ) {
-
-          await this.startNextGame();
-
-          return;
-
-        }
-
-        const nextIndex =
-
-          state.called_count;
-
-        const nextBall =
-
-          order[nextIndex];
-
-        this.ctx.storage.sql.exec(
-
-          `UPDATE state
-
-           SET
-
-             current_ball=?,
-
-             called_count=?
-
-           WHERE id=1`,
-
-          nextBall,
-
-          nextIndex + 1
-
-        );
-
-        if (
-
-          nextIndex + 1 >= TOTAL_BALLS
-
-        ) {
-
-          await this.startNextGame();
-
-          return;
-
-        }
-
-        await this.scheduleNext();
-
-      }
-
-    } catch (e) {
-
-      await this.ctx.storage.setAlarm(
-
-        Date.now() + 3500
+        nextIndex
 
       );
+
+      await this.scheduleNext(BALL_INTERVAL);
 
     }
 
@@ -630,13 +524,11 @@ export class GameScheduler extends DurableObject {
 
   async startNextGame() {
 
-    const current = await this.getState();
+    const oldState = this.getState();
 
-    const nextGame =
+    const gameNumber = Number(oldState.game_number) + 1;
 
-      Number(current.game_number) + 1;
-
-    const t = Date.now();
+    const now = Date.now();
 
     this.ctx.storage.sql.exec(
 
@@ -644,7 +536,7 @@ export class GameScheduler extends DurableObject {
 
        WHERE game_number < ?`,
 
-      nextGame
+      gameNumber - 2
 
     );
 
@@ -652,107 +544,105 @@ export class GameScheduler extends DurableObject {
 
       `UPDATE state
 
-       SET
+       SET game_number = ?,
 
-         game_number=?,
+           status = ?,
 
-         status='lobby',
+           started_at = ?,
 
-         lobby_started=?,
+           ball_index = ?,
 
-         started_at=NULL,
+           ball_order = ?
 
-         ended_at=?,
+       WHERE id = 1`,
 
-         current_ball=NULL,
+      gameNumber,
 
-         called_count=0,
+      "lobby",
 
-         ball_order=?
+      now,
 
-       WHERE id=1`,
+      -1,
 
-      nextGame,
-
-      t,
-
-      t,
-
-      JSON.stringify(
-
-        makeBallOrder(nextGame)
-
-      )
+      JSON.stringify(makeBallOrder(gameNumber))
 
     );
 
-    await this.ctx.storage.setAlarm(
-
-      t + LOBBY_SECONDS * 1000
-
-    );
+    await this.scheduleNext(LOBBY_SECONDS * 1000);
 
   }
 
   async game() {
 
-    const state = await this.getState();
+    const state = this.getState();
 
-    const called =
+    if (!state) {
 
-      await this.getCalledBalls(state);
+      return {
 
-    const remaining =
+        status: "lobby",
 
-      state.status === "lobby"
+        gameNumber: 1,
 
-        ? Math.max(
+        lobbyRemaining: LOBBY_SECONDS,
 
-            0,
+        currentBall: null,
 
-            Math.ceil(
+        currentLetter: null,
 
-              (
+        calledBalls: [],
 
-                state.lobby_started +
+        calledCount: 0,
 
-                LOBBY_SECONDS * 1000 -
+      };
 
-                Date.now()
+    }
 
-              ) / 1000
+    const calledBalls = this.getCalledBalls(state);
 
-            )
+    let lobbyRemaining = 0;
 
-          )
+    if (state.status === "lobby") {
 
-        : 0;
+      lobbyRemaining = Math.max(
+
+        0,
+
+        LOBBY_SECONDS -
+
+          Math.floor((Date.now() - state.started_at) / 1000)
+
+      );
+
+    }
+
+    const currentBall =
+
+      state.status === "live" && state.ball_index >= 0
+
+        ? state.ball_order[state.ball_index]
+
+        : null;
 
     return {
 
-      ok: true,
+      status: state.status,
 
       gameNumber: state.game_number,
 
-      status: state.status,
+      lobbyRemaining,
 
-      lobbyRemaining: remaining,
+      currentBall,
 
-      currentBall: state.current_ball,
+      currentLetter: currentBall
 
-      currentLetter:
+        ? ballLetter(currentBall)
 
-        state.current_ball
+        : null,
 
-          ? ballLetter(state.current_ball)
+      calledBalls,
 
-          : null,
-
-      calledBalls: called,
-
-      calledCount: called.length,
-
-      nextGameStartsAutomatically: true
+      calledCount: calledBalls.length,
 
     };
 
@@ -760,29 +650,25 @@ export class GameScheduler extends DurableObject {
 
   async cards() {
 
-    const state = await this.getState();
+    const cards = [];
+
+    for (let i = 1; i <= CARD_COUNT; i++) {
+
+      cards.push({
+
+        number: i,
+
+        available: true,
+
+      });
+
+    }
 
     return {
 
-      ok: true,
+      cards,
 
-      cards: Array.from(
-
-        { length: CARD_COUNT },
-
-        (_, i) => ({
-
-          number: i + 1,
-
-          available: true
-
-        })
-
-      ),
-
-      gameNumber:
-
-        state.game_number
+      total: CARD_COUNT,
 
     };
 
@@ -790,7 +676,19 @@ export class GameScheduler extends DurableObject {
 
   async selectCards(userId, cards) {
 
-    const state = await this.getState();
+    const state = this.getState();
+
+    if (!state) {
+
+      return {
+
+        ok: false,
+
+        error: "GAME_NOT_READY",
+
+      };
+
+    }
 
     if (state.status !== "lobby") {
 
@@ -798,85 +696,59 @@ export class GameScheduler extends DurableObject {
 
         ok: false,
 
-        error: "GAME_IN_PROGRESS"
+        error: "GAME_IN_PROGRESS",
 
       };
 
     }
 
-    const unique = [
+    const clean = [
 
       ...new Set(
 
-        cards.map(Number)
+        Array.isArray(cards)
 
-      )
+          ? cards
 
-    ];
+              .map(Number)
 
-    if (
+              .filter(cardNumberValid)
 
-      unique.length < 1 ||
+          : []
 
-      unique.length >
+      ),
 
-        MAX_CARDS_PER_PLAYER ||
+    ].slice(0, MAX_CARDS_PER_PLAYER);
 
-      unique.some(
+    const sql = this.ctx.storage.sql;
 
-        n => !cardNumberValid(n)
-
-      )
-
-    ) {
-
-      return {
-
-        ok: false,
-
-        error: "INVALID_CARDS"
-
-      };
-
-    }
-
-    this.ctx.storage.sql.exec(
+    sql.exec(
 
       `DELETE FROM selected_cards
 
-       WHERE game_number=?
+       WHERE user_id = ? AND game_number = ?`,
 
-       AND telegram_id=?`,
+      userId,
 
-      state.game_number,
-
-      userId
+      state.game_number
 
     );
 
-    for (const n of unique) {
+    for (const cardNumber of clean) {
 
-      this.ctx.storage.sql.exec(
+      sql.exec(
 
-        `INSERT INTO selected_cards
+        `INSERT OR IGNORE INTO selected_cards
 
-         (
-
-           game_number,
-
-           telegram_id,
-
-           card_number
-
-         )
+         (user_id, game_number, card_number)
 
          VALUES (?, ?, ?)`,
 
-        state.game_number,
-
         userId,
 
-        n
+        state.game_number,
+
+        cardNumber
 
       );
 
@@ -886,11 +758,9 @@ export class GameScheduler extends DurableObject {
 
       ok: true,
 
-      selectedCards: unique,
+      selected: clean,
 
-      gameNumber:
-
-        state.game_number
+      gameNumber: state.game_number,
 
     };
 
@@ -898,49 +768,43 @@ export class GameScheduler extends DurableObject {
 
   async userCards(userId) {
 
-    const state =
+    const state = this.getState();
 
-      await this.getState();
+    if (!state) {
 
-    const rows =
+      return {
 
-      this.ctx.storage.sql
+        selected: [],
 
-        .exec(
+      };
 
-          `SELECT card_number
+    }
 
-           FROM selected_cards
+    const rows = [
 
-           WHERE game_number=?
+      ...this.ctx.storage.sql.exec(
 
-           AND telegram_id=?
+        `SELECT card_number
 
-           ORDER BY card_number`,
+         FROM selected_cards
 
-          state.game_number,
+         WHERE user_id = ? AND game_number = ?
 
-          userId
+         ORDER BY card_number`,
 
-        )
+        userId,
 
-        .toArray();
+        state.game_number
+
+      ),
+
+    ];
 
     return {
 
-      ok: true,
+      selected: rows.map((r) => Number(r.card_number)),
 
-      gameNumber:
-
-        state.game_number,
-
-      selectedCards:
-
-        rows.map(
-
-          r => Number(r.card_number)
-
-        )
+      gameNumber: state.game_number,
 
     };
 
@@ -948,31 +812,29 @@ export class GameScheduler extends DurableObject {
 
   async balance(userId) {
 
-    let row =
+    const sql = this.ctx.storage.sql;
 
-      this.ctx.storage.sql
+    const rows = [
 
-        .exec(
+      ...sql.exec(
 
-          `SELECT balance
+        `SELECT balance
 
-           FROM balances
+         FROM balances
 
-           WHERE telegram_id=?`,
+         WHERE user_id = ?`,
 
-          userId
+        userId
 
-        )
+      ),
 
-        .toArray()[0];
+    ];
 
-    if (!row) {
+    if (!rows.length) {
 
-      this.ctx.storage.sql.exec(
+      sql.exec(
 
-        `INSERT INTO balances
-
-         (telegram_id, balance)
+        `INSERT INTO balances(user_id, balance)
 
          VALUES (?, ?)`,
 
@@ -982,11 +844,9 @@ export class GameScheduler extends DurableObject {
 
       );
 
-      row = {
+      return {
 
-        balance:
-
-          PLAY_BALANCE_START
+        balance: PLAY_BALANCE_START,
 
       };
 
@@ -994,39 +854,45 @@ export class GameScheduler extends DurableObject {
 
     return {
 
-      ok: true,
-
-      balance:
-
-        Number(row.balance)
+      balance: Number(rows[0].balance),
 
     };
 
   }
 
-  async walletRequest(
+  async walletRequest(userId, method, type, amount) {
 
-    userId,
+    const allowedMethods = [
 
-    method,
+      "Telebirr",
 
-    type,
+      "eBirr",
 
-    amount
+      "M-PESA",
 
-  ) {
+    ];
 
-    const value =
+    if (!allowedMethods.includes(method)) {
 
-      Number(amount);
+      return {
+
+        ok: false,
+
+        error: "INVALID_METHOD",
+
+      };
+
+    }
+
+    const cleanAmount = Math.floor(Number(amount));
 
     if (
 
-      !Number.isFinite(value) ||
+      !Number.isFinite(cleanAmount) ||
 
-      value <= 0 ||
+      cleanAmount <= 0 ||
 
-      value > 1000000
+      cleanAmount > 100000
 
     ) {
 
@@ -1034,119 +900,71 @@ export class GameScheduler extends DurableObject {
 
         ok: false,
 
-        error: "INVALID_AMOUNT"
+        error: "INVALID_AMOUNT",
 
       };
 
     }
 
-    const methods = [
+    const sql = this.ctx.storage.sql;
 
-      "Telebirr",
+    const current = await this.balance(userId);
 
-      "eBirr",
+    let newBalance = current.balance;
 
-      "M-PESA"
+    if (type === "deposit") {
 
-    ];
+      newBalance += cleanAmount;
 
-    if (!methods.includes(method)) {
+    } else if (type === "withdraw") {
 
-      return {
-
-        ok: false,
-
-        error: "INVALID_METHOD"
-
-      };
-
-    }
-
-    if (type === "withdraw") {
-
-      const current =
-
-        await this.balance(userId);
-
-      if (
-
-        current.balance < value
-
-      ) {
+      if (cleanAmount > current.balance) {
 
         return {
 
           ok: false,
 
-          error:
+          error: "INSUFFICIENT_BALANCE",
 
-            "INSUFFICIENT_BALANCE"
+          balance: current.balance,
 
         };
 
       }
 
-      this.ctx.storage.sql.exec(
+      newBalance -= cleanAmount;
 
-        `UPDATE balances
+    } else {
 
-         SET balance=balance-?
+      return {
 
-         WHERE telegram_id=?`,
+        ok: false,
 
-        value,
+        error: "INVALID_TYPE",
 
-        userId
-
-      );
+      };
 
     }
 
-    if (type === "deposit") {
+    sql.exec(
 
-      this.ctx.storage.sql.exec(
+      `UPDATE balances
 
-        `INSERT INTO balances
+       SET balance = ?
 
-         (telegram_id, balance)
+       WHERE user_id = ?`,
 
-         VALUES (?, ?)
+      newBalance,
 
-         ON CONFLICT(telegram_id)
+      userId
 
-         DO UPDATE SET
+    );
 
-           balance=
-
-           balance+
-
-           excluded.balance`,
-
-        userId,
-
-        value
-
-      );
-
-    }
-
-    this.ctx.storage.sql.exec(
+    sql.exec(
 
       `INSERT INTO transactions
 
-       (
-
-         telegram_id,
-
-         method,
-
-         type,
-
-         amount,
-
-         created_at
-
-       )
+       (user_id, method, type, amount, created_at)
 
        VALUES (?, ?, ?, ?, ?)`,
 
@@ -1156,97 +974,79 @@ export class GameScheduler extends DurableObject {
 
       type,
 
-      value,
+      cleanAmount,
 
       Date.now()
 
     );
 
-    return await this.balance(
+    return {
 
-      userId
+      ok: true,
 
-    );
+      balance: newBalance,
+
+      method,
+
+      type,
+
+      amount: cleanAmount,
+
+      simulated: true,
+
+    };
 
   }
 
   async checkWinners(userId) {
 
-    const state =
+    const state = this.getState();
 
-      await this.getState();
-
-    const called =
-
-      await this.getCalledBalls(
-
-        state
-
-      );
-
-    if (
-
-      state.status !== "live"
-
-    ) {
+    if (!state) {
 
       return {
 
         ok: false,
 
-        error: "GAME_NOT_LIVE"
+        winner: false,
 
       };
 
     }
 
-    const rows =
+    const rows = [
 
-      this.ctx.storage.sql
+      ...this.ctx.storage.sql.exec(
 
-        .exec(
+        `SELECT card_number
 
-          `SELECT card_number
+         FROM selected_cards
 
-           FROM selected_cards
+         WHERE user_id = ? AND game_number = ?
 
-           WHERE game_number=?
+         ORDER BY card_number`,
 
-           AND telegram_id=?`,
+        userId,
 
-          state.game_number,
+        state.game_number
 
-          userId
+      ),
 
-        )
+    ];
 
-        .toArray();
+    const called = this.getCalledBalls(state);
 
-    const winningCards = [];
+    const winners = [];
 
     for (const row of rows) {
 
-      const n =
+      const cardNumber = Number(row.card_number);
 
-        Number(row.card_number);
+      const card = makeCard(cardNumber);
 
-      const card =
+      if (hasTwoLines(card, called)) {
 
-        makeCard(n);
-
-      if (
-
-        hasTwoLines(
-
-          card,
-
-          called
-
-        )
-
-      ) {
-
-        winningCards.push(n);
+        winners.push(cardNumber);
 
       }
 
@@ -1256,11 +1056,11 @@ export class GameScheduler extends DurableObject {
 
       ok: true,
 
-      winningCards,
+      winner: winners.length > 0,
 
-      calledCount:
+      cards: winners,
 
-        called.length
+      gameNumber: state.game_number,
 
     };
 
@@ -1268,147 +1068,141 @@ export class GameScheduler extends DurableObject {
 
   async fetch(request) {
 
-    const url =
+    const url = new URL(request.url);
 
-      new URL(request.url);
+    const path = url.pathname;
 
-    const path =
+    const user = getTelegramUser(request);
 
-      url.pathname;
+    try {
 
-    const user =
+      if (path === "/do/game") {
 
-      getTelegramUser(request);
+        return json(await this.game());
 
-    if (path === "/game") {
+      }
+
+      if (path === "/do/cards") {
+
+        return json(await this.cards());
+
+      }
+
+      if (path === "/do/user-cards") {
+
+        return json(await this.userCards(user.id));
+
+      }
+
+      if (path === "/do/select-cards") {
+
+        if (request.method !== "POST") {
+
+          return json(
+
+            { error: "METHOD_NOT_ALLOWED" },
+
+            405
+
+          );
+
+        }
+
+        const body = await request.json();
+
+        return json(
+
+          await this.selectCards(
+
+            user.id,
+
+            body.cards
+
+          )
+
+        );
+
+      }
+
+      if (path === "/do/balance") {
+
+        return json(await this.balance(user.id));
+
+      }
+
+      if (path === "/do/wallet") {
+
+        if (request.method !== "POST") {
+
+          return json(
+
+            { error: "METHOD_NOT_ALLOWED" },
+
+            405
+
+          );
+
+        }
+
+        const body = await request.json();
+
+        return json(
+
+          await this.walletRequest(
+
+            user.id,
+
+            body.method,
+
+            body.type,
+
+            body.amount
+
+          )
+
+        );
+
+      }
+
+      if (path === "/do/claim") {
+
+        return json(
+
+          await this.checkWinners(user.id)
+
+        );
+
+      }
 
       return json(
 
-        await this.game()
+        {
+
+          error: "NOT_FOUND",
+
+        },
+
+        404
+
+      );
+
+    } catch (error) {
+
+      return json(
+
+        {
+
+          error: "SERVER_ERROR",
+
+          message: error?.message || String(error),
+
+        },
+
+        500
 
       );
 
     }
-
-    if (path === "/cards") {
-
-      return json(
-
-        await this.cards()
-
-      );
-
-    }
-
-    if (
-
-      path === "/user-cards"
-
-    ) {
-
-      return json(
-
-        await this.userCards(
-
-          user.id
-
-        )
-
-      );
-
-    }
-
-    if (
-
-      path === "/select-cards" &&
-
-      request.method === "POST"
-
-    ) {
-
-      const body =
-
-        await request.json();
-
-      return json(
-
-        await this.selectCards(
-
-          user.id,
-
-          body.cards || []
-
-        )
-
-      );
-
-    }
-
-    if (path === "/balance") {
-
-      return json(
-
-        await this.balance(
-
-          user.id
-
-        )
-
-      );
-
-    }
-
-    if (
-
-      path === "/wallet" &&
-
-      request.method === "POST"
-
-    ) {
-
-      const body =
-
-        await request.json();
-
-      return json(
-
-        await this.walletRequest(
-
-          user.id,
-
-          body.method,
-
-          body.type,
-
-          body.amount
-
-        )
-
-      );
-
-    }
-
-    if (path === "/claim") {
-
-      return json(
-
-        await this.checkWinners(
-
-          user.id
-
-        )
-
-      );
-
-    }
-
-    return json({
-
-      ok: true,
-
-      service: APP_NAME
-
-    });
 
   }
 
@@ -1418,3617 +1212,3283 @@ function pageHtml() {
 
   return `<!DOCTYPE html>
 
-<html lang="en">
+<html lang="am">
 
 <head>
 
-<meta charset="UTF-8">
+  <meta charset="UTF-8">
 
-<meta
+  <meta
 
-  name="viewport"
+    name="viewport"
 
-  content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"
+    content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
 
->
+  >
 
-<meta
+  <meta
 
-  name="theme-color"
+    name="theme-color"
 
-  content="#07090d"
+    content="#07090d"
 
->
+  >
 
-<title>Fast Bingo</title>
+  <title>Fast Bingo</title>
 
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
 
-<style>
+    :root{
 
-:root{
+      --bg:#07090d;
 
-  --bg:#07090d;
+      --surface:#10141c;
 
-  --surface:#10141c;
+      --surface2:#151b25;
 
-  --surface2:#151b25;
+      --surface3:#1b2230;
 
-  --surface3:#1b2230;
+      --line:#293243;
 
-  --line:#293243;
+      --text:#ffffff;
 
-  --text:#ffffff;
+      --muted:#8993a4;
 
-  --muted:#8993a4;
+      --red:#e50914;
 
-  --red:#e50914;
+      --red2:#ff3038;
 
-  --red2:#ff3038;
+      --green:#26d07c;
 
-  --green:#26d07c;
+      --gold:#ffc857;
 
-  --gold:#ffc857;
+      --blue:#4c8dff;
 
-  --blue:#4c8dff;
+      --shadow:0 12px 35px rgba(0,0,0,.28);
 
-}
+    }
 
-*{
+    *{
 
-  box-sizing:border-box;
+      box-sizing:border-box;
 
-  -webkit-tap-highlight-color:transparent;
+      -webkit-tap-highlight-color:transparent;
 
-}
+    }
 
-html{
+    html{
 
-  margin:0;
+      background:var(--bg);
 
-  padding:0;
+      scroll-behavior:smooth;
 
-  background:var(--bg);
+    }
 
-}
+    body{
 
-body{
+      margin:0;
 
-  margin:0;
+      background:
 
-  padding:0;
+        radial-gradient(
 
-  min-height:100vh;
+          circle at 50% -10%,
 
-  background:
+          rgba(229,9,20,.13),
 
-    radial-gradient(
+          transparent 38%
 
-      circle at 50% -10%,
+        ),
 
-      #263247 0,
+        var(--bg);
 
-      #111722 28%,
+      color:var(--text);
 
-      var(--bg) 58%
+      font-family:
 
-    );
+        -apple-system,
 
-  color:var(--text);
+        BlinkMacSystemFont,
 
-  font-family:
+        "Segoe UI",
 
-    -apple-system,
+        Roboto,
 
-    BlinkMacSystemFont,
+        Arial,
 
-    "Segoe UI",
+        sans-serif;
 
-    Arial,
+      min-height:100vh;
 
-    sans-serif;
+      padding-bottom:92px;
 
-}
+    }
 
-button,
+    button,
 
-input,
+    input,
 
-select{
+    select{
 
-  font:inherit;
+      font:inherit;
 
-}
+    }
 
-button{
+    button{
 
-  cursor:pointer;
+      cursor:pointer;
 
-}
+    }
 
-.app{
+    .app{
 
-  width:100%;
+      width:100%;
 
-  max-width:820px;
+      max-width:760px;
 
-  margin:0 auto;
+      margin:0 auto;
 
-  padding:
+      padding-bottom:30px;
 
-    14px
+    }
 
-    12px
+    .topbar{
 
-    100px;
+      position:sticky;
 
-}
+      top:0;
 
-/* TOP BAR */
+      z-index:30;
 
-.topbar{
+      display:flex;
 
-  display:flex;
+      align-items:center;
 
-  align-items:center;
+      justify-content:space-between;
 
-  justify-content:space-between;
+      gap:10px;
 
-  gap:10px;
+      padding:
 
-  margin-bottom:14px;
+        calc(10px + env(safe-area-inset-top))
 
-}
+        14px
 
-.brandWrap{
+        10px;
 
-  display:flex;
+      background:rgba(7,9,13,.92);
 
-  align-items:center;
+      backdrop-filter:blur(18px);
 
-  gap:10px;
+      border-bottom:1px solid rgba(255,255,255,.06);
 
-  min-width:0;
+    }
 
-}
+    .brand{
 
-.logo{
+      display:flex;
 
-  width:44px;
+      align-items:center;
 
-  height:44px;
+      gap:9px;
 
-  border-radius:13px;
+      min-width:0;
 
-  display:flex;
+    }
 
-  align-items:center;
+    .brand-ball{
 
-  justify-content:center;
+      width:38px;
 
-  background:
+      height:38px;
 
-    linear-gradient(
+      border-radius:50%;
 
-      145deg,
+      display:grid;
 
-      var(--red2),
+      place-items:center;
 
-      #a90008
+      background:
 
-    );
+        radial-gradient(
 
-  box-shadow:
+          circle at 32% 25%,
 
-    0 8px 25px #e5091438;
+          #ff5960,
 
-  font-size:21px;
+          var(--red) 50%,
 
-  flex:none;
+          #a50009
 
-}
+        );
 
-.brand{
+      box-shadow:
 
-  font-size:19px;
+        0 5px 18px rgba(229,9,20,.32);
 
-  line-height:1;
+      font-size:19px;
 
-  font-weight:950;
+      flex:none;
 
-  letter-spacing:.5px;
+    }
 
-}
+    .brand-text{
 
-.subtitle{
+      min-width:0;
 
-  margin-top:5px;
+    }
 
-  font-size:10px;
+    .brand-name{
 
-  color:var(--muted);
+      font-weight:900;
 
-  letter-spacing:.7px;
+      letter-spacing:.7px;
 
-  font-weight:700;
+      font-size:15px;
 
-}
+      line-height:1.1;
 
-.balanceMini{
+    }
 
-  background:
+    .brand-sub{
 
-    linear-gradient(
+      color:var(--muted);
 
-      145deg,
+      font-size:10px;
 
-      #171e2a,
+      margin-top:3px;
 
-      #0e131c
+      white-space:nowrap;
 
-    );
+    }
 
-  border:1px solid var(--line);
+    .balance-pill{
 
-  border-radius:14px;
+      display:flex;
 
-  padding:8px 11px;
+      align-items:center;
 
-  text-align:right;
+      gap:6px;
 
-  min-width:112px;
+      border:1px solid var(--line);
 
-}
+      background:var(--surface);
 
-.balanceMini span{
+      border-radius:999px;
 
-  display:block;
+      padding:8px 11px;
 
-  color:var(--muted);
+      font-size:12px;
 
-  font-size:9px;
+      font-weight:800;
 
-  font-weight:700;
+      white-space:nowrap;
 
-}
+    }
 
-.balanceMini strong{
+    .balance-pill span{
 
-  display:block;
+      color:var(--gold);
 
-  margin-top:2px;
+    }
 
-  font-size:13px;
+    .hero{
 
-}
+      padding:18px 14px 8px;
 
-/* HERO */
+    }
 
-.hero{
+    .status-row{
 
-  position:relative;
+      display:flex;
 
-  overflow:hidden;
+      justify-content:space-between;
 
-  border-radius:25px;
+      align-items:center;
 
-  border:1px solid #293344;
+      gap:10px;
 
-  background:
+      margin-bottom:12px;
 
-    linear-gradient(
+    }
 
-      145deg,
+    .status-badge{
 
-      #171d28,
+      display:inline-flex;
 
-      #0d1118
+      align-items:center;
 
-    );
+      gap:7px;
 
-  box-shadow:
+      border-radius:999px;
 
-    0 18px 45px #00000070;
+      padding:7px 10px;
 
-  padding:17px;
+      background:rgba(38,208,124,.10);
 
-  margin-bottom:13px;
+      border:1px solid rgba(38,208,124,.25);
 
-}
+      color:var(--green);
 
-.heroGlow{
+      font-size:11px;
 
-  position:absolute;
+      font-weight:900;
 
-  width:190px;
+    }
 
-  height:190px;
+    .status-dot{
 
-  right:-75px;
+      width:7px;
 
-  top:-90px;
+      height:7px;
 
-  border-radius:50%;
+      border-radius:50%;
 
-  background:#e5091428;
+      background:currentColor;
 
-  filter:blur(4px);
+      box-shadow:0 0 10px currentColor;
 
-  pointer-events:none;
+    }
 
-}
+    .game-number{
 
-.heroTop{
+      color:var(--muted);
 
-  position:relative;
+      font-size:11px;
 
-  display:flex;
+      font-weight:700;
 
-  align-items:center;
+    }
 
-  justify-content:space-between;
+    .hero-card{
 
-  gap:12px;
+      position:relative;
 
-}
+      overflow:hidden;
 
-.statusBadge{
+      border:1px solid var(--line);
 
-  display:inline-flex;
+      border-radius:24px;
 
-  align-items:center;
+      background:
 
-  gap:7px;
+        linear-gradient(
 
-  padding:7px 10px;
+          145deg,
 
-  border-radius:999px;
+          rgba(255,255,255,.055),
 
-  background:#19221f;
+          rgba(255,255,255,.015)
 
-  color:var(--green);
+        ),
 
-  border:1px solid #29463a;
+        var(--surface);
 
-  font-size:10px;
+      box-shadow:var(--shadow);
 
-  font-weight:950;
+      padding:18px;
 
-  letter-spacing:.6px;
+    }
 
-}
+    .hero-card::before{
 
-.statusDot{
+      content:"";
 
-  width:7px;
+      position:absolute;
 
-  height:7px;
+      width:190px;
 
-  border-radius:50%;
+      height:190px;
 
-  background:currentColor;
+      border-radius:50%;
 
-  box-shadow:0 0 10px currentColor;
+      background:rgba(229,9,20,.08);
 
-}
+      filter:blur(4px);
 
-.statusBadge.live{
+      right:-90px;
 
-  background:#2a2020;
+      top:-90px;
 
-  color:#ff6d72;
+    }
 
-  border-color:#4d292d;
+    .hero-title{
 
-}
+      position:relative;
 
-.gameNumber{
+      text-align:center;
 
-  color:var(--muted);
+      font-size:13px;
 
-  font-size:10px;
+      font-weight:900;
 
-  font-weight:800;
+      color:#f1f3f6;
 
-}
+      margin-bottom:14px;
 
-.heroTitle{
+    }
 
-  position:relative;
+    .hero-message{
 
-  margin-top:13px;
+      position:relative;
 
-  font-size:25px;
+      text-align:center;
 
-  font-weight:950;
+      color:var(--muted);
 
-  letter-spacing:-.5px;
+      font-size:12px;
 
-}
+      line-height:1.6;
 
-.heroMessage{
+      min-height:20px;
 
-  position:relative;
+    }
 
-  margin-top:4px;
+    .countdown{
 
-  color:#9da7b7;
+      position:relative;
 
-  font-size:12px;
+      display:flex;
 
-  line-height:1.45;
+      align-items:center;
 
-}
+      justify-content:center;
 
-.countdown{
+      gap:7px;
 
-  position:relative;
+      margin:12px 0 14px;
 
-  display:flex;
+      color:var(--gold);
 
-  align-items:center;
+      font-size:15px;
 
-  justify-content:center;
+      font-weight:950;
 
-  margin:16px 0 4px;
+    }
 
-}
+    .countdown strong{
 
-.countNumber{
+      font-size:22px;
 
-  font-size:48px;
+    }
 
-  line-height:1;
+    .ball-area{
 
-  font-weight:950;
+      position:relative;
 
-  letter-spacing:-2px;
+      display:flex;
 
-}
+      justify-content:center;
 
-.countLabel{
+      align-items:center;
 
-  margin-left:8px;
+      padding:8px 0 13px;
 
-  color:var(--muted);
+    }
 
-  font-size:11px;
+    .current-ball{
 
-  font-weight:850;
+      width:146px;
 
-  text-transform:uppercase;
+      height:146px;
 
-}
+      border-radius:50%;
 
-/* CURRENT BALL */
+      display:flex;
 
-.ballStage{
+      flex-direction:column;
 
-  position:relative;
+      align-items:center;
 
-  margin-top:16px;
+      justify-content:center;
 
-  padding:16px;
+      background:
 
-  border-radius:20px;
+        radial-gradient(
 
-  background:
+          circle at 32% 22%,
 
-    linear-gradient(
+          #ffffff,
 
-      180deg,
+          #f0f1f4 16%,
 
-      #0a0e15,
+          #d7d9de 44%,
 
-      #080b11
+          #9da1a8 100%
 
-    );
+        );
 
-  border:1px solid #222b3a;
+      color:#090b10;
 
-  text-align:center;
+      border:8px solid #272c34;
 
-}
+      box-shadow:
 
-.ballCaption{
+        0 0 0 5px rgba(229,9,20,.13),
 
-  color:#707b8d;
+        0 20px 45px rgba(0,0,0,.45);
 
-  font-size:9px;
+    }
 
-  font-weight:900;
+    .current-ball-letter{
 
-  letter-spacing:1.2px;
+      font-size:19px;
 
-  margin-bottom:10px;
+      font-weight:1000;
 
-}
+      color:var(--red);
 
-.ballCircle{
+      line-height:1;
 
-  width:92px;
+    }
 
-  height:92px;
+    .current-ball-number{
 
-  margin:0 auto;
+      font-size:52px;
 
-  border-radius:50%;
+      line-height:1;
 
-  display:flex;
+      font-weight:1000;
 
-  align-items:center;
+      letter-spacing:-2px;
 
-  justify-content:center;
+      margin-top:4px;
 
-  background:
+    }
 
-    radial-gradient(
+    .ball-caption{
 
-      circle at 34% 25%,
+      margin-top:6px;
 
-      #ff5b61,
+      color:#626a77;
 
-      #e50914 47%,
+      font-size:9px;
 
-      #990006 100%
+      font-weight:900;
 
-    );
+      letter-spacing:.8px;
 
-  border:5px solid #ffffff;
+    }
 
-  box-shadow:
+    .recent-row{
 
-    0 0 0 6px #e5091422,
+      position:relative;
 
-    0 14px 35px #000000aa;
+      display:flex;
 
-  font-size:31px;
+      align-items:center;
 
-  font-weight:950;
+      gap:7px;
 
-}
+      overflow-x:auto;
 
-.ballCircle.empty{
+      padding:7px 2px 2px;
 
-  background:
+      scrollbar-width:none;
 
-    radial-gradient(
+    }
 
-      circle at 35% 25%,
+    .recent-row::-webkit-scrollbar{
 
-      #354052,
+      display:none;
 
-      #1c2533 55%,
+    }
 
-      #10151e
+    .mini-ball{
 
-    );
+      width:31px;
 
-  color:#697486;
+      height:31px;
 
-  border-color:#465163;
+      flex:none;
 
-  box-shadow:none;
+      display:grid;
 
-}
+      place-items:center;
 
-.ballInfo{
+      border-radius:50%;
 
-  margin-top:9px;
+      background:var(--surface3);
 
-  color:#c2cad6;
+      border:1px solid var(--line);
 
-  font-size:11px;
+      color:#fff;
 
-  font-weight:900;
+      font-size:10px;
 
-}
+      font-weight:900;
 
-/* TICKER */
+    }
 
-.ballTicker{
+    .mini-ball.latest{
 
-  display:flex;
+      background:var(--red);
 
-  align-items:center;
+      border-color:var(--red);
 
-  gap:8px;
+    }
 
-  overflow:hidden;
+    .stats{
 
-  margin-top:12px;
+      display:grid;
 
-}
+      grid-template-columns:repeat(3,1fr);
 
-.tickerLabel{
+      gap:8px;
 
-  flex:none;
+      padding:8px 14px 14px;
 
-  color:#6f798b;
+    }
 
-  font-size:9px;
+    .stat{
 
-  font-weight:900;
+      background:var(--surface);
 
-  letter-spacing:.8px;
+      border:1px solid var(--line);
 
-}
+      border-radius:15px;
 
-.tickerBalls{
+      padding:11px 8px;
 
-  display:flex;
+      text-align:center;
 
-  gap:5px;
+    }
 
-  overflow:hidden;
+    .stat-value{
 
-}
+      font-size:17px;
 
-.tickerBall{
+      font-weight:950;
 
-  flex:none;
+      line-height:1;
 
-  min-width:29px;
+    }
 
-  height:29px;
+    .stat-label{
 
-  padding:0 7px;
+      color:var(--muted);
 
-  display:flex;
+      font-size:9px;
 
-  align-items:center;
+      margin-top:5px;
 
-  justify-content:center;
+      font-weight:700;
 
-  border-radius:50%;
+    }
 
-  background:#1a2230;
+    .tabs{
 
-  border:1px solid #2b3749;
+      display:grid;
 
-  font-size:9px;
+      grid-template-columns:repeat(3,1fr);
 
-  font-weight:900;
+      gap:6px;
 
-}
+      margin:0 14px 14px;
 
-.tickerBall.latest{
+      padding:5px;
 
-  background:var(--red);
+      background:var(--surface);
 
-  border-color:#ff5459;
+      border:1px solid var(--line);
 
-}
+      border-radius:16px;
 
-/* QUICK STATS */
+    }
 
-.quickStats{
+    .tab{
 
-  display:grid;
+      border:0;
 
-  grid-template-columns:
+      background:transparent;
 
-    repeat(3,1fr);
+      color:var(--muted);
 
-  gap:7px;
+      padding:10px 7px;
 
-  margin-bottom:13px;
+      border-radius:11px;
 
-}
+      font-size:11px;
 
-.statBox{
+      font-weight:900;
 
-  background:#10151e;
+    }
 
-  border:1px solid #222c3b;
+    .tab.active{
 
-  border-radius:15px;
+      color:#fff;
 
-  padding:11px;
+      background:var(--surface3);
 
-  text-align:center;
+      box-shadow:0 2px 8px rgba(0,0,0,.2);
 
-}
+    }
 
-.statBox strong{
+    .section{
 
-  display:block;
+      display:none;
 
-  font-size:16px;
+      padding:0 14px;
 
-  font-weight:950;
+    }
 
-}
+    .section.active{
 
-.statBox span{
+      display:block;
 
-  display:block;
+    }
 
-  margin-top:3px;
+    .panel{
 
-  color:var(--muted);
+      background:var(--surface);
 
-  font-size:8px;
+      border:1px solid var(--line);
 
-  font-weight:800;
+      border-radius:19px;
 
-}
+      padding:15px;
 
-/* NAV */
+      margin-bottom:12px;
 
-.nav{
+    }
 
-  position:sticky;
+    .panel-title{
 
-  top:7px;
+      font-size:13px;
 
-  z-index:20;
+      font-weight:950;
 
-  display:grid;
+      margin-bottom:4px;
 
-  grid-template-columns:
+    }
 
-    repeat(3,1fr);
+    .panel-sub{
 
-  gap:6px;
+      color:var(--muted);
 
-  padding:6px;
+      font-size:10px;
 
-  margin-bottom:13px;
+      line-height:1.6;
 
-  background:#0d121aee;
+      margin-bottom:13px;
 
-  border:1px solid #252f3f;
+    }
 
-  border-radius:17px;
+    .info-grid{
 
-  backdrop-filter:blur(18px);
+      display:grid;
 
-}
+      grid-template-columns:repeat(2,1fr);
 
-.navBtn{
+      gap:8px;
 
-  border:0;
+    }
 
-  border-radius:12px;
+    .info-box{
 
-  padding:10px 5px;
+      background:var(--surface2);
 
-  color:#8d98a9;
+      border:1px solid var(--line);
 
-  background:transparent;
+      border-radius:13px;
 
-  font-size:10px;
+      padding:12px;
 
-  font-weight:900;
+    }
 
-}
+    .info-box-title{
 
-.navBtn.active{
+      font-size:11px;
 
-  color:#fff;
+      font-weight:900;
 
-  background:var(--red);
+    }
 
-  box-shadow:0 5px 16px #e5091435;
+    .info-box-text{
 
-}
+      color:var(--muted);
 
-/* PANELS */
+      font-size:9px;
 
-.panel{
+      margin-top:4px;
 
-  background:
+      line-height:1.5;
 
-    linear-gradient(
+    }
 
-      145deg,
+    .my-cards{
 
-      #111720,
+      display:grid;
 
-      #0c1118
+      gap:10px;
 
-    );
+    }
 
-  border:1px solid #222c3b;
+    .bingo-card{
 
-  border-radius:20px;
+      background:var(--surface2);
 
-  padding:14px;
+      border:1px solid var(--line);
 
-  margin-bottom:12px;
+      border-radius:16px;
 
-}
+      padding:11px;
 
-.panelHeader{
+    }
 
-  display:flex;
+    .bingo-card-head{
 
-  align-items:center;
+      display:flex;
 
-  justify-content:space-between;
+      justify-content:space-between;
 
-  gap:10px;
+      align-items:center;
 
-  margin-bottom:12px;
+      margin-bottom:8px;
 
-}
+    }
 
-.panelTitle{
+    .card-number-label{
 
-  font-size:15px;
+      font-size:11px;
 
-  font-weight:950;
+      font-weight:950;
 
-}
+    }
 
-.panelHint{
+    .card-state{
 
-  color:#687386;
+      color:var(--green);
 
-  font-size:9px;
+      font-size:9px;
 
-  font-weight:800;
+      font-weight:900;
 
-}
+    }
 
-/* CARD SELECTION */
+    .bingo-grid{
 
-.selectionTop{
+      display:grid;
 
-  display:flex;
+      grid-template-columns:repeat(5,1fr);
 
-  align-items:center;
+      gap:4px;
 
-  justify-content:space-between;
+    }
 
-  gap:8px;
+    .bingo-cell{
 
-  margin-bottom:10px;
+      min-height:36px;
 
-}
+      display:grid;
 
-.selectionCount{
+      place-items:center;
 
-  color:#aab4c3;
+      background:#0e131b;
 
-  font-size:11px;
+      border:1px solid #242d3b;
 
-  font-weight:800;
+      border-radius:6px;
 
-}
+      color:#f7f8fa;
 
-.selectionCount strong{
+      font-size:11px;
 
-  color:#fff;
+      font-weight:850;
 
-}
+    }
 
-.selectedPills{
+    .bingo-cell.called{
 
-  display:flex;
+      background:rgba(229,9,20,.9);
 
-  gap:5px;
+      border-color:var(--red);
 
-  flex-wrap:wrap;
+      color:#fff;
 
-  margin-bottom:11px;
+    }
 
-}
+    .bingo-cell.free{
 
-.pill{
+      background:rgba(255,200,87,.13);
 
-  display:inline-flex;
+      border-color:rgba(255,200,87,.35);
 
-  align-items:center;
+      color:var(--gold);
 
-  padding:6px 9px;
+      font-size:8px;
 
-  border-radius:999px;
+    }
 
-  background:#242d3b;
+    .primary-btn{
 
-  border:1px solid #344155;
+      width:100%;
 
-  color:#e7ebf2;
+      border:0;
 
-  font-size:9px;
+      border-radius:13px;
 
-  font-weight:900;
+      padding:13px 15px;
 
-}
+      background:linear-gradient(
 
-.cardGrid{
+        135deg,
 
-  display:grid;
+        var(--red),
 
-  grid-template-columns:
+        var(--red2)
 
-    repeat(10,1fr);
+      );
 
-  gap:5px;
+      color:#fff;
 
-}
+      font-weight:950;
 
-.cardBtn{
+      font-size:12px;
 
-  min-width:0;
+      box-shadow:0 8px 20px rgba(229,9,20,.2);
 
-  border:1px solid #293445;
+    }
 
-  border-radius:8px;
+    .secondary-btn{
 
-  background:#141b26;
+      width:100%;
 
-  color:#b9c2d0;
+      border:1px solid var(--line);
 
-  padding:8px 2px;
+      border-radius:13px;
 
-  font-size:9px;
+      padding:12px 15px;
 
-  font-weight:950;
+      background:var(--surface2);
 
-}
+      color:#fff;
 
-.cardBtn:active{
+      font-weight:900;
 
-  transform:scale(.95);
+      font-size:11px;
 
-}
+    }
 
-.cardBtn.selected{
+    .btn-row{
 
-  background:
+      display:grid;
 
-    linear-gradient(
+      grid-template-columns:1fr 1fr;
 
-      145deg,
+      gap:8px;
 
-      #f0141e,
+    }
 
-      #b9060d
+    .called-grid{
 
-    );
+      display:grid;
 
-  border-color:#ff555b;
+      grid-template-columns:repeat(10,1fr);
 
-  color:#fff;
+      gap:5px;
 
-  box-shadow:0 4px 12px #e5091435;
+    }
 
-}
+    .called-number{
 
-/* ACTION BUTTON */
+      aspect-ratio:1;
 
-.primaryBtn{
+      display:grid;
 
-  width:100%;
+      place-items:center;
 
-  border:0;
+      border-radius:7px;
 
-  border-radius:14px;
+      background:var(--surface2);
 
-  padding:13px 14px;
+      border:1px solid var(--line);
 
-  margin-top:11px;
+      color:var(--muted);
 
-  background:
+      font-size:9px;
 
-    linear-gradient(
+      font-weight:850;
 
-      145deg,
+    }
 
-      #f20d18,
+    .called-number.active{
 
-      #bf050d
+      background:var(--red);
 
-    );
+      border-color:var(--red);
 
-  color:#fff;
+      color:#fff;
 
-  font-size:12px;
+    }
 
-  font-weight:950;
+    .letter-heading{
 
-  box-shadow:
+      display:grid;
 
-    0 8px 20px #e5091435;
+      grid-template-columns:repeat(5,1fr);
 
-}
+      gap:5px;
 
-.primaryBtn:active{
+      margin-bottom:5px;
 
-  transform:scale(.985);
+    }
 
-}
+    .letter-heading div{
 
-.secondaryBtn{
+      text-align:center;
 
-  width:100%;
+      color:var(--red);
 
-  border:1px solid #2c384a;
+      font-size:10px;
 
-  border-radius:14px;
+      font-weight:1000;
 
-  padding:12px 14px;
+    }
 
-  margin-top:9px;
+    .selected-list{
 
-  background:#171f2b;
+      display:flex;
 
-  color:#e1e6ed;
+      flex-wrap:wrap;
 
-  font-size:11px;
+      gap:6px;
 
-  font-weight:900;
+      margin-bottom:12px;
 
-}
+    }
 
-/* BINGO CARD */
+    .selected-pill{
 
-.myCards{
+      border:1px solid rgba(38,208,124,.28);
 
-  display:flex;
+      background:rgba(38,208,124,.09);
 
-  flex-direction:column;
+      color:var(--green);
 
-  gap:10px;
+      border-radius:999px;
 
-}
+      padding:6px 9px;
 
-.bingoCard{
+      font-size:10px;
 
-  background:#0b1017;
+      font-weight:900;
 
-  border:1px solid #2a3546;
+    }
 
-  border-radius:17px;
+    .card-grid{
 
-  padding:10px;
+      display:grid;
 
-}
+      grid-template-columns:repeat(10,minmax(0,1fr));
 
-.cardHeader{
+      gap:4px;
 
-  display:flex;
+    }
 
-  align-items:center;
+    .card-select{
 
-  justify-content:space-between;
+      min-width:0;
 
-  margin-bottom:7px;
+      aspect-ratio:1;
 
-}
+      border:1px solid var(--line);
 
-.cardName{
+      background:#0d1219;
 
-  font-size:11px;
+      color:#dfe3e9;
 
-  font-weight:950;
+      border-radius:6px;
 
-}
+      font-size:8px;
 
-.cardState{
+      font-weight:950;
 
-  color:#6f7b8d;
+      padding:0;
 
-  font-size:8px;
+    }
 
-  font-weight:900;
+    .card-select.selected{
 
-}
+      background:var(--red);
 
-.bingoHead,
+      color:#fff;
 
-.bingoGrid{
+      border-color:var(--red);
 
-  display:grid;
+      box-shadow:0 0 0 1px rgba(255,255,255,.08);
 
-  grid-template-columns:
+    }
 
-    repeat(5,1fr);
+    .card-select:disabled{
 
-  gap:4px;
+      opacity:.35;
 
-}
+    }
 
-.bingoHead div{
+    .wallet-balance{
 
-  text-align:center;
+      display:flex;
 
-  color:var(--red2);
+      align-items:center;
 
-  font-size:11px;
+      justify-content:space-between;
 
-  font-weight:950;
+      background:var(--surface2);
 
-  padding:3px 0;
+      border:1px solid var(--line);
 
-}
+      border-radius:15px;
 
-.bingoCell{
+      padding:14px;
 
-  aspect-ratio:1;
+      margin-bottom:12px;
 
-  display:flex;
+    }
 
-  align-items:center;
+    .wallet-label{
 
-  justify-content:center;
+      color:var(--muted);
 
-  border-radius:7px;
+      font-size:10px;
 
-  background:#192231;
+    }
 
-  border:1px solid #263244;
+    .wallet-value{
 
-  color:#dce2ea;
+      font-size:22px;
 
-  font-size:12px;
+      font-weight:1000;
 
-  font-weight:950;
+      color:var(--gold);
 
-}
+      margin-top:2px;
 
-.bingoCell.marked{
+    }
 
-  background:
+    .type-toggle{
 
-    linear-gradient(
+      display:grid;
 
-      145deg,
+      grid-template-columns:1fr 1fr;
 
-      #ef111b,
+      gap:5px;
 
-      #b5060d
+      padding:4px;
 
-    );
+      background:var(--surface2);
 
-  border-color:#ff555a;
+      border:1px solid var(--line);
 
-  color:#fff;
+      border-radius:12px;
 
-  box-shadow:
+      margin-bottom:10px;
 
-    inset 0 0 0 1px #ffffff12;
+    }
 
-}
+    .type-btn{
 
-.bingoCell.free{
+      border:0;
 
-  background:#2a303c;
+      border-radius:9px;
 
-  color:#ffc857;
+      padding:10px;
 
-  border-color:#4b4431;
+      background:transparent;
 
-  font-size:8px;
+      color:var(--muted);
 
-}
+      font-size:10px;
 
-/* CALLED BALLS */
+      font-weight:900;
 
-.calledGrid{
+    }
 
-  display:grid;
+    .type-btn.active{
 
-  grid-template-columns:
+      background:var(--surface3);
 
-    repeat(10,1fr);
+      color:#fff;
 
-  gap:6px;
+    }
 
-  max-height:235px;
+    .field{
 
-  overflow:auto;
+      margin-bottom:9px;
 
-  padding-right:2px;
+    }
 
-}
+    .field label{
 
-.calledItem{
+      display:block;
 
-  height:32px;
+      color:var(--muted);
 
-  display:flex;
+      font-size:9px;
 
-  align-items:center;
+      font-weight:800;
 
-  justify-content:center;
+      margin:0 0 5px 3px;
 
-  border-radius:50%;
+    }
 
-  background:#171f2b;
+    .field input,
 
-  border:1px solid #2a3749;
+    .field select{
 
-  color:#bac4d2;
+      width:100%;
 
-  font-size:9px;
+      border:1px solid var(--line);
 
-  font-weight:950;
+      border-radius:11px;
 
-}
+      background:#0c1118;
 
-.calledItem.latest{
+      color:#fff;
 
-  background:var(--red);
+      padding:11px;
 
-  border-color:#ff5b60;
+      outline:none;
 
-  color:#fff;
+      font-size:12px;
 
-}
+    }
 
-/* WINNER */
+    .language-buttons{
 
-.claimBox{
+      display:grid;
 
-  text-align:center;
+      grid-template-columns:1fr 1fr;
 
-  padding:14px;
+      gap:7px;
 
-  border-radius:16px;
+    }
 
-  background:#101720;
+    .language-btn{
 
-  border:1px solid #263345;
+      border:1px solid var(--line);
 
-}
+      background:var(--surface2);
 
-.claimIcon{
+      color:var(--muted);
 
-  font-size:32px;
+      border-radius:11px;
 
-  margin-bottom:5px;
+      padding:10px;
 
-}
+      font-size:11px;
 
-.claimTitle{
+      font-weight:900;
 
-  font-size:16px;
+    }
 
-  font-weight:950;
+    .language-btn.active{
 
-}
+      border-color:var(--red);
 
-.claimText{
+      color:#fff;
 
-  margin-top:4px;
+      background:rgba(229,9,20,.12);
 
-  color:#8995a7;
+    }
 
-  font-size:10px;
+    .note{
 
-  line-height:1.4;
+      margin-top:10px;
 
-}
+      color:#727b89;
 
-/* WALLET */
+      font-size:9px;
 
-.walletBalance{
+      line-height:1.6;
 
-  text-align:center;
+      text-align:center;
 
-  padding:19px;
+    }
 
-  border-radius:18px;
+    .bottom-nav{
 
-  background:
+      position:fixed;
 
-    radial-gradient(
+      z-index:50;
 
-      circle at 50% 0,
+      left:50%;
 
-      #273246,
+      bottom:0;
 
-      #121821 62%
+      transform:translateX(-50%);
 
-    );
+      width:min(760px,100%);
 
-  border:1px solid #2b3748;
+      padding:
 
-}
+        8px
 
-.walletLabel{
+        12px
 
-  color:#7e899a;
+        calc(8px + env(safe-area-inset-bottom));
 
-  font-size:9px;
+      background:rgba(7,9,13,.94);
 
-  font-weight:900;
+      backdrop-filter:blur(18px);
 
-  letter-spacing:.8px;
+      border-top:1px solid rgba(255,255,255,.07);
 
-}
+    }
 
-.walletAmount{
+    .bottom-inner{
 
-  margin-top:5px;
+      display:grid;
 
-  font-size:30px;
+      grid-template-columns:repeat(3,1fr);
 
-  font-weight:950;
+      gap:6px;
 
-}
+      max-width:500px;
 
-.walletCurrency{
+      margin:0 auto;
 
-  color:#8e99a9;
+    }
 
-  font-size:10px;
+    .bottom-btn{
 
-  font-weight:800;
+      border:0;
 
-}
+      background:transparent;
 
-.walletActions{
+      color:var(--muted);
 
-  display:grid;
+      padding:7px 4px;
 
-  grid-template-columns:
+      border-radius:11px;
 
-    repeat(2,1fr);
+      font-size:9px;
 
-  gap:7px;
+      font-weight:900;
 
-  margin-top:12px;
+    }
 
-}
+    .bottom-btn.active{
 
-.walletAction{
+      color:#fff;
 
-  border:1px solid #2b384b;
+      background:var(--surface2);
 
-  border-radius:13px;
+    }
 
-  padding:12px 7px;
+    .toast{
 
-  background:#171f2b;
+      position:fixed;
 
-  color:#e8ecf2;
+      z-index:100;
 
-  font-size:10px;
+      left:50%;
 
-  font-weight:900;
+      bottom:92px;
 
-}
+      transform:translate(-50%,20px);
 
-.walletAction.active{
+      width:min(92%,420px);
 
-  background:#e50914;
+      background:#f5f6f8;
 
-  border-color:#ff4b51;
+      color:#090b10;
 
-  color:#fff;
+      border-radius:13px;
 
-}
+      padding:12px 14px;
 
-.field{
+      font-size:11px;
 
-  width:100%;
+      font-weight:850;
 
-  margin-top:8px;
+      text-align:center;
 
-  padding:12px;
+      opacity:0;
 
-  border-radius:12px;
+      pointer-events:none;
 
-  border:1px solid #2a3749;
+      transition:.22s ease;
 
-  background:#0b1017;
+      box-shadow:0 12px 30px rgba(0,0,0,.35);
 
-  color:#fff;
+    }
 
-  outline:none;
+    .toast.show{
 
-  font-size:12px;
+      opacity:1;
 
-}
+      transform:translate(-50%,0);
 
-.field:focus{
+    }
 
-  border-color:#d92a31;
+    .empty{
 
-}
+      padding:25px 10px;
 
-.notice{
+      text-align:center;
 
-  margin-top:8px;
+      color:var(--muted);
 
-  color:#6f7b8d;
+      font-size:11px;
 
-  font-size:9px;
+    }
 
-  line-height:1.5;
+    @media(max-width:480px){
 
-}
+      .current-ball{
 
-/* LANGUAGE */
+        width:128px;
 
-.languageGrid{
+        height:128px;
 
-  display:grid;
+      }
 
-  grid-template-columns:
+      .current-ball-number{
 
-    repeat(2,1fr);
+        font-size:46px;
 
-  gap:7px;
+      }
 
-}
+      .card-grid{
 
-.languageBtn{
+        gap:3px;
 
-  border:1px solid #2b3749;
+      }
 
-  border-radius:12px;
+      .card-select{
 
-  padding:11px;
+        border-radius:5px;
 
-  background:#171f2b;
+        font-size:7px;
 
-  color:#aeb8c7;
+      }
 
-  font-size:10px;
+      .called-grid{
 
-  font-weight:900;
+        gap:4px;
 
-}
+      }
 
-.languageBtn.active{
+      .called-number{
 
-  background:#e50914;
+        font-size:8px;
 
-  color:#fff;
+      }
 
-  border-color:#ff4c52;
+    }
 
-}
+    @media(max-width:360px){
 
-/* HOME INFO */
+      .card-grid{
 
-.infoGrid{
+        gap:2px;
 
-  display:grid;
+      }
 
-  grid-template-columns:
+      .card-select{
 
-    repeat(2,1fr);
+        font-size:6px;
 
-  gap:7px;
+      }
 
-}
+      .brand-sub{
 
-.infoCard{
+        display:none;
 
-  background:#151c27;
+      }
 
-  border:1px solid #263244;
+      .balance-pill{
 
-  border-radius:14px;
+        padding:7px 9px;
 
-  padding:11px;
+        font-size:10px;
 
-}
+      }
 
-.infoCard strong{
+    }
 
-  display:block;
-
-  font-size:11px;
-
-}
-
-.infoCard span{
-
-  display:block;
-
-  margin-top:4px;
-
-  color:#768294;
-
-  font-size:8px;
-
-  line-height:1.35;
-
-}
-
-/* EMPTY */
-
-.empty{
-
-  padding:24px 10px;
-
-  text-align:center;
-
-  color:#697587;
-
-  font-size:10px;
-
-  font-weight:800;
-
-}
-
-/* BOTTOM BAR */
-
-.bottomBar{
-
-  position:fixed;
-
-  left:50%;
-
-  bottom:8px;
-
-  transform:translateX(-50%);
-
-  width:
-
-    min(
-
-      calc(100% - 20px),
-
-      620px
-
-    );
-
-  z-index:30;
-
-  display:flex;
-
-  align-items:center;
-
-  justify-content:space-around;
-
-  gap:4px;
-
-  padding:6px;
-
-  background:#0d121bee;
-
-  border:1px solid #283344;
-
-  border-radius:18px;
-
-  backdrop-filter:blur(20px);
-
-  box-shadow:
-
-    0 10px 35px #00000080;
-
-}
-
-.bottomBtn{
-
-  flex:1;
-
-  border:0;
-
-  border-radius:12px;
-
-  padding:9px 4px;
-
-  background:transparent;
-
-  color:#727d8e;
-
-  font-size:9px;
-
-  font-weight:900;
-
-}
-
-.bottomBtn.active{
-
-  background:#1d2532;
-
-  color:#fff;
-
-}
-
-.bottomIcon{
-
-  display:block;
-
-  font-size:15px;
-
-  margin-bottom:2px;
-
-}
-
-/* TOAST */
-
-.toast{
-
-  position:fixed;
-
-  left:50%;
-
-  bottom:78px;
-
-  transform:
-
-    translate(-50%,15px);
-
-  z-index:100;
-
-  opacity:0;
-
-  pointer-events:none;
-
-  background:#202a38;
-
-  border:1px solid #354257;
-
-  color:#fff;
-
-  border-radius:12px;
-
-  padding:10px 14px;
-
-  font-size:10px;
-
-  font-weight:850;
-
-  transition:
-
-    opacity .2s ease,
-
-    transform .2s ease;
-
-  max-width:
-
-    calc(100% - 40px);
-
-  text-align:center;
-
-}
-
-.toast.show{
-
-  opacity:1;
-
-  transform:
-
-    translate(-50%,0);
-
-}
-
-/* RESPONSIVE */
-
-@media(max-width:600px){
-
-  .app{
-
-    padding-left:10px;
-
-    padding-right:10px;
-
-  }
-
-  .cardGrid{
-
-    grid-template-columns:
-
-      repeat(8,1fr);
-
-  }
-
-  .calledGrid{
-
-    grid-template-columns:
-
-      repeat(8,1fr);
-
-  }
-
-}
-
-@media(max-width:380px){
-
-  .logo{
-
-    width:40px;
-
-    height:40px;
-
-  }
-
-  .brand{
-
-    font-size:17px;
-
-  }
-
-  .balanceMini{
-
-    min-width:100px;
-
-  }
-
-  .cardGrid{
-
-    grid-template-columns:
-
-      repeat(7,1fr);
-
-  }
-
-  .calledGrid{
-
-    grid-template-columns:
-
-      repeat(7,1fr);
-
-  }
-
-}
-
-</style>
+  </style>
 
 </head>
 
 <body>
 
-<div class="app">
+  <div class="app">
 
-  <div class="topbar">
+    <header class="topbar">
 
-    <div class="brandWrap">
+      <div class="brand">
 
-      <div class="logo">🎱</div>
+        <div class="brand-ball">🎱</div>
 
-      <div>
+        <div class="brand-text">
 
-        <div class="brand">
+          <div class="brand-name">
 
-          FAST BINGO
+            FAST BINGO
 
-        </div>
+          </div>
 
-        <div class="subtitle">
+          <div class="brand-sub" id="brandSub">
 
-          75 BALL • LIVE BINGO
+            75 BALL • LIVE BINGO
+
+          </div>
 
         </div>
 
       </div>
 
-    </div>
+      <div class="balance-pill">
 
-    <div class="balanceMini">
+        💵
 
-      <span id="balanceLabel">
+        <span id="topBalance">
 
-        Play Balance
-
-      </span>
-
-      <strong id="balance">
-
-        2,500.00 ETB
-
-      </strong>
-
-    </div>
-
-  </div>
-
-  <div class="hero">
-
-    <div class="heroGlow"></div>
-
-    <div class="heroTop">
-
-      <div
-
-        id="statusBadge"
-
-        class="statusBadge"
-
-      >
-
-        <span class="statusDot"></span>
-
-        <span id="status">
-
-          LOBBY
+          2,500
 
         </span>
 
       </div>
 
-      <div
+    </header>
 
-        id="gameNumber"
+    <main>
 
-        class="gameNumber"
+      <section class="hero">
+
+        <div class="status-row">
+
+          <div
+
+            class="status-badge"
+
+            id="statusBadge"
+
+          >
+
+            <span class="status-dot"></span>
+
+            <span id="statusText">
+
+              ሎቢ
+
+            </span>
+
+          </div>
+
+          <div
+
+            class="game-number"
+
+            id="gameNumber"
+
+          >
+
+            Game #1
+
+          </div>
+
+        </div>
+
+        <div class="hero-card">
+
+          <div
+
+            class="hero-title"
+
+            id="heroTitle"
+
+          >
+
+            ለሚቀጥለው ጨዋታ ይዘጋጁ
+
+          </div>
+
+          <div
+
+            class="hero-message"
+
+            id="heroMessage"
+
+          >
+
+            ካርድዎን ይምረጡ። ጨዋታው በቅርቡ ይጀምራል።
+
+          </div>
+
+          <div
+
+            class="countdown"
+
+            id="countdown"
+
+          >
+
+            <span>⏱</span>
+
+            <strong id="countdownValue">
+
+              45
+
+            </strong>
+
+            <span id="countdownLabel">
+
+              ሰከንድ
+
+            </span>
+
+          </div>
+
+          <div class="ball-area">
+
+            <div class="current-ball">
+
+              <div
+
+                class="current-ball-letter"
+
+                id="currentBallLetter"
+
+              >
+
+                B
+
+              </div>
+
+              <div
+
+                class="current-ball-number"
+
+                id="currentBallNumber"
+
+              >
+
+                —
+
+              </div>
+
+              <div
+
+                class="ball-caption"
+
+                id="ballCaption"
+
+              >
+
+                CURRENT BALL
+
+              </div>
+
+            </div>
+
+          </div>
+
+          <div
+
+            class="recent-row"
+
+            id="recentBalls"
+
+          ></div>
+
+        </div>
+
+      </section>
+
+      <section class="stats">
+
+        <div class="stat">
+
+          <div
+
+            class="stat-value"
+
+            id="calledCount"
+
+          >
+
+            0
+
+          </div>
+
+          <div
+
+            class="stat-label"
+
+            id="calledLabel"
+
+          >
+
+            የተጠሩ
+
+          </div>
+
+        </div>
+
+        <div class="stat">
+
+          <div class="stat-value">
+
+            400
+
+          </div>
+
+          <div
+
+            class="stat-label"
+
+            id="cardsLabel"
+
+          >
+
+            ካርዶች
+
+          </div>
+
+        </div>
+
+        <div class="stat">
+
+          <div class="stat-value">
+
+            4
+
+          </div>
+
+          <div
+
+            class="stat-label"
+
+            id="maxLabel"
+
+          >
+
+            ከፍተኛ
+
+          </div>
+
+        </div>
+
+      </section>
+
+      <nav class="tabs">
+
+        <button
+
+          class="tab active"
+
+          id="tabPlay"
+
+          onclick="showSection('play')"
+
+        >
+
+          መጫወት
+
+        </button>
+
+        <button
+
+          class="tab"
+
+          id="tabCards"
+
+          onclick="showSection('cards')"
+
+        >
+
+          ካርዶች
+
+        </button>
+
+        <button
+
+          class="tab"
+
+          id="tabBalance"
+
+          onclick="showSection('balance')"
+
+        >
+
+          ሂሳብ
+
+        </button>
+
+      </nav>
+
+      <!-- PLAY -->
+
+      <section
+
+        class="section active"
+
+        id="sectionPlay"
 
       >
 
-        GAME #1
+        <div class="panel">
 
-      </div>
+          <div
 
-    </div>
+            class="panel-title"
 
-    <div
+            id="yourGameTitle"
 
-      id="heroTitle"
+          >
 
-      class="heroTitle"
+            የእርስዎ ጨዋታ
 
-    >
+          </div>
 
-      Next game starts soon
+          <div
 
-    </div>
+            class="panel-sub"
 
-    <div
+            id="yourGameSub"
 
-      id="message"
+          >
 
-      class="heroMessage"
+            እስከ 4 ካርድ መምረጥ ይችላሉ።
 
-    >
+          </div>
 
-      Choose up to 4 cards before the game starts.
+          <div class="info-grid">
 
-    </div>
+            <div class="info-box">
 
-    <div class="countdown">
+              <div
 
-      <div
+                class="info-box-title"
 
-        id="timer"
+                id="rule75Title"
 
-        class="countNumber"
+              >
+
+                75 ኳስ
+
+              </div>
+
+              <div
+
+                class="info-box-text"
+
+                id="rule75Text"
+
+              >
+
+                B 1–15 • I 16–30 • N 31–45 • G 46–60 • O 61–75
+
+              </div>
+
+            </div>
+
+            <div class="info-box">
+
+              <div
+
+                class="info-box-title"
+
+                id="ruleLinesTitle"
+
+              >
+
+                2 መስመር
+
+              </div>
+
+              <div
+
+                class="info-box-text"
+
+                id="ruleLinesText"
+
+              >
+
+                ሁለት ሙሉ መስመሮች ሲሞሉ Bingo ነው።
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        <div class="panel">
+
+          <div
+
+            class="panel-title"
+
+            id="myCardsTitle"
+
+          >
+
+            የእኔ ካርዶች
+
+          </div>
+
+          <div
+
+            class="panel-sub"
+
+            id="myCardsSub"
+
+          >
+
+            በዚህ ጨዋታ የመረጡት ካርዶች።
+
+          </div>
+
+          <div
+
+            class="my-cards"
+
+            id="myCards"
+
+          >
+
+            <div class="empty">
+
+              ካርድ አልመረጡም።
+
+            </div>
+
+          </div>
+
+          <div style="height:10px"></div>
+
+          <div class="btn-row">
+
+            <button
+
+              class="secondary-btn"
+
+              onclick="showSection('cards')"
+
+              id="chooseCardsBtn"
+
+            >
+
+              ካርድ ምረጥ
+
+            </button>
+
+            <button
+
+              class="primary-btn"
+
+              onclick="claim()"
+
+              id="checkBingoBtn"
+
+            >
+
+              CHECK BINGO
+
+            </button>
+
+          </div>
+
+        </div>
+
+        <div class="panel">
+
+          <div
+
+            class="panel-title"
+
+            id="calledTitle"
+
+          >
+
+            የተጠሩ ኳሶች
+
+          </div>
+
+          <div
+
+            class="panel-sub"
+
+            id="calledSub"
+
+          >
+
+            በዚህ ጨዋታ እስካሁን የተጠሩ ቁጥሮች።
+
+          </div>
+
+          <div class="letter-heading">
+
+            <div>B</div>
+
+            <div>I</div>
+
+            <div>N</div>
+
+            <div>G</div>
+
+            <div>O</div>
+
+          </div>
+
+          <div
+
+            class="called-grid"
+
+            id="calledGrid"
+
+          ></div>
+
+        </div>
+
+      </section>
+
+      <!-- CARDS -->
+
+      <section
+
+        class="section"
+
+        id="sectionCards"
 
       >
 
-        45
+        <div class="panel">
 
-      </div>
+          <div
 
-      <div
+            class="panel-title"
 
-        id="timerLabel"
+            id="chooseTitle"
 
-        class="countLabel"
+          >
+
+            ካርድ ይምረጡ
+
+          </div>
+
+          <div
+
+            class="panel-sub"
+
+            id="chooseSub"
+
+          >
+
+            እስከ 4 ካርድ መምረጥ ይችላሉ።
+
+          </div>
+
+          <div
+
+            class="selected-list"
+
+            id="selectedList"
+
+          ></div>
+
+          <button
+
+            class="primary-btn"
+
+            onclick="saveCards()"
+
+            id="saveCardsBtn"
+
+          >
+
+            የመረጥኩትን አስቀምጥ
+
+          </button>
+
+          <div style="height:14px"></div>
+
+          <div
+
+            class="card-grid"
+
+            id="cardGrid"
+
+          ></div>
+
+        </div>
+
+      </section>
+
+      <!-- BALANCE -->
+
+      <section
+
+        class="section"
+
+        id="sectionBalance"
 
       >
 
-        seconds
+        <div class="panel">
 
-      </div>
+          <div class="wallet-balance">
 
-    </div>
+            <div>
 
-    <div class="ballStage">
+              <div
 
-      <div class="ballCaption">
+                class="wallet-label"
 
-        CURRENT BALL
+                id="walletLabel"
 
-      </div>
+              >
 
-      <div
+                የእርስዎ ሂሳብ
 
-        id="ball"
+              </div>
 
-        class="ballCircle empty"
+              <div
+
+                class="wallet-value"
+
+                id="walletBalance"
+
+              >
+
+                2,500 ETB
+
+              </div>
+
+            </div>
+
+            <div style="font-size:26px">
+
+              💵
+
+            </div>
+
+          </div>
+
+          <div
+
+            class="type-toggle"
+
+          >
+
+            <button
+
+              class="type-btn active"
+
+              id="depositBtn"
+
+              onclick="setWalletType('deposit')"
+
+            >
+
+              ገቢ አድርግ
+
+            </button>
+
+            <button
+
+              class="type-btn"
+
+              id="withdrawBtn"
+
+              onclick="setWalletType('withdraw')"
+
+            >
+
+              ወጪ አድርግ
+
+            </button>
+
+          </div>
+
+          <div class="field">
+
+            <label id="methodLabel">
+
+              ዘዴ
+
+            </label>
+
+            <select id="walletMethod">
+
+              <option value="Telebirr">
+
+                Telebirr
+
+              </option>
+
+              <option value="eBirr">
+
+                eBirr
+
+              </option>
+
+              <option value="M-PESA">
+
+                M-PESA
+
+              </option>
+
+            </select>
+
+          </div>
+
+          <div class="field">
+
+            <label id="amountLabel">
+
+              መጠን
+
+            </label>
+
+            <input
+
+              id="walletAmount"
+
+              type="number"
+
+              min="1"
+
+              inputmode="numeric"
+
+              placeholder="100"
+
+            >
+
+          </div>
+
+          <button
+
+            class="primary-btn"
+
+            onclick="walletRequest()"
+
+            id="walletSubmit"
+
+          >
+
+            ገቢ አድርግ
+
+          </button>
+
+          <div
+
+            class="note"
+
+            id="walletNote"
+
+          >
+
+            ይህ የplay-money ሙከራ ሂሳብ ብቻ ነው። ትክክለኛ ገንዘብ አይንቀሳቀስም።
+
+          </div>
+
+        </div>
+
+        <div class="panel">
+
+          <div
+
+            class="panel-title"
+
+            id="languageTitle"
+
+          >
+
+            ቋንቋ
+
+          </div>
+
+          <div
+
+            class="panel-sub"
+
+            id="languageSub"
+
+          >
+
+            የMini App ቋንቋ ይምረጡ።
+
+          </div>
+
+          <div class="language-buttons">
+
+            <button
+
+              class="language-btn active"
+
+              id="amBtn"
+
+              onclick="setLanguage('am')"
+
+            >
+
+              🇪🇹 አማርኛ
+
+            </button>
+
+            <button
+
+              class="language-btn"
+
+              id="enBtn"
+
+              onclick="setLanguage('en')"
+
+            >
+
+              🇬🇧 English
+
+            </button>
+
+          </div>
+
+        </div>
+
+      </section>
+
+    </main>
+
+  </div>
+
+  <div class="bottom-nav">
+
+    <div class="bottom-inner">
+
+      <button
+
+        class="bottom-btn active"
+
+        id="bottomPlay"
+
+        onclick="showSection('play')"
 
       >
 
-        —
+        🎮<br>
 
-      </div>
+        <span>መጫወት</span>
 
-      <div
+      </button>
 
-        id="ballletter"
+      <button
 
-        class="ballInfo"
+        class="bottom-btn"
+
+        id="bottomCards"
+
+        onclick="showSection('cards')"
 
       >
 
-        WAITING FOR THE GAME
+        🃏<br>
 
-      </div>
+        <span>ካርዶች</span>
 
-    </div>
+      </button>
 
-    <div class="ballTicker">
+      <button
 
-      <div class="tickerLabel">
+        class="bottom-btn"
 
-        RECENT
+        id="bottomBalance"
 
-      </div>
+        onclick="showSection('balance')"
 
-      <div
+      >
 
-        id="tickerBalls"
+        💵<br>
 
-        class="tickerBalls"
+        <span>ሂሳብ</span>
 
-      ></div>
+      </button>
 
     </div>
 
   </div>
 
-  <div class="quickStats">
+  <div
 
-    <div class="statBox">
+    class="toast"
 
-      <strong id="calledCount">
+    id="toast"
 
-        0
-
-      </strong>
-
-      <span>
-
-        BALLS CALLED
-
-      </span>
-
-    </div>
-
-    <div class="statBox">
-
-      <strong>
-
-        400
-
-      </strong>
-
-      <span>
-
-        CARDS
-
-      </span>
-
-    </div>
-
-    <div class="statBox">
-
-      <strong>
-
-        4
-
-      </strong>
-
-      <span>
-
-        MAX / PLAYER
-
-      </span>
-
-    </div>
-
-  </div>
-
-  <div class="nav">
-
-    <button
-
-      class="navBtn active"
-
-      onclick="showSection('play',this)"
-
-    >
-
-      🎱 PLAY
-
-    </button>
-
-    <button
-
-      class="navBtn"
-
-      onclick="showSection('cardsSection',this)"
-
-    >
-
-      🎟 CARDS
-
-    </button>
-
-    <button
-
-      class="navBtn"
-
-      onclick="showSection('wallet',this)"
-
-    >
-
-      💵 BALANCE
-
-    </button>
-
-  </div>
-
-  <section
-
-    id="play"
-
-    class="section"
-
-  >
-
-    <div class="panel">
-
-      <div class="panelHeader">
-
-        <div class="panelTitle">
-
-          Your game
-
-        </div>
-
-        <div
-
-          id="playHint"
-
-          class="panelHint"
-
-        >
-
-          SELECT CARDS
-
-        </div>
-
-      </div>
-
-      <div class="infoGrid">
-
-        <div class="infoCard">
-
-          <strong>
-
-            75 Ball Bingo
-
-          </strong>
-
-          <span>
-
-            B 1–15 · I 16–30 · N 31–45 · G 46–60 · O 61–75
-
-          </span>
-
-        </div>
-
-        <div class="infoCard">
-
-          <strong>
-
-            2 Lines
-
-          </strong>
-
-          <span>
-
-            Complete two lines to claim Bingo.
-
-          </span>
-
-        </div>
-
-      </div>
-
-    </div>
-
-    <div class="panel">
-
-      <div class="panelHeader">
-
-        <div class="panelTitle">
-
-          My Cards
-
-        </div>
-
-        <div
-
-          id="myCardCount"
-
-          class="panelHint"
-
-        >
-
-          0 / 4
-
-        </div>
-
-      </div>
-
-      <div
-
-        id="myCards"
-
-        class="myCards"
-
-      >
-
-        <div class="empty">
-
-          Select your cards below.
-
-        </div>
-
-      </div>
-
-      <button
-
-        class="secondaryBtn"
-
-        onclick="claim()"
-
-      >
-
-        🏆 CHECK BINGO
-
-      </button>
-
-      <div
-
-        id="claimResult"
-
-        class="notice"
-
-      ></div>
-
-    </div>
-
-    <div class="panel">
-
-      <div class="panelHeader">
-
-        <div class="panelTitle">
-
-          Called Balls
-
-        </div>
-
-        <div
-
-          id="calledTitle"
-
-          class="panelHint"
-
-        >
-
-          0 / 75
-
-        </div>
-
-      </div>
-
-      <div
-
-        id="called"
-
-        class="calledGrid"
-
-      >
-
-        <div class="empty">
-
-          No balls called yet.
-
-        </div>
-
-      </div>
-
-    </div>
-
-  </section>
-
-  <section
-
-    id="cardsSection"
-
-    class="section"
-
-    style="display:none"
-
-  >
-
-    <div class="panel">
-
-      <div class="selectionTop">
-
-        <div class="panelTitle">
-
-          Choose your cards
-
-        </div>
-
-        <div
-
-          id="selectionCount"
-
-          class="selectionCount"
-
-        >
-
-          <strong>0</strong> / 4
-
-        </div>
-
-      </div>
-
-      <div
-
-        id="selected"
-
-        class="selectedPills"
-
-      >
-
-        <span class="pill">
-
-          No cards selected
-
-        </span>
-
-      </div>
-
-      <button
-
-        class="primaryBtn"
-
-        onclick="saveCards()"
-
-      >
-
-        SAVE SELECTED CARDS
-
-      </button>
-
-      <div class="notice">
-
-        Choose up to 4 cards while the lobby is open. Once the game begins, card selection is locked.
-
-      </div>
-
-    </div>
-
-    <div class="panel">
-
-      <div class="panelHeader">
-
-        <div class="panelTitle">
-
-          400 Cards
-
-        </div>
-
-        <div class="panelHint">
-
-          1 — 400
-
-        </div>
-
-      </div>
-
-      <div
-
-        id="cards"
-
-        class="cardGrid"
-
-      ></div>
-
-    </div>
-
-  </section>
-
-  <section
-
-    id="wallet"
-
-    class="section"
-
-    style="display:none"
-
-  >
-
-    <div class="panel">
-
-      <div class="walletBalance">
-
-        <div class="walletLabel">
-
-          PLAY BALANCE
-
-        </div>
-
-        <div
-
-          id="walletAmount"
-
-          class="walletAmount"
-
-        >
-
-          2,500.00
-
-        </div>
-
-        <div class="walletCurrency">
-
-          ETB
-
-        </div>
-
-      </div>
-
-      <div class="walletActions">
-
-        <button
-
-          id="depositBtn"
-
-          class="walletAction active"
-
-          onclick="setWalletType('deposit')"
-
-        >
-
-          ADD BALANCE
-
-        </button>
-
-        <button
-
-          id="withdrawBtn"
-
-          class="walletAction"
-
-          onclick="setWalletType('withdraw')"
-
-        >
-
-          WITHDRAW
-
-        </button>
-
-      </div>
-
-      <select
-
-        id="method"
-
-        class="field"
-
-      >
-
-        <option>
-
-          Telebirr
-
-        </option>
-
-        <option>
-
-          eBirr
-
-        </option>
-
-        <option>
-
-          M-PESA
-
-        </option>
-
-      </select>
-
-      <input
-
-        id="amount"
-
-        class="field"
-
-        type="number"
-
-        min="1"
-
-        placeholder="Enter amount"
-
-      >
-
-      <button
-
-        class="primaryBtn"
-
-        onclick="walletRequest()"
-
-      >
-
-        SUBMIT REQUEST
-
-      </button>
-
-      <div class="notice">
-
-        This balance is for play only. No real money is transferred.
-
-      </div>
-
-      <div
-
-        id="walletResult"
-
-        class="notice"
-
-      ></div>
-
-    </div>
-
-    <div class="panel">
-
-      <div class="panelHeader">
-
-        <div class="panelTitle">
-
-          Language
-
-        </div>
-
-        <div class="panelHint">
-
-          LANGUAGE
-
-        </div>
-
-      </div>
-
-      <div class="languageGrid">
-
-        <button
-
-          id="enBtn"
-
-          class="languageBtn active"
-
-          onclick="setLanguage('en')"
-
-        >
-
-          English
-
-        </button>
-
-        <button
-
-          id="amBtn"
-
-          class="languageBtn"
-
-          onclick="setLanguage('am')"
-
-        >
-
-          አማርኛ
-
-        </button>
-
-      </div>
-
-    </div>
-
-  </section>
-
-</div>
-
-<div class="bottomBar">
-
-  <button
-
-    id="bottomPlay"
-
-    class="bottomBtn active"
-
-    onclick="bottomNavigate('play')"
-
-  >
-
-    <span class="bottomIcon">
-
-      🎱
-
-    </span>
-
-    PLAY
-
-  </button>
-
-  <button
-
-    id="bottomCards"
-
-    class="bottomBtn"
-
-    onclick="bottomNavigate('cardsSection')"
-
-  >
-
-    <span class="bottomIcon">
-
-      🎟
-
-    </span>
-
-    CARDS
-
-  </button>
-
-  <button
-
-    id="bottomWallet"
-
-    class="bottomBtn"
-
-    onclick="bottomNavigate('wallet')"
-
-  >
-
-    <span class="bottomIcon">
-
-      💵
-
-    </span>
-
-    BALANCE
-
-  </button>
-
-</div>
-
-<div
-
-  id="toast"
-
-  class="toast"
-
-></div>
+  ></div>
 
 <script>
 
-const tg =
+  const tg =
 
-  window.Telegram &&
+    window.Telegram &&
 
-  window.Telegram.WebApp
+    window.Telegram.WebApp
 
-    ? window.Telegram.WebApp
+      ? window.Telegram.WebApp
 
-    : null;
+      : null;
 
-if (tg) {
+  if (tg) {
 
-  tg.ready();
+    tg.ready();
 
-  tg.expand();
-
-}
-
-const telegramUser =
-
-  tg &&
-
-  tg.initDataUnsafe &&
-
-  tg.initDataUnsafe.user
-
-    ? tg.initDataUnsafe.user
-
-    : {
-
-        id:"guest",
-
-        first_name:"Player",
-
-        username:""
-
-      };
-
-const userHeader =
-
-  JSON.stringify(
-
-    telegramUser
-
-  );
-
-let selected = [];
-
-let currentGame = null;
-
-let walletType = "deposit";
-
-let language = "en";
-
-let refreshBusy = false;
-
-const translations = {
-
-  en: {
-
-    lobby:
-
-      "LOBBY",
-
-    live:
-
-      "GAME IN PROGRESS",
-
-    titleLobby:
-
-      "Next game starts soon",
-
-    titleLive:
-
-      "Game is live",
-
-    wait:
-
-      "Choose up to 4 cards before the next game starts.",
-
-    liveMsg:
-
-      "🎱 GAME IN PROGRESS — please wait for the next lobby.",
-
-    waiting:
-
-      "WAITING FOR THE GAME",
-
-    seconds:
-
-      "seconds",
-
-    liveTime:
-
-      "LIVE",
-
-    selectCards:
-
-      "SELECT CARDS",
-
-    gameLocked:
-
-      "GAME LOCKED",
-
-    noBalls:
-
-      "No balls called yet.",
-
-    save:
-
-      "SAVE SELECTED CARDS",
-
-    saved:
-
-      "Cards saved successfully.",
-
-    bingo:
-
-      "BINGO!",
-
-    noBingo:
-
-      "You do not have two completed lines yet.",
-
-    gameWait:
-
-      "Game in progress. Please wait for the next lobby.",
-
-    notLive:
-
-      "The game is not live yet.",
-
-    choose:
-
-      "Select your cards below.",
-
-    noCards:
-
-      "No cards selected.",
-
-    selectOne:
-
-      "Select at least one card.",
-
-    maxCards:
-
-      "You can select up to 4 cards.",
-
-    updated:
-
-      "Play balance updated.",
-
-    invalidAmount:
-
-      "Enter a valid amount.",
-
-    balance:
-
-      "Play Balance"
-
-  },
-
-  am: {
-
-    lobby:
-
-      "መጠበቂያ",
-
-    live:
-
-      "🎱 ጨዋታው በመካሄድ ላይ",
-
-    titleLobby:
-
-      "ቀጣዩ ጨዋታ በቅርቡ ይጀምራል",
-
-    titleLive:
-
-      "ጨዋታው ተጀምሯል",
-
-    wait:
-
-      "ጨዋታው ከመጀመሩ በፊት እስከ 4 ካርድ ይምረጡ።",
-
-    liveMsg:
-
-      "🎱 GAME IN PROGRESS — እባክዎ ቀጣዩን መጠበቂያ ይጠብቁ።",
-
-    waiting:
-
-      "ጨዋታውን በመጠበቅ ላይ",
-
-    seconds:
-
-      "ሰከንድ",
-
-    liveTime:
-
-      "በመካሄድ ላይ",
-
-    selectCards:
-
-      "ካርድ ይምረጡ",
-
-    gameLocked:
-
-      "ጨዋታው ተጀምሯል",
-
-    noBalls:
-
-      "እስካሁን ኳስ አልተጠራም።",
-
-    save:
-
-      "የመረጥኳቸውን ካርዶች አስቀምጥ",
-
-    saved:
-
-      "ካርዶቹ በትክክል ተቀምጠዋል።",
-
-    bingo:
-
-      "ቢንጎ!",
-
-    noBingo:
-
-      "እስካሁን 2 መስመር አልሞላም።",
-
-    gameWait:
-
-      "ጨዋታው በመካሄድ ላይ ነው። ቀጣዩን መጠበቂያ ይጠብቁ።",
-
-    notLive:
-
-      "ጨዋታው ገና አልጀመረም።",
-
-    choose:
-
-      "ከታች ያሉትን ካርዶች ይምረጡ።",
-
-    noCards:
-
-      "ምንም ካርድ አልተመረጠም።",
-
-    selectOne:
-
-      "ቢያንስ አንድ ካርድ ይምረጡ።",
-
-    maxCards:
-
-      "ከ4 ካርድ በላይ መምረጥ አይችሉም።",
-
-    updated:
-
-      "የጨዋታ ሂሳብዎ ተሻሽሏል።",
-
-    invalidAmount:
-
-      "ትክክለኛ መጠን ያስገቡ።",
-
-    balance:
-
-      "የጨዋታ ሂሳብ"
+    tg.expand();
 
   }
 
-};
+  const telegramUser =
 
-function api(path, options = {}) {
+    tg &&
 
-  options.headers = {
+    tg.initDataUnsafe &&
 
-    ...(options.headers || {}),
+    tg.initDataUnsafe.user
 
-    "x-telegram-user":
+      ? tg.initDataUnsafe.user
 
-      userHeader
+      : {
+
+          id: "guest",
+
+          first_name: "Guest"
+
+        };
+
+  const userHeader =
+
+    JSON.stringify(telegramUser);
+
+  let selected = [];
+
+  let currentGame = null;
+
+  let walletType = "deposit";
+
+  let language = "am";
+
+  let refreshBusy = false;
+
+  const translations = {
+
+    am: {
+
+      brandSub: "75 ኳስ • የቀጥታ Bingo",
+
+      lobby: "ሎቢ",
+
+      live: "በመካሄድ ላይ",
+
+      game: "ጨዋታ",
+
+      prepare: "ለሚቀጥለው ጨዋታ ይዘጋጁ",
+
+      lobbyMessage:
+
+        "ካርድዎን ይምረጡ። ጨዋታው በቅርቡ ይጀምራል።",
+
+      liveMessage:
+
+        "ጨዋታው በመካሄድ ላይ ነው። ቀጣዩን ኳስ ይጠብቁ።",
+
+      waitMessage:
+
+        "🎱 GAME IN PROGRESS • እባክዎ ቀጣዩን ጨዋታ ይጠብቁ።",
+
+      seconds: "ሰከንድ",
+
+      currentBall: "የአሁኑ ኳስ",
+
+      called: "የተጠሩ",
+
+      cards: "ካርዶች",
+
+      maximum: "ከፍተኛ",
+
+      play: "መጫወት",
+
+      cardTab: "ካርዶች",
+
+      balance: "ሂሳብ",
+
+      yourGame: "የእርስዎ ጨዋታ",
+
+      yourGameSub:
+
+        "እስከ 4 ካርድ መምረጥ ይችላሉ።",
+
+      ball75: "75 ኳስ",
+
+      ball75Text:
+
+        "B 1–15 • I 16–30 • N 31–45 • G 46–60 • O 61–75",
+
+      twoLines: "2 መስመር",
+
+      twoLinesText:
+
+        "ሁለት ሙሉ መስመሮች ሲሞሉ Bingo ነው።",
+
+      myCards: "የእኔ ካርዶች",
+
+      myCardsSub:
+
+        "በዚህ ጨዋታ የመረጡት ካርዶች።",
+
+      chooseCard: "ካርድ ምረጥ",
+
+      checkBingo: "CHECK BINGO",
+
+      calledBalls: "የተጠሩ ኳሶች",
+
+      calledBallsSub:
+
+        "በዚህ ጨዋታ እስካሁን የተጠሩ ቁጥሮች።",
+
+      chooseCards: "ካርድ ይምረጡ",
+
+      chooseCardsSub:
+
+        "እስከ 4 ካርድ መምረጥ ይችላሉ።",
+
+      saveCards: "የመረጥኩትን አስቀምጥ",
+
+      wallet: "የእርስዎ ሂሳብ",
+
+      deposit: "ገቢ አድርግ",
+
+      withdraw: "ወጪ አድርግ",
+
+      method: "ዘዴ",
+
+      amount: "መጠን",
+
+      submitDeposit: "ገቢ አድርግ",
+
+      submitWithdraw: "ወጪ አድርግ",
+
+      walletNote:
+
+        "ይህ የplay-money ሙከራ ሂሳብ ብቻ ነው። ትክክለኛ ገንዘብ አይንቀሳቀስም።",
+
+      language: "ቋንቋ",
+
+      languageSub:
+
+        "የMini App ቋንቋ ይምረጡ።",
+
+      noCards: "ካርድ አልመረጡም።",
+
+      saved: "ካርዶችዎ ተቀምጠዋል።",
+
+      selectDuringLobby:
+
+        "ካርድ መምረጥ የሚችሉት በLobby ጊዜ ብቻ ነው።",
+
+      maxCards:
+
+        "ከፍተኛው 4 ካርድ ብቻ ነው።",
+
+      gameProgress:
+
+        "ጨዋታው በመካሄድ ላይ ነው። ቀጣዩን ጨዋታ ይጠብቁ።",
+
+      savedSuccess:
+
+        "የመረጧቸው ካርዶች ተቀምጠዋል።",
+
+      bingo:
+
+        "🎉 BINGO! ሁለት መስመሮች ሞልተዋል።",
+
+      noBingo:
+
+        "እስካሁን Bingo አልሞላም።",
+
+      amountInvalid:
+
+        "እባክዎ ትክክለኛ መጠን ያስገቡ።",
+
+      insufficient:
+
+        "በሂሳብዎ ላይ በቂ ቀሪ የለም።",
+
+      walletSuccess:
+
+        "የplay-money ሂሳብዎ ተሻሽሏል።",
+
+      cardSaved: "ተመርጧል",
+
+      free: "FREE"
+
+    },
+
+    en: {
+
+      brandSub: "75 BALL • LIVE BINGO",
+
+      lobby: "LOBBY",
+
+      live: "LIVE",
+
+      game: "GAME",
+
+      prepare: "Get ready for the next game",
+
+      lobbyMessage:
+
+        "Choose your cards. The game will start soon.",
+
+      liveMessage:
+
+        "The game is live. Wait for the next ball.",
+
+      waitMessage:
+
+        "🎱 GAME IN PROGRESS • Please wait for the next game.",
+
+      seconds: "seconds",
+
+      currentBall: "CURRENT BALL",
+
+      called: "CALLED",
+
+      cards: "CARDS",
+
+      maximum: "MAX",
+
+      play: "PLAY",
+
+      cardTab: "CARDS",
+
+      balance: "BALANCE",
+
+      yourGame: "Your Game",
+
+      yourGameSub:
+
+        "You can select up to 4 cards.",
+
+      ball75: "75 BALL",
+
+      ball75Text:
+
+        "B 1–15 • I 16–30 • N 31–45 • G 46–60 • O 61–75",
+
+      twoLines: "2 LINES",
+
+      twoLinesText:
+
+        "Bingo is reached when two complete lines are marked.",
+
+      myCards: "My Cards",
+
+      myCardsSub:
+
+        "Cards selected for this game.",
+
+      chooseCard: "Choose Cards",
+
+      checkBingo: "CHECK BINGO",
+
+      calledBalls: "Called Balls",
+
+      calledBallsSub:
+
+        "Numbers called so far in this game.",
+
+      chooseCards: "Choose Cards",
+
+      chooseCardsSub:
+
+        "Select up to 4 cards.",
+
+      saveCards: "SAVE SELECTED CARDS",
+
+      wallet: "Your Balance",
+
+      deposit: "ADD BALANCE",
+
+      withdraw: "WITHDRAW",
+
+      method: "METHOD",
+
+      amount: "AMOUNT",
+
+      submitDeposit: "ADD BALANCE",
+
+      submitWithdraw: "WITHDRAW",
+
+      walletNote:
+
+        "This is a play-money simulation only. No real money is transferred.",
+
+      language: "Language",
+
+      languageSub:
+
+        "Choose the Mini App language.",
+
+      noCards: "No cards selected.",
+
+      saved: "Your cards are saved.",
+
+      selectDuringLobby:
+
+        "Cards can only be selected during the lobby.",
+
+      maxCards:
+
+        "You can select a maximum of 4 cards.",
+
+      gameProgress:
+
+        "The game is in progress. Please wait for the next game.",
+
+      savedSuccess:
+
+        "Your selected cards have been saved.",
+
+      bingo:
+
+        "🎉 BINGO! You have two completed lines.",
+
+      noBingo:
+
+        "No Bingo yet.",
+
+      amountInvalid:
+
+        "Please enter a valid amount.",
+
+      insufficient:
+
+        "Insufficient balance.",
+
+      walletSuccess:
+
+        "Your play-money balance has been updated.",
+
+      cardSaved: "SELECTED",
+
+      free: "FREE"
+
+    }
 
   };
 
-  return fetch(
+  function t(key){
 
-    path,
+    return (
 
-    options
+      translations[language][key] ||
 
-  ).then(
+      translations.en[key] ||
 
-    r => r.json()
-
-  );
-
-}
-
-function showToast(message) {
-
-  const toast =
-
-    document.getElementById(
-
-      "toast"
+      key
 
     );
-
-  toast.textContent =
-
-    message;
-
-  toast.classList.add(
-
-    "show"
-
-  );
-
-  clearTimeout(
-
-    window.__toastTimer
-
-  );
-
-  window.__toastTimer =
-
-    setTimeout(
-
-      () => {
-
-        toast.classList.remove(
-
-          "show"
-
-        );
-
-      },
-
-      2200
-
-    );
-
-}
-
-function showSection(
-
-  sectionId,
-
-  button
-
-) {
-
-  document
-
-    .querySelectorAll(
-
-      ".section"
-
-    )
-
-    .forEach(
-
-      section => {
-
-        section.style.display =
-
-          "none";
-
-      }
-
-    );
-
-  const section =
-
-    document.getElementById(
-
-      sectionId
-
-    );
-
-  if (section) {
-
-    section.style.display =
-
-      "block";
 
   }
 
-  document
+  function showToast(message){
 
-    .querySelectorAll(
+    const el =
 
-      ".navBtn"
+      document.getElementById("toast");
 
-    )
+    el.textContent = message;
 
-    .forEach(
+    el.classList.add("show");
 
-      b => {
+    clearTimeout(window.toastTimer);
 
-        b.classList.remove(
+    window.toastTimer =
 
-          "active"
+      setTimeout(() => {
 
-        );
+        el.classList.remove("show");
+
+      }, 2400);
+
+  }
+
+  async function api(path, options = {}){
+
+    const headers = {
+
+      ...(options.headers || {}),
+
+      "x-telegram-user": userHeader
+
+    };
+
+    if (
+
+      options.body &&
+
+      !headers["content-type"]
+
+    ) {
+
+      headers["content-type"] =
+
+        "application/json";
+
+    }
+
+    const response = await fetch(
+
+      path,
+
+      {
+
+        ...options,
+
+        headers,
+
+        cache:"no-store"
 
       }
 
     );
 
-  if (button) {
+    const text =
 
-    button.classList.add(
+      await response.text();
+
+    let data = {};
+
+    try {
+
+      data = JSON.parse(text);
+
+    } catch {
+
+      data = {
+
+        error: text
+
+      };
+
+    }
+
+    if (!response.ok) {
+
+      throw new Error(
+
+        data.error ||
+
+        "Request failed"
+
+      );
+
+    }
+
+    return data;
+
+  }
+
+  function showSection(section){
+
+    const sections = {
+
+      play:
+
+        document.getElementById(
+
+          "sectionPlay"
+
+        ),
+
+      cards:
+
+        document.getElementById(
+
+          "sectionCards"
+
+        ),
+
+      balance:
+
+        document.getElementById(
+
+          "sectionBalance"
+
+        )
+
+    };
+
+    Object.values(sections)
+
+      .forEach((el) => {
+
+        el.classList.remove("active");
+
+      });
+
+    sections[section].classList.add(
 
       "active"
 
     );
 
-  }
+    const tabMap = {
 
-  updateBottomButtons(
+      play:
 
-    sectionId
+        document.getElementById("tabPlay"),
 
-  );
+      cards:
 
-  window.scrollTo({
+        document.getElementById("tabCards"),
 
-    top:0,
+      balance:
 
-    behavior:"smooth"
+        document.getElementById("tabBalance")
 
-  });
+    };
 
-}
+    Object.values(tabMap)
 
-function bottomNavigate(
+      .forEach((el) => {
 
-  sectionId
+        el.classList.remove("active");
 
-) {
+      });
 
-  const matching =
+    tabMap[section].classList.add(
 
-    Array.from(
+      "active"
 
-      document.querySelectorAll(
+    );
 
-        ".navBtn"
+    const bottomMap = {
 
-      )
+      play:
 
-    ).find(
+        document.getElementById(
 
-      b =>
+          "bottomPlay"
 
-        (
+        ),
 
-          sectionId === "play" &&
+      cards:
 
-          b.textContent.includes(
+        document.getElementById(
 
-            "PLAY"
+          "bottomCards"
 
-          )
+        ),
 
-        ) ||
+      balance:
 
-        (
+        document.getElementById(
 
-          sectionId ===
-
-          "cardsSection" &&
-
-          b.textContent.includes(
-
-            "CARDS"
-
-          )
-
-        ) ||
-
-        (
-
-          sectionId ===
-
-          "wallet" &&
-
-          b.textContent.includes(
-
-            "BALANCE"
-
-          )
+          "bottomBalance"
 
         )
 
-    );
+    };
 
-  showSection(
+    Object.values(bottomMap)
 
-    sectionId,
+      .forEach((el) => {
 
-    matching
+        el.classList.remove("active");
 
-  );
+      });
 
-}
+    bottomMap[section].classList.add(
 
-function updateBottomButtons(
-
-  sectionId
-
-) {
-
-  document
-
-    .getElementById(
-
-      "bottomPlay"
-
-    )
-
-    .classList.toggle(
-
-      "active",
-
-      sectionId === "play"
+      "active"
 
     );
 
-  document
+    if (section === "cards") {
 
-    .getElementById(
+      loadCards();
 
-      "bottomCards"
+    }
 
-    )
+    if (section === "balance") {
 
-    .classList.toggle(
+      loadBalance();
 
-      "active",
-
-      sectionId ===
-
-        "cardsSection"
-
-    );
-
-  document
-
-    .getElementById(
-
-      "bottomWallet"
-
-    )
-
-    .classList.toggle(
-
-      "active",
-
-      sectionId ===
-
-        "wallet"
-
-    );
-
-}
-
-function makeClientCard(
-
-  number
-
-) {
-
-  const seed =
-
-    number * 9973;
-
-  const B =
-
-    seededShuffle(
-
-      Array.from(
-
-        {length:15},
-
-        (_,i) => i + 1
-
-      ),
-
-      seed + 1
-
-    ).slice(0,5);
-
-  const I =
-
-    seededShuffle(
-
-      Array.from(
-
-        {length:15},
-
-        (_,i) => i + 16
-
-      ),
-
-      seed + 2
-
-    ).slice(0,5);
-
-  const N =
-
-    seededShuffle(
-
-      Array.from(
-
-        {length:15},
-
-        (_,i) => i + 31
-
-      ),
-
-      seed + 3
-
-    ).slice(0,5);
-
-  const G =
-
-    seededShuffle(
-
-      Array.from(
-
-        {length:15},
-
-        (_,i) => i + 46
-
-      ),
-
-      seed + 4
-
-    ).slice(0,5);
-
-  const O =
-
-    seededShuffle(
-
-      Array.from(
-
-        {length:15},
-
-        (_,i) => i + 61
-
-      ),
-
-      seed + 5
-
-    ).slice(0,5);
-
-  return [
-
-    B[0],I[0],N[0],G[0],O[0],
-
-    B[1],I[1],N[1],G[1],O[1],
-
-    B[2],I[2],
-
-    "FREE",
-
-    G[2],O[2],
-
-    B[3],I[3],N[3],G[3],O[3],
-
-    B[4],I[4],N[4],G[4],O[4]
-
-  ];
-
-}
-
-function seededShuffle(
-
-  arr,
-
-  seed
-
-) {
-
-  const a = [
-
-    ...arr
-
-  ];
-
-  let s =
-
-    seed >>> 0;
-
-  function rnd() {
-
-    s =
-
-      (
-
-        s * 1664525 +
-
-        1013904223
-
-      ) >>> 0;
-
-    return s /
-
-      4294967296;
+    }
 
   }
 
-  for (
+  function ballLetterClient(n){
 
-    let i =
+    if (n <= 15) return "B";
 
-      a.length - 1;
+    if (n <= 30) return "I";
 
-    i > 0;
+    if (n <= 45) return "N";
 
-    i--
+    if (n <= 60) return "G";
 
-  ) {
+    return "O";
 
-    const j =
+  }
 
-      Math.floor(
+  function seededShuffle(arr, seed){
 
-        rnd() *
+    const a = [...arr];
 
-        (i + 1)
+    let s = seed >>> 0;
 
-      );
+    for (let i = a.length - 1; i > 0; i--) {
 
-    [
+      s =
 
-      a[i],
+        (s * 1664525 + 1013904223) >>> 0;
 
-      a[j]
+      const j = s % (i + 1);
 
-    ] =
+      [a[i], a[j]] =
 
-    [
+        [a[j], a[i]];
 
-      a[j],
+    }
 
-      a[i]
+    return a;
+
+  }
+
+  function makeClientCard(number){
+
+    const ranges = [
+
+      [1,15],
+
+      [16,30],
+
+      [31,45],
+
+      [46,60],
+
+      [61,75]
 
     ];
 
+    const columns = [];
+
+    for(let c = 0; c < 5; c++){
+
+      const [from,to] =
+
+        ranges[c];
+
+      const pool =
+
+        Array.from(
+
+          {length:to-from+1},
+
+          (_,i) => from+i
+
+        );
+
+      columns.push(
+
+        seededShuffle(
+
+          pool,
+
+          number * 1009 + c * 917
+
+        ).slice(0,5)
+
+      );
+
+    }
+
+    const grid =
+
+      Array.from(
+
+        {length:5},
+
+        () => Array(5).fill(null)
+
+      );
+
+    for(let c = 0; c < 5; c++){
+
+      for(let r = 0; r < 5; r++){
+
+        grid[r][c] =
+
+          columns[c][r];
+
+      }
+
+    }
+
+    grid[2][2] = "FREE";
+
+    return {
+
+      number,
+
+      grid
+
+    };
+
   }
 
-  return a;
+  function renderBingoCard(card){
 
-}
+    const state =
 
-function renderBingoCard(
+      currentGame || {
 
-  number
+        calledBalls:[]
 
-) {
+      };
 
-  const wrap =
+    const called =
 
-    document.createElement(
+      new Set(
 
-      "div"
-
-    );
-
-  wrap.className =
-
-    "bingoCard";
-
-  const header =
-
-    document.createElement(
-
-      "div"
-
-    );
-
-  header.className =
-
-    "cardHeader";
-
-  const title =
-
-    document.createElement(
-
-      "div"
-
-    );
-
-  title.className =
-
-    "cardName";
-
-  title.textContent =
-
-    "CARD #" +
-
-    number;
-
-  const state =
-
-    document.createElement(
-
-      "div"
-
-    );
-
-  state.className =
-
-    "cardState";
-
-  state.textContent =
-
-    "5 × 5";
-
-  header.appendChild(
-
-    title
-
-  );
-
-  header.appendChild(
-
-    state
-
-  );
-
-  wrap.appendChild(
-
-    header
-
-  );
-
-  const head =
-
-    document.createElement(
-
-      "div"
-
-    );
-
-  head.className =
-
-    "bingoHead";
-
-  [
-
-    "B",
-
-    "I",
-
-    "N",
-
-    "G",
-
-    "O"
-
-  ].forEach(
-
-    letter => {
-
-      const d =
-
-        document.createElement(
-
-          "div"
-
-        );
-
-      d.textContent =
-
-        letter;
-
-      head.appendChild(
-
-        d
+        state.calledBalls || []
 
       );
 
-    }
+    let html = "";
 
-  );
+    html += `
 
-  wrap.appendChild(
+      <div class="bingo-card">
 
-    head
+        <div class="bingo-card-head">
 
-  );
+          <div class="card-number-label">
 
-  const grid =
+            #${card.number}
 
-    document.createElement(
+          </div>
 
-      "div"
+          <div class="card-state">
 
-    );
+            ${t("cardSaved")}
 
-  grid.className =
+          </div>
 
-    "bingoGrid";
+        </div>
 
-  const card =
+        <div class="letter-heading">
 
-    makeClientCard(
+          <div>B</div>
 
-      number
+          <div>I</div>
 
-    );
+          <div>N</div>
 
-  const called =
+          <div>G</div>
 
-    new Set(
+          <div>O</div>
 
-      (
+        </div>
 
-        currentGame &&
+        <div class="bingo-grid">
 
-        currentGame.calledBalls
+    `;
 
-      ) || []
+    for(let r=0;r<5;r++){
 
-    );
+      for(let c=0;c<5;c++){
 
-  card.forEach(
+        const value =
 
-    value => {
+          card.grid[r][c];
 
-      const cell =
+        const isFree =
 
-        document.createElement(
+          value === "FREE";
 
-          "div"
+        const isCalled =
 
-        );
+          !isFree &&
 
-      cell.className =
+          called.has(value);
 
-        "bingoCell";
+        let classes =
 
-      cell.textContent =
+          "bingo-cell";
 
-        value;
+        if(isFree){
 
-      if (
+          classes += " free";
 
-        value === "FREE"
+        }
 
-      ) {
+        if(isCalled){
 
-        cell.classList.add(
+          classes += " called";
 
-          "free"
+        }
 
-        );
+        html += `
+
+          <div class="${classes}">
+
+            ${
+
+              isFree
+
+                ? t("free")
+
+                : value
+
+            }
+
+          </div>
+
+        `;
 
       }
 
-      if (
-
-        value === "FREE" ||
-
-        called.has(
-
-          Number(value)
-
-        )
-
-      ) {
-
-        cell.classList.add(
-
-          "marked"
-
-        );
-
-      }
-
-      grid.appendChild(
-
-        cell
-
-      );
-
     }
 
-  );
+    html += `
 
-  wrap.appendChild(
+        </div>
 
-    grid
+      </div>
 
-  );
+    `;
 
-  return wrap;
+    return html;
 
-}
+  }
 
-async function loadCards() {
+  async function loadCards(){
 
-  try {
-
-    const data =
-
-      await api(
-
-        "/do/cards"
-
-      );
-
-    const box =
+    const grid =
 
       document.getElementById(
 
-        "cards"
+        "cardGrid"
 
       );
 
-    box.innerHTML =
+    if(grid.dataset.loaded === "1"){
 
-      "";
+      renderSelected();
 
-    for (
+      return;
 
-      const card
+    }
 
-      of data.cards
+    grid.innerHTML = "";
 
-    ) {
+    for(let i=1;i<=CARD_COUNT;i++){
 
       const button =
 
@@ -5040,97 +4500,43 @@ async function loadCards() {
 
       button.className =
 
-        "cardBtn";
+        "card-select";
 
       button.textContent =
 
-        card.number;
+        i;
 
-      if (
+      button.dataset.number =
 
-        selected.includes(
-
-          card.number
-
-        )
-
-      ) {
-
-        button.classList.add(
-
-          "selected"
-
-        );
-
-      }
+        i;
 
       button.onclick =
 
-        () =>
+        () => toggleCard(i);
 
-          toggleCard(
-
-            card.number
-
-          );
-
-      box.appendChild(
-
-        button
-
-      );
+      grid.appendChild(button);
 
     }
 
-  } catch (e) {
+    grid.dataset.loaded = "1";
 
-    console.error(e);
+    renderSelected();
 
   }
 
-}
+  function toggleCard(number){
 
-function toggleCard(
+    if(
 
-  number
+      currentGame &&
 
-) {
+      currentGame.status !== "lobby"
 
-  if (
-
-    selected.includes(
-
-      number
-
-    )
-
-  ) {
-
-    selected =
-
-      selected.filter(
-
-        x =>
-
-          x !== number
-
-      );
-
-  } else {
-
-    if (
-
-      selected.length >= 4
-
-    ) {
+    ){
 
       showToast(
 
-        translations[
-
-          language
-
-        ].maxCards
+        t("selectDuringLobby")
 
       );
 
@@ -5138,913 +4544,691 @@ function toggleCard(
 
     }
 
-    selected.push(
+    const index =
 
-      number
+      selected.indexOf(number);
 
-    );
+    if(index >= 0){
 
-  }
+      selected.splice(index,1);
 
-  selected.sort(
+    }else{
 
-    (a,b) => a - b
+      if(
 
-  );
+        selected.length >=
 
-  renderSelected();
+        MAX_CARDS_PER_PLAYER
 
-  loadCards();
+      ){
 
-  renderMyCards();
+        showToast(
 
-}
+          t("maxCards")
 
-function renderSelected() {
+        );
 
-  const box =
-
-    document.getElementById(
-
-      "selected"
-
-    );
-
-  const count =
-
-    document.getElementById(
-
-      "selectionCount"
-
-    );
-
-  const myCount =
-
-    document.getElementById(
-
-      "myCardCount"
-
-    );
-
-  count.innerHTML =
-
-    "<strong>" +
-
-    selected.length +
-
-    "</strong> / 4";
-
-  myCount.textContent =
-
-    selected.length +
-
-    " / 4";
-
-  if (
-
-    !selected.length
-
-  ) {
-
-    box.innerHTML =
-
-      '<span class="pill">' +
-
-      translations[
-
-        language
-
-      ].noCards +
-
-      "</span>";
-
-    return;
-
-  }
-
-  box.innerHTML =
-
-    selected
-
-      .map(
-
-        n =>
-
-          '<span class="pill">' +
-
-          "CARD #" +
-
-          n +
-
-          "</span>"
-
-      )
-
-      .join("");
-
-}
-
-async function saveCards() {
-
-  if (
-
-    !selected.length
-
-  ) {
-
-    showToast(
-
-      translations[
-
-        language
-
-      ].selectOne
-
-    );
-
-    return;
-
-  }
-
-  const result =
-
-    await api(
-
-      "/do/select-cards",
-
-      {
-
-        method:"POST",
-
-        headers:{
-
-          "content-type":
-
-            "application/json"
-
-        },
-
-        body:
-
-          JSON.stringify({
-
-            cards:selected
-
-          })
+        return;
 
       }
 
-    );
-
-  if (
-
-    !result.ok
-
-  ) {
-
-    if (
-
-      result.error ===
-
-      "GAME_IN_PROGRESS"
-
-    ) {
-
-      showToast(
-
-        translations[
-
-          language
-
-        ].gameWait
-
-      );
-
-    } else {
-
-      showToast(
-
-        "Unable to save cards."
-
-      );
+      selected.push(number);
 
     }
 
-    return;
-
-  }
-
-  selected =
-
-    result.selectedCards ||
-
-    selected;
-
-  renderSelected();
-
-  renderMyCards();
-
-  showToast(
-
-    translations[
-
-      language
-
-    ].saved
-
-  );
-
-}
-
-async function loadMyCards() {
-
-  try {
-
-    const data =
-
-      await api(
-
-        "/do/user-cards"
-
-      );
-
-    selected =
-
-      data.selectedCards ||
-
-      [];
-
     selected.sort(
 
-      (a,b) => a - b
+      (a,b) => a-b
 
     );
 
     renderSelected();
 
-    renderMyCards();
-
-  } catch (e) {
-
-    console.error(e);
-
   }
 
-}
+  function renderSelected(){
 
-function renderMyCards() {
+    const list =
 
-  const box =
+      document.getElementById(
 
-    document.getElementById(
+        "selectedList"
 
-      "myCards"
+      );
 
-    );
+    const grid =
 
-  box.innerHTML =
+      document.getElementById(
 
-    "";
+        "cardGrid"
 
-  if (
+      );
 
-    !selected.length
+    list.innerHTML = "";
 
-  ) {
+    selected.forEach((number) => {
 
-    box.innerHTML =
+      const pill =
 
-      '<div class="empty">' +
+        document.createElement(
 
-      translations[
+          "div"
 
-        language
+        );
 
-      ].choose +
+      pill.className =
 
-      "</div>";
+        "selected-pill";
 
-    return;
+      pill.textContent =
 
-  }
+        "#" + number;
 
-  selected.forEach(
+      list.appendChild(pill);
 
-    number => {
+    });
 
-      box.appendChild(
+    if(!selected.length){
 
-        renderBingoCard(
+      list.innerHTML = "";
 
-          number
+    }
+
+    if(grid){
+
+      grid
+
+        .querySelectorAll(
+
+          ".card-select"
 
         )
+
+        .forEach((button) => {
+
+          const number =
+
+            Number(
+
+              button.dataset.number
+
+            );
+
+          button.classList.toggle(
+
+            "selected",
+
+            selected.includes(number)
+
+          );
+
+        });
+
+    }
+
+  }
+
+  async function saveCards(){
+
+    if(
+
+      !currentGame ||
+
+      currentGame.status !== "lobby"
+
+    ){
+
+      showToast(
+
+        t("selectDuringLobby")
+
+      );
+
+      return;
+
+    }
+
+    try{
+
+      const result =
+
+        await api(
+
+          "/api/select-cards",
+
+          {
+
+            method:"POST",
+
+            body:JSON.stringify({
+
+              cards:selected
+
+            })
+
+          }
+
+        );
+
+      selected =
+
+        Array.isArray(
+
+          result.selected
+
+        )
+
+          ? result.selected
+
+          : [];
+
+      renderSelected();
+
+      await loadMyCards();
+
+      showToast(
+
+        t("savedSuccess")
+
+      );
+
+      showSection("play");
+
+    }catch(error){
+
+      showToast(
+
+        error.message ||
+
+        "Error"
 
       );
 
     }
 
-  );
+  }
 
-}
+  async function loadMyCards(){
 
-function renderCalledBalls(
+    try{
 
-  balls
+      const data =
 
-) {
+        await api(
 
-  const box =
+          "/api/user-cards"
 
-    document.getElementById(
+        );
 
-      "called"
+      selected =
 
-    );
+        Array.isArray(
 
-  const ticker =
+          data.selected
 
-    document.getElementById(
+        )
 
-      "tickerBalls"
+          ? data.selected
 
-    );
+          : [];
 
-  if (
+      renderSelected();
 
-    !balls ||
+      renderMyCards();
 
-    !balls.length
+    }catch{
 
-  ) {
+      renderMyCards();
 
-    box.innerHTML =
-
-      '<div class="empty">' +
-
-      translations[
-
-        language
-
-      ].noBalls +
-
-      "</div>";
-
-    ticker.innerHTML =
-
-      "";
-
-    return;
+    }
 
   }
 
-  const reversed =
+  function renderMyCards(){
 
-    [...balls].reverse();
+    const container =
 
-  box.innerHTML =
+      document.getElementById(
 
-    reversed
+        "myCards"
 
-      .map(
+      );
 
-        (
+    if(!selected.length){
 
-          number,
+      container.innerHTML = `
 
-          index
+        <div class="empty">
 
-        ) =>
+          ${t("noCards")}
 
-          '<div class="calledItem ' +
+        </div>
 
-          (
+      `;
 
-            index === 0
+      return;
 
-              ? "latest"
+    }
+
+    container.innerHTML =
+
+      selected
+
+        .map((number) =>
+
+          renderBingoCard(
+
+            makeClientCard(number)
+
+          )
+
+        )
+
+        .join("");
+
+  }
+
+  function renderCalledBalls(){
+
+    const grid =
+
+      document.getElementById(
+
+        "calledGrid"
+
+      );
+
+    if(!currentGame){
+
+      grid.innerHTML = "";
+
+      return;
+
+    }
+
+    const called =
+
+      new Set(
+
+        currentGame.calledBalls || []
+
+      );
+
+    let html = "";
+
+    for(
+
+      let number = 1;
+
+      number <= TOTAL_BALLS;
+
+      number++
+
+    ){
+
+      html += `
+
+        <div
+
+          class="called-number ${
+
+            called.has(number)
+
+              ? "active"
 
               : ""
 
-          ) +
+          }"
 
-          '">' +
+        >
 
-          number +
+          ${number}
 
-          "</div>"
+        </div>
 
-      )
+      `;
 
-      .join("");
+    }
 
-  ticker.innerHTML =
+    grid.innerHTML = html;
 
-    reversed
+  }
 
-      .slice(0,9)
+  function renderRecentBalls(){
 
-      .map(
+    const container =
 
-        (
+      document.getElementById(
 
-          number,
+        "recentBalls"
 
-          index
+      );
 
-        ) =>
+    if(!currentGame){
 
-          '<div class="tickerBall ' +
+      container.innerHTML = "";
 
-          (
+      return;
 
-            index === 0
+    }
 
-              ? "latest"
+    const called =
 
-              : ""
+      currentGame.calledBalls || [];
 
-          ) +
+    const recent =
 
-          '">' +
+      called.slice(-12).reverse();
 
-          ballLetterClient(
+    container.innerHTML =
 
-            number
+      recent
 
-          ) +
+        .map((number,index) => `
 
-          "-" +
+          <div
 
-          number +
+            class="mini-ball ${
 
-          "</div>"
+              index === 0
 
-      )
+                ? "latest"
 
-      .join("");
+                : ""
 
-}
+            }"
 
-function ballLetterClient(
+          >
 
-  n
+            ${number}
 
-) {
+          </div>
 
-  if (n <= 15)
+        `)
 
-    return "B";
+        .join("");
 
-  if (n <= 30)
+  }
 
-    return "I";
+  function updateGameUI(){
 
-  if (n <= 45)
+    if(!currentGame) return;
 
-    return "N";
+    const live =
 
-  if (n <= 60)
+      currentGame.status === "live";
 
-    return "G";
+    const statusText =
 
-  return "O";
+      document.getElementById(
 
-}
+        "statusText"
 
-function updateGameUI(
+      );
 
-  data
+    const statusBadge =
 
-) {
+      document.getElementById(
 
-  currentGame =
+        "statusBadge"
 
-    data;
+      );
 
-  const status =
+    statusText.textContent =
 
-    document.getElementById(
+      live
 
-      "status"
+        ? t("live")
 
-    );
+        : t("lobby");
 
-  const badge =
+    statusBadge.style.color =
 
-    document.getElementById(
+      live
 
-      "statusBadge"
+        ? "#26d07c"
 
-    );
+        : "#ffc857";
 
-  const title =
+    statusBadge.style.background =
 
-    document.getElementById(
+      live
 
-      "heroTitle"
+        ? "rgba(38,208,124,.10)"
 
-    );
+        : "rgba(255,200,87,.10)";
 
-  const message =
+    statusBadge.style.borderColor =
 
-    document.getElementById(
+      live
 
-      "message"
+        ? "rgba(38,208,124,.25)"
 
-    );
-
-  const timer =
-
-    document.getElementById(
-
-      "timer"
-
-    );
-
-  const timerLabel =
-
-    document.getElementById(
-
-      "timerLabel"
-
-    );
-
-  const ball =
-
-    document.getElementById(
-
-      "ball"
-
-    );
-
-  const ballInfo =
-
-    document.getElementById(
-
-      "ballletter"
-
-    );
-
-  const gameNumber =
+        : "rgba(255,200,87,.25)";
 
     document.getElementById(
 
       "gameNumber"
 
-    );
+    ).textContent =
 
-  const calledCount =
+      t("game") +
+
+      " #" +
+
+      currentGame.gameNumber;
+
+    document.getElementById(
+
+      "heroTitle"
+
+    ).textContent =
+
+      live
+
+        ? "🎱 " + t("live")
+
+        : t("prepare");
+
+    document.getElementById(
+
+      "heroMessage"
+
+    ).textContent =
+
+      live
+
+        ? t("liveMessage")
+
+        : t("lobbyMessage");
+
+    const countdown =
+
+      document.getElementById(
+
+        "countdown"
+
+      );
+
+    if(live){
+
+      countdown.style.display =
+
+        "none";
+
+    }else{
+
+      countdown.style.display =
+
+        "flex";
+
+      document.getElementById(
+
+        "countdownValue"
+
+      ).textContent =
+
+        currentGame.lobbyRemaining || 0;
+
+      document.getElementById(
+
+        "countdownLabel"
+
+      ).textContent =
+
+        t("seconds");
+
+    }
+
+    const currentBall =
+
+      currentGame.currentBall;
+
+    document.getElementById(
+
+      "currentBallNumber"
+
+    ).textContent =
+
+      currentBall || "—";
+
+    document.getElementById(
+
+      "currentBallLetter"
+
+    ).textContent =
+
+      currentBall
+
+        ? ballLetterClient(
+
+            currentBall
+
+          )
+
+        : "B";
+
+    document.getElementById(
+
+      "ballCaption"
+
+    ).textContent =
+
+      t("currentBall");
 
     document.getElementById(
 
       "calledCount"
 
-    );
+    ).textContent =
 
-  const calledTitle =
+      currentGame.calledCount || 0;
 
-    document.getElementById(
+    renderRecentBalls();
 
-      "calledTitle"
+    renderCalledBalls();
 
-    );
+    renderMyCards();
 
-  const playHint =
+  }
 
-    document.getElementById(
+  async function refreshGame(){
 
-      "playHint"
+    if(refreshBusy) return;
 
-    );
+    refreshBusy = true;
 
-  gameNumber.textContent =
+    try{
 
-    "GAME #" +
+      currentGame =
 
-    data.gameNumber;
+        await api(
 
-  calledCount.textContent =
+          "/api/game"
 
-    data.calledCount ||
+        );
 
-    0;
+      updateGameUI();
 
-  calledTitle.textContent =
+    }catch(error){
 
-    (
+      console.error(error);
 
-      data.calledCount ||
+    }finally{
 
-      0
-
-    ) +
-
-    " / 75";
-
-  if (
-
-    data.status === "lobby"
-
-  ) {
-
-    badge.className =
-
-      "statusBadge";
-
-    status.textContent =
-
-      translations[
-
-        language
-
-      ].lobby;
-
-    title.textContent =
-
-      translations[
-
-        language
-
-      ].titleLobby;
-
-    message.textContent =
-
-      translations[
-
-        language
-
-      ].wait;
-
-    timer.textContent =
-
-      data.lobbyRemaining;
-
-    timerLabel.textContent =
-
-      translations[
-
-        language
-
-      ].seconds;
-
-    ball.className =
-
-      "ballCircle empty";
-
-    ball.textContent =
-
-      "—";
-
-    ballInfo.textContent =
-
-      translations[
-
-        language
-
-      ].waiting;
-
-    playHint.textContent =
-
-      translations[
-
-        language
-
-      ].selectCards;
-
-  } else {
-
-    badge.className =
-
-      "statusBadge live";
-
-    status.textContent =
-
-      translations[
-
-        language
-
-      ].live;
-
-    title.textContent =
-
-      translations[
-
-        language
-
-      ].titleLive;
-
-    message.textContent =
-
-      translations[
-
-        language
-
-      ].liveMsg;
-
-    timer.textContent =
-
-      translations[
-
-        language
-
-      ].liveTime;
-
-    timerLabel.textContent =
-
-      "";
-
-    playHint.textContent =
-
-      translations[
-
-        language
-
-      ].gameLocked;
-
-    if (
-
-      data.currentBall
-
-    ) {
-
-      ball.className =
-
-        "ballCircle";
-
-      ball.textContent =
-
-        data.currentBall;
-
-      ballInfo.textContent =
-
-        data.currentLetter +
-
-        " • " +
-
-        data.currentBall;
-
-    } else {
-
-      ball.className =
-
-        "ballCircle empty";
-
-      ball.textContent =
-
-        "—";
-
-      ballInfo.textContent =
-
-        translations[
-
-          language
-
-        ].waiting;
+      refreshBusy = false;
 
     }
 
   }
 
-  renderCalledBalls(
+  async function loadBalance(){
 
-    data.calledBalls ||
+    try{
 
-    []
+      const data =
 
-  );
+        await api(
 
-  renderMyCards();
+          "/api/balance"
 
-}
+        );
 
-async function refreshGame() {
+      const balance =
 
-  if (
+        Number(
 
-    refreshBusy
+          data.balance || 0
 
-  ) {
+        );
 
-    return;
+      document.getElementById(
 
-  }
+        "topBalance"
 
-  refreshBusy =
+      ).textContent =
 
-    true;
+        balance.toLocaleString();
 
-  try {
+      document.getElementById(
 
-    const data =
+        "walletBalance"
 
-      await api(
+      ).textContent =
 
-        "/do/game"
+        balance.toLocaleString() +
 
-      );
+        " ETB";
 
-    updateGameUI(
+    }catch(error){
 
-      data
+      console.error(error);
 
-    );
-
-  } catch (e) {
-
-    console.error(e);
-
-  } finally {
-
-    refreshBusy =
-
-      false;
+    }
 
   }
 
-}
+  function setWalletType(type){
 
-async function loadBalance() {
+    walletType = type;
 
-  try {
+    const deposit =
 
-    const data =
+      document.getElementById(
 
-      await api(
-
-        "/do/balance"
+        "depositBtn"
 
       );
 
-    const value =
+    const withdraw =
 
-      Number(
+      document.getElementById(
 
-        data.balance || 0
-
-      );
-
-    const formatted =
-
-      value.toLocaleString(
-
-        undefined,
-
-        {
-
-          minimumFractionDigits:2,
-
-          maximumFractionDigits:2
-
-        }
+        "withdrawBtn"
 
       );
 
-    document.getElementById(
-
-      "balance"
-
-    ).textContent =
-
-      formatted +
-
-      " ETB";
-
-    document.getElementById(
-
-      "walletAmount"
-
-    ).textContent =
-
-      formatted;
-
-  } catch (e) {
-
-    console.error(e);
-
-  }
-
-}
-
-function setWalletType(
-
-  type
-
-) {
-
-  walletType =
-
-    type;
-
-  document
-
-    .getElementById(
-
-      "depositBtn"
-
-    )
-
-    .classList.toggle(
+    deposit.classList.toggle(
 
       "active",
 
@@ -6052,15 +5236,7 @@ function setWalletType(
 
     );
 
-  document
-
-    .getElementById(
-
-      "withdrawBtn"
-
-    )
-
-    .classList.toggle(
+    withdraw.classList.toggle(
 
       "active",
 
@@ -6068,331 +5244,631 @@ function setWalletType(
 
     );
 
-}
+    document.getElementById(
 
-async function walletRequest() {
+      "walletSubmit"
 
-  const amount =
+    ).textContent =
 
-    Number(
+      type === "deposit"
+
+        ? t("submitDeposit")
+
+        : t("submitWithdraw");
+
+  }
+
+  async function walletRequest(){
+
+    const method =
 
       document.getElementById(
 
-        "amount"
+        "walletMethod"
 
-      ).value
+      ).value;
 
-    );
+    const amount =
 
-  const method =
+      Number(
 
-    document.getElementById(
+        document.getElementById(
 
-      "method"
+          "walletAmount"
 
-    ).value;
-
-  if (
-
-    !amount ||
-
-    amount <= 0
-
-  ) {
-
-    showToast(
-
-      translations[
-
-        language
-
-      ].invalidAmount
-
-    );
-
-    return;
-
-  }
-
-  const result =
-
-    await api(
-
-      "/do/wallet",
-
-      {
-
-        method:"POST",
-
-        headers:{
-
-          "content-type":
-
-            "application/json"
-
-        },
-
-        body:
-
-          JSON.stringify({
-
-            method,
-
-            type:walletType,
-
-            amount
-
-          })
-
-      }
-
-    );
-
-  if (
-
-    !result.ok
-
-  ) {
-
-    const message =
-
-      result.error ===
-
-      "INSUFFICIENT_BALANCE"
-
-        ? (
-
-          language === "am"
-
-            ? "በሂሳብዎ በቂ ገንዘብ የለም።"
-
-            : "Insufficient balance."
-
-        )
-
-        : (
-
-          result.error ||
-
-          "Request failed."
-
-        );
-
-    showToast(
-
-      message
-
-    );
-
-    return;
-
-  }
-
-  document.getElementById(
-
-    "amount"
-
-  ).value =
-
-    "";
-
-  await loadBalance();
-
-  showToast(
-
-    translations[
-
-      language
-
-    ].updated
-
-  );
-
-}
-
-async function claim() {
-
-  const result =
-
-    await api(
-
-      "/do/claim"
-
-    );
-
-  const box =
-
-    document.getElementById(
-
-      "claimResult"
-
-    );
-
-  if (
-
-    !result.ok
-
-  ) {
-
-    box.textContent =
-
-      result.error ===
-
-      "GAME_NOT_LIVE"
-
-        ? translations[
-
-            language
-
-          ].notLive
-
-        : "Unable to check Bingo.";
-
-    return;
-
-  }
-
-  if (
-
-    result.winningCards &&
-
-    result.winningCards.length
-
-  ) {
-
-    box.textContent =
-
-      translations[
-
-        language
-
-      ].bingo +
-
-      " • CARD #" +
-
-      result.winningCards.join(
-
-        ", #"
+        ).value
 
       );
 
-    showToast(
+    if(
 
-      translations[
+      !Number.isFinite(amount) ||
 
-        language
+      amount <= 0
 
-      ].bingo
+    ){
 
-    );
+      showToast(
 
-  } else {
+        t("amountInvalid")
 
-    box.textContent =
+      );
 
-      translations[
+      return;
 
-        language
+    }
 
-      ].noBingo;
+    try{
+
+      const result =
+
+        await api(
+
+          "/api/wallet",
+
+          {
+
+            method:"POST",
+
+            body:JSON.stringify({
+
+              method,
+
+              type:walletType,
+
+              amount
+
+            })
+
+          }
+
+        );
+
+      if(
+
+        result.error ===
+
+        "INSUFFICIENT_BALANCE"
+
+      ){
+
+        showToast(
+
+          t("insufficient")
+
+        );
+
+        return;
+
+      }
+
+      if(!result.ok){
+
+        showToast(
+
+          result.error ||
+
+          "Error"
+
+        );
+
+        return;
+
+      }
+
+      document.getElementById(
+
+        "walletAmount"
+
+      ).value = "";
+
+      await loadBalance();
+
+      showToast(
+
+        t("walletSuccess")
+
+      );
+
+    }catch(error){
+
+      showToast(
+
+        error.message ||
+
+        "Error"
+
+      );
+
+    }
 
   }
 
-}
+  async function claim(){
 
-function setLanguage(
+    try{
 
-  lang
+      const result =
 
-) {
+        await api(
 
-  language =
+          "/api/claim"
 
-    lang;
+        );
 
-  document
+      if(result.winner){
 
-    .getElementById(
+        showToast(
 
-      "enBtn"
+          t("bingo") +
 
-    )
+          " #" +
 
-    .classList.toggle(
+          result.cards.join(", #")
 
-      "active",
+        );
 
-      lang === "en"
+      }else{
 
-    );
+        showToast(
 
-  document
+          t("noBingo")
 
-    .getElementById(
+        );
+
+      }
+
+    }catch(error){
+
+      showToast(
+
+        error.message ||
+
+        "Error"
+
+      );
+
+    }
+
+  }
+
+  function applyLanguage(){
+
+    document.documentElement
+
+      .lang = language;
+
+    document.getElementById(
+
+      "brandSub"
+
+    ).textContent =
+
+      t("brandSub");
+
+    document.getElementById(
+
+      "calledLabel"
+
+    ).textContent =
+
+      t("called");
+
+    document.getElementById(
+
+      "cardsLabel"
+
+    ).textContent =
+
+      t("cards");
+
+    document.getElementById(
+
+      "maxLabel"
+
+    ).textContent =
+
+      t("maximum");
+
+    document.getElementById(
+
+      "tabPlay"
+
+    ).textContent =
+
+      t("play");
+
+    document.getElementById(
+
+      "tabCards"
+
+    ).textContent =
+
+      t("cardTab");
+
+    document.getElementById(
+
+      "tabBalance"
+
+    ).textContent =
+
+      t("balance");
+
+    document.getElementById(
+
+      "bottomPlay"
+
+    ).innerHTML =
+
+      "🎮<br><span>" +
+
+      t("play") +
+
+      "</span>";
+
+    document.getElementById(
+
+      "bottomCards"
+
+    ).innerHTML =
+
+      "🃏<br><span>" +
+
+      t("cardTab") +
+
+      "</span>";
+
+    document.getElementById(
+
+      "bottomBalance"
+
+    ).innerHTML =
+
+      "💵<br><span>" +
+
+      t("balance") +
+
+      "</span>";
+
+    document.getElementById(
+
+      "yourGameTitle"
+
+    ).textContent =
+
+      t("yourGame");
+
+    document.getElementById(
+
+      "yourGameSub"
+
+    ).textContent =
+
+      t("yourGameSub");
+
+    document.getElementById(
+
+      "rule75Title"
+
+    ).textContent =
+
+      t("ball75");
+
+    document.getElementById(
+
+      "rule75Text"
+
+    ).textContent =
+
+      t("ball75Text");
+
+    document.getElementById(
+
+      "ruleLinesTitle"
+
+    ).textContent =
+
+      t("twoLines");
+
+    document.getElementById(
+
+      "ruleLinesText"
+
+    ).textContent =
+
+      t("twoLinesText");
+
+    document.getElementById(
+
+      "myCardsTitle"
+
+    ).textContent =
+
+      t("myCards");
+
+    document.getElementById(
+
+      "myCardsSub"
+
+    ).textContent =
+
+      t("myCardsSub");
+
+    document.getElementById(
+
+      "chooseCardsBtn"
+
+    ).textContent =
+
+      t("chooseCard");
+
+    document.getElementById(
+
+      "checkBingoBtn"
+
+    ).textContent =
+
+      t("checkBingo");
+
+    document.getElementById(
+
+      "calledTitle"
+
+    ).textContent =
+
+      t("calledBalls");
+
+    document.getElementById(
+
+      "calledSub"
+
+    ).textContent =
+
+      t("calledBallsSub");
+
+    document.getElementById(
+
+      "chooseTitle"
+
+    ).textContent =
+
+      t("chooseCards");
+
+    document.getElementById(
+
+      "chooseSub"
+
+    ).textContent =
+
+      t("chooseCardsSub");
+
+    document.getElementById(
+
+      "saveCardsBtn"
+
+    ).textContent =
+
+      t("saveCards");
+
+    document.getElementById(
+
+      "walletLabel"
+
+    ).textContent =
+
+      t("wallet");
+
+    document.getElementById(
+
+      "depositBtn"
+
+    ).textContent =
+
+      t("deposit");
+
+    document.getElementById(
+
+      "withdrawBtn"
+
+    ).textContent =
+
+      t("withdraw");
+
+    document.getElementById(
+
+      "methodLabel"
+
+    ).textContent =
+
+      t("method");
+
+    document.getElementById(
+
+      "amountLabel"
+
+    ).textContent =
+
+      t("amount");
+
+    document.getElementById(
+
+      "walletSubmit"
+
+    ).textContent =
+
+      walletType === "deposit"
+
+        ? t("submitDeposit")
+
+        : t("submitWithdraw");
+
+    document.getElementById(
+
+      "walletNote"
+
+    ).textContent =
+
+      t("walletNote");
+
+    document.getElementById(
+
+      "languageTitle"
+
+    ).textContent =
+
+      t("language");
+
+    document.getElementById(
+
+      "languageSub"
+
+    ).textContent =
+
+      t("languageSub");
+
+    document.getElementById(
 
       "amBtn"
 
-    )
-
-    .classList.toggle(
+    ).classList.toggle(
 
       "active",
 
-      lang === "am"
+      language === "am"
 
     );
 
-  document.getElementById(
+    document.getElementById(
 
-    "balanceLabel"
+      "enBtn"
 
-  ).textContent =
+    ).classList.toggle(
 
-    translations[
+      "active",
 
-      lang
+      language === "en"
 
-    ].balance;
+    );
 
-  refreshGame();
+    setWalletType(walletType);
 
-  renderSelected();
+    updateGameUI();
 
-  renderMyCards();
+    renderMyCards();
 
-}
+    renderSelected();
 
-function boot() {
+  }
 
-  loadBalance();
+  function setLanguage(lang){
 
-  loadCards();
+    if(
 
-  loadMyCards();
+      lang !== "am" &&
 
-  refreshGame();
+      lang !== "en"
 
-  setInterval(
+    ){
 
-    refreshGame,
+      return;
 
-    1500
+    }
 
-  );
+    language = lang;
 
-  setInterval(
+    try{
 
-    loadBalance,
+      localStorage.setItem(
 
-    5000
+        "fastBingoLanguage",
 
-  );
+        lang
 
-}
+      );
 
-boot();
+    }catch{}
+
+    applyLanguage();
+
+  }
+
+  async function boot(){
+
+    try{
+
+      const savedLanguage =
+
+        localStorage.getItem(
+
+          "fastBingoLanguage"
+
+        );
+
+      if(
+
+        savedLanguage === "am" ||
+
+        savedLanguage === "en"
+
+      ){
+
+        language =
+
+          savedLanguage;
+
+      }else{
+
+        language = "am";
+
+      }
+
+    }catch{
+
+      language = "am";
+
+    }
+
+    applyLanguage();
+
+    await Promise.all([
+
+      refreshGame(),
+
+      loadBalance(),
+
+      loadMyCards(),
+
+      loadCards()
+
+    ]);
+
+    setInterval(
+
+      refreshGame,
+
+      1000
+
+    );
+
+    setInterval(
+
+      loadBalance,
+
+      10000
+
+    );
+
+  }
+
+  boot();
 
 </script>
+
+<script
+
+  src="https://telegram.org/js/telegram-web-app.js"
+
+></script>
 
 </body>
 
@@ -6412,459 +5888,279 @@ async function proxyToGame(
 
   const id =
 
-    env.GAME_SCHEDULER
+    env.GAME_SCHEDULER.idFromName(
 
-      .idFromName(
+      "main-game"
 
-        "main-game"
-
-      );
+    );
 
   const stub =
 
-    env.GAME_SCHEDULER.get(
+    env.GAME_SCHEDULER.get(id);
 
-      id
+  const url =
 
-    );
+    new URL(request.url);
 
-  const user =
+  url.pathname =
 
-    getTelegramUser(
-
-      request
-
-    );
+    path.replace(/^\/api/, "/do");
 
   const headers =
 
-    new Headers(
+    new Headers(request.headers);
 
-      request.headers
+  const telegramUser =
+
+    request.headers.get(
+
+      "x-telegram-user"
 
     );
 
-  headers.set(
+  if(telegramUser){
 
-    "x-telegram-user",
+    headers.set(
 
-    JSON.stringify(user)
+      "x-telegram-user",
 
-  );
+      telegramUser
 
-  const newRequest =
+    );
+
+  }
+
+  const proxied =
 
     new Request(
 
-      new URL(
-
-        path,
-
-        request.url
-
-      ),
+      url.toString(),
 
       {
 
-        method:
-
-          request.method,
+        method:request.method,
 
         headers,
 
         body:
 
-          request.method ===
+          request.method === "GET" ||
 
-            "GET" ||
-
-          request.method ===
-
-            "HEAD"
+          request.method === "HEAD"
 
             ? undefined
 
-            : await request.arrayBuffer()
+            : request.body
 
       }
 
     );
 
-  return await stub.fetch(
-
-    newRequest
-
-  );
+  return stub.fetch(proxied);
 
 }
 
 export default {
 
-  async fetch(
-
-    request,
-
-    env
-
-  ) {
+  async fetch(request, env){
 
     const url =
 
       new URL(request.url);
 
-    try {
+    if(url.pathname === "/health"){
 
-      if (
+      return json({
 
-        url.pathname ===
+        ok:true,
 
-        "/health"
+        app:APP_NAME,
 
-      ) {
+        time:new Date().toISOString()
 
-        return json({
+      });
 
-          ok:true,
+    }
 
-          service:
+    if(
 
-            APP_NAME,
+      url.pathname === "/api/game"
 
-          status:
+    ){
 
-            "online"
+      return proxyToGame(
 
-        });
+        request,
 
-      }
-
-      if (
-
-        url.pathname ===
+        env,
 
         "/api/game"
-
-      ) {
-
-        return proxyToGame(
-
-          request,
-
-          env,
-
-          "/game"
-
-        );
-
-      }
-
-      if (
-
-        url.pathname ===
-
-        "/api/cards"
-
-      ) {
-
-        return proxyToGame(
-
-          request,
-
-          env,
-
-          "/cards"
-
-        );
-
-      }
-
-      if (
-
-        url.pathname ===
-
-        "/api/user-cards"
-
-      ) {
-
-        return proxyToGame(
-
-          request,
-
-          env,
-
-          "/user-cards"
-
-        );
-
-      }
-
-      if (
-
-        url.pathname ===
-
-        "/api/select-cards"
-
-      ) {
-
-        return proxyToGame(
-
-          request,
-
-          env,
-
-          "/select-cards"
-
-        );
-
-      }
-
-      if (
-
-        url.pathname ===
-
-        "/api/balance"
-
-      ) {
-
-        return proxyToGame(
-
-          request,
-
-          env,
-
-          "/balance"
-
-        );
-
-      }
-
-      if (
-
-        url.pathname ===
-
-        "/api/wallet"
-
-      ) {
-
-        return proxyToGame(
-
-          request,
-
-          env,
-
-          "/wallet"
-
-        );
-
-      }
-
-      if (
-
-        url.pathname ===
-
-        "/api/claim"
-
-      ) {
-
-        return proxyToGame(
-
-          request,
-
-          env,
-
-          "/claim"
-
-        );
-
-      }
-
-      if (
-
-        url.pathname ===
-
-        "/do/game"
-
-      ) {
-
-        return proxyToGame(
-
-          request,
-
-          env,
-
-          "/game"
-
-        );
-
-      }
-
-      if (
-
-        url.pathname ===
-
-        "/do/cards"
-
-      ) {
-
-        return proxyToGame(
-
-          request,
-
-          env,
-
-          "/cards"
-
-        );
-
-      }
-
-      if (
-
-        url.pathname ===
-
-        "/do/user-cards"
-
-      ) {
-
-        return proxyToGame(
-
-          request,
-
-          env,
-
-          "/user-cards"
-
-        );
-
-      }
-
-      if (
-
-        url.pathname ===
-
-        "/do/select-cards"
-
-      ) {
-
-        return proxyToGame(
-
-          request,
-
-          env,
-
-          "/select-cards"
-
-        );
-
-      }
-
-      if (
-
-        url.pathname ===
-
-        "/do/balance"
-
-      ) {
-
-        return proxyToGame(
-
-          request,
-
-          env,
-
-          "/balance"
-
-        );
-
-      }
-
-      if (
-
-        url.pathname ===
-
-        "/do/wallet"
-
-      ) {
-
-        return proxyToGame(
-
-          request,
-
-          env,
-
-          "/wallet"
-
-        );
-
-      }
-
-      if (
-
-        url.pathname ===
-
-        "/do/claim"
-
-      ) {
-
-        return proxyToGame(
-
-          request,
-
-          env,
-
-          "/claim"
-
-        );
-
-      }
-
-      if (
-
-        url.pathname ===
-
-        "/favicon.ico"
-
-      ) {
-
-        return new Response(
-
-          "",
-
-          {
-
-            status:204
-
-          }
-
-        );
-
-      }
-
-      return html(
-
-        pageHtml()
-
-      );
-
-    } catch (error) {
-
-      return json(
-
-        {
-
-          ok:false,
-
-          error:
-
-            String(error)
-
-        },
-
-        500
 
       );
 
     }
+
+    if(
+
+      url.pathname === "/api/cards"
+
+    ){
+
+      return proxyToGame(
+
+        request,
+
+        env,
+
+        "/api/cards"
+
+      );
+
+    }
+
+    if(
+
+      url.pathname === "/api/user-cards"
+
+    ){
+
+      return proxyToGame(
+
+        request,
+
+        env,
+
+        "/api/user-cards"
+
+      );
+
+    }
+
+    if(
+
+      url.pathname === "/api/select-cards"
+
+    ){
+
+      return proxyToGame(
+
+        request,
+
+        env,
+
+        "/api/select-cards"
+
+      );
+
+    }
+
+    if(
+
+      url.pathname === "/api/balance"
+
+    ){
+
+      return proxyToGame(
+
+        request,
+
+        env,
+
+        "/api/balance"
+
+      );
+
+    }
+
+    if(
+
+      url.pathname === "/api/wallet"
+
+    ){
+
+      return proxyToGame(
+
+        request,
+
+        env,
+
+        "/api/wallet"
+
+      );
+
+    }
+
+    if(
+
+      url.pathname === "/api/claim"
+
+    ){
+
+      return proxyToGame(
+
+        request,
+
+        env,
+
+        "/api/claim"
+
+      );
+
+    }
+
+    if(
+
+      url.pathname === "/do/game" ||
+
+      url.pathname === "/do/cards" ||
+
+      url.pathname === "/do/user-cards" ||
+
+      url.pathname === "/do/select-cards" ||
+
+      url.pathname === "/do/balance" ||
+
+      url.pathname === "/do/wallet" ||
+
+      url.pathname === "/do/claim"
+
+    ){
+
+      const id =
+
+        env.GAME_SCHEDULER.idFromName(
+
+          "main-game"
+
+        );
+
+      const stub =
+
+        env.GAME_SCHEDULER.get(id);
+
+      return stub.fetch(request);
+
+    }
+
+    if(
+
+      url.pathname === "/favicon.ico"
+
+    ){
+
+      return new Response(null,{
+
+        status:204
+
+      });
+
+    }
+
+    return html(
+
+      pageHtml()
+
+    );
 
   }
 
