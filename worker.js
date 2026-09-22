@@ -5808,7 +5808,7 @@ async function proxyToGame(
 
     path.replace(
 
-      /^\\/api/,
+      /^\/api/,
 
       "/do"
 
