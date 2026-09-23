@@ -122,9 +122,23 @@ const apiBase = botToken
 
   : undefined;
 
+/*
+
+ * Fast Bingo Mini App
+
+ *
+
+ * Use the Cloudflare Worker URL directly.
+
+ * TELEGRAM_MINI_APP_URL can still override it if configured.
+
+ */
+
 const telegramMiniAppUrl =
 
-  process.env.TELEGRAM_MINI_APP_URL;
+  process.env.TELEGRAM_MINI_APP_URL ||
+
+  "https://fast-bingo-mini-app.dagnaeli21.workers.dev/";
 
 const telegramPollingEnabled =
 
@@ -436,25 +450,31 @@ function mainKeyboard(
 
   const rows: TelegramButton[][] = [];
 
-  if (telegramMiniAppUrl) {
+  /*
 
-    rows.push([
+   * IMPORTANT:
 
-      {
+   * 🎮 Play is a Telegram Web App button.
 
-        text: t(language, "play"),
+   * It opens the Cloudflare Fast Bingo Mini App directly.
 
-        web_app: {
+   */
 
-          url: telegramMiniAppUrl,
+  rows.push([
 
-        },
+    {
+
+      text: t(language, "play"),
+
+      web_app: {
+
+        url: telegramMiniAppUrl,
 
       },
 
-    ]);
+    },
 
-  }
+  ]);
 
   rows.push([
 
@@ -468,7 +488,9 @@ function mainKeyboard(
 
       ),
 
-      callback_data: "menu:balance",
+      callback_data:
+
+        "menu:balance",
 
     },
 
@@ -482,7 +504,9 @@ function mainKeyboard(
 
       ),
 
-      callback_data: "menu:language",
+      callback_data:
+
+        "menu:language",
 
     },
 
@@ -500,7 +524,9 @@ function mainKeyboard(
 
       ),
 
-      callback_data: "menu:help",
+      callback_data:
+
+        "menu:help",
 
     },
 
@@ -1014,7 +1040,11 @@ async function notifyParticipants(
 
     );
 
-  for (const telegramId of participants) {
+  for (
+
+    const telegramId of participants
+
+  ) {
 
     try {
 
@@ -1209,20 +1239,6 @@ async function handleMessage(
       "menu",
 
     );
-
-    if (!hasTelegramUser(telegramId)) {
-
-      await showLanguage(
-
-        chatId,
-
-        language,
-
-      );
-
-      return;
-
-    }
 
     await showMainMenu(
 
