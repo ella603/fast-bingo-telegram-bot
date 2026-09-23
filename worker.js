@@ -12,7 +12,11 @@ const MAX_CARDS_PER_PLAYER = 4;
 
 const CARD_COUNT = 400;
 
-const PLAY_BALANCE_START = 2500;
+const CARD_PRICE = 10;
+
+const JACKPOT_PER_CARD = 8;
+
+const PLAY_BALANCE_START = 0;
 
 function json(data, status = 200) {
 
@@ -22,11 +26,11 @@ function json(data, status = 200) {
 
     headers: {
 
-      "content-type": "application/json; charset=UTF-8",
+      "content-type": "application/json; charset=utf-8",
 
-      "cache-control": "no-store",
+      "cache-control": "no-store"
 
-    },
+    }
 
   });
 
@@ -38,11 +42,11 @@ function html(body) {
 
     headers: {
 
-      "content-type": "text/html; charset=UTF-8",
+      "content-type": "text/html; charset=utf-8",
 
-      "cache-control": "no-store",
+      "cache-control": "no-store"
 
-    },
+    }
 
   });
 
@@ -50,7 +54,7 @@ function html(body) {
 
 function shuffle(arr, seed) {
 
-  const a = [...arr];
+  const a = arr.slice();
 
   let s = seed >>> 0;
 
@@ -60,7 +64,11 @@ function shuffle(arr, seed) {
 
     const j = s % (i + 1);
 
-    [a[i], a[j]] = [a[j], a[i]];
+    const tmp = a[i];
+
+    a[i] = a[j];
+
+    a[j] = tmp;
 
   }
 
@@ -70,21 +78,19 @@ function shuffle(arr, seed) {
 
 function ballLetter(n) {
 
-  if (n <= 15) return "B";
+  if (n >= 1 && n <= 15) return "B";
 
-  if (n <= 30) return "I";
+  if (n >= 16 && n <= 30) return "I";
 
-  if (n <= 45) return "N";
+  if (n >= 31 && n <= 45) return "N";
 
-  if (n <= 60) return "G";
+  if (n >= 46 && n <= 60) return "G";
 
   return "O";
 
 }
 
 function makeCard(number) {
-
-  const seed = 100000 + number * 7919;
 
   const ranges = [
 
@@ -96,7 +102,7 @@ function makeCard(number) {
 
     [46, 60],
 
-    [61, 75],
+    [61, 75]
 
   ];
 
@@ -104,39 +110,43 @@ function makeCard(number) {
 
   for (let c = 0; c < 5; c++) {
 
-    const from = ranges[c][0];
+    const values = [];
 
-    const to = ranges[c][1];
+    for (
 
-    const values = shuffle(
+      let n = ranges[c][0];
 
-      Array.from(
+      n <= ranges[c][1];
 
-        { length: to - from + 1 },
+      n++
 
-        (_, i) => from + i
+    ) {
 
-      ),
+      values.push(n);
 
-      seed + c * 97
+    }
 
-    ).slice(0, 5);
+    columns.push(
 
-    columns.push(values);
+      shuffle(
+
+        values,
+
+        100000 + number * 7919 + c * 97
+
+      ).slice(0, 5)
+
+    );
 
   }
 
-  const grid = Array.from(
+  const grid = [];
 
-    { length: 5 },
+  for (let r = 0; r < 5; r++) {
 
-    () => Array(5).fill(null)
+    grid[r] = [];
 
-  );
-
-  for (let c = 0; c < 5; c++) {
-
-    for (let r = 0; r < 5; r++) {
+    for (let c = 0; c < 5; c++) {
 
       grid[r][c] = columns[c][r];
 
@@ -150,7 +160,7 @@ function makeCard(number) {
 
     number,
 
-    grid,
+    grid
 
   };
 
@@ -168,7 +178,7 @@ function makeBallOrder(gameNumber) {
 
     ),
 
-    50000 + gameNumber * 9176
+    900001 + gameNumber * 104729
 
   );
 
@@ -178,33 +188,27 @@ function hasTwoLines(card, called) {
 
   const calledSet = new Set(called);
 
-  const marked = (value) => {
+  const rows = [];
 
-    return value === "FREE" || calledSet.has(value);
-
-  };
-
-  let lines = 0;
+  const cols = [];
 
   for (let r = 0; r < 5; r++) {
 
-    if (card.grid[r].every(marked)) {
+    let ok = true;
 
-      lines++;
+    for (let c = 0; c < 5; c++) {
 
-    }
+      const v = card.grid[r][c];
 
-  }
+      if (
 
-  for (let c = 0; c < 5; c++) {
+        v !== "FREE" &&
 
-    let complete = true;
+        !calledSet.has(v)
 
-    for (let r = 0; r < 5; r++) {
+      ) {
 
-      if (!marked(card.grid[r][c])) {
-
-        complete = false;
+        ok = false;
 
         break;
 
@@ -212,77 +216,71 @@ function hasTwoLines(card, called) {
 
     }
 
-    if (complete) {
-
-      lines++;
-
-    }
+    if (ok) rows.push(r);
 
   }
 
-  let diagonal1 = true;
+  for (let c = 0; c < 5; c++) {
 
-  let diagonal2 = true;
+    let ok = true;
 
-  for (let i = 0; i < 5; i++) {
+    for (let r = 0; r < 5; r++) {
 
-    if (!marked(card.grid[i][i])) {
+      const v = card.grid[r][c];
 
-      diagonal1 = false;
+      if (
+
+        v !== "FREE" &&
+
+        !calledSet.has(v)
+
+      ) {
+
+        ok = false;
+
+        break;
+
+      }
 
     }
 
-    if (!marked(card.grid[i][4 - i])) {
-
-      diagonal2 = false;
-
-    }
+    if (ok) cols.push(c);
 
   }
 
-  if (diagonal1) lines++;
-
-  if (diagonal2) lines++;
-
-  return lines >= 2;
-
-}
-
-function cardNumberValid(n) {
-
-  return Number.isInteger(n) &&
-
-    n >= 1 &&
-
-    n <= CARD_COUNT;
+  return rows.length + cols.length >= 2;
 
 }
 
 function getTelegramUser(request) {
 
-  const raw = request.headers.get("x-telegram-user");
+  const raw = request.headers.get(
+
+    "x-telegram-user"
+
+  );
 
   if (raw) {
 
     try {
 
-      const parsed = JSON.parse(raw);
+      const user = JSON.parse(raw);
 
-      if (parsed && parsed.id) {
+      if (user && user.id !== undefined) {
 
         return {
 
-          id: String(parsed.id),
+          id: String(user.id),
 
-          first_name: parsed.first_name || "",
+          first_name: user.first_name || "Player",
 
-          username: parsed.username || "",
+          username: user.username || ""
 
         };
 
       }
 
-    } catch {}
+    } catch (_) {}
 
   }
 
@@ -292,7 +290,7 @@ function getTelegramUser(request) {
 
     first_name: "Guest",
 
-    username: "",
+    username: ""
 
   };
 
@@ -308,11 +306,15 @@ class GameScheduler extends DurableObject {
 
     this.env = env;
 
-    this.ctx.blockConcurrencyWhile(async () => {
+    ctx.blockConcurrencyWhile(
 
-      await this.init();
+      async () => {
 
-    });
+        await this.init();
+
+      }
+
+    );
 
   }
 
@@ -330,7 +332,9 @@ class GameScheduler extends DurableObject {
 
         status TEXT NOT NULL,
 
-        started_at INTEGER NOT NULL,
+        lobby_ends_at INTEGER,
+
+        started_at INTEGER,
 
         ball_index INTEGER NOT NULL,
 
@@ -344,13 +348,23 @@ class GameScheduler extends DurableObject {
 
       CREATE TABLE IF NOT EXISTS selected_cards (
 
-        user_id TEXT NOT NULL,
-
         game_number INTEGER NOT NULL,
+
+        user_id TEXT NOT NULL,
 
         card_number INTEGER NOT NULL,
 
-        PRIMARY KEY(user_id, game_number, card_number)
+        selected_at INTEGER NOT NULL,
+
+        PRIMARY KEY (
+
+          game_number,
+
+          user_id,
+
+          card_number
+
+        )
 
       )
 
@@ -362,7 +376,7 @@ class GameScheduler extends DurableObject {
 
         user_id TEXT PRIMARY KEY,
 
-        balance INTEGER NOT NULL
+        balance REAL NOT NULL
 
       )
 
@@ -376,11 +390,13 @@ class GameScheduler extends DurableObject {
 
         user_id TEXT NOT NULL,
 
-        method TEXT NOT NULL,
-
         type TEXT NOT NULL,
 
-        amount INTEGER NOT NULL,
+        method TEXT,
+
+        amount REAL NOT NULL,
+
+        simulated INTEGER NOT NULL,
 
         created_at INTEGER NOT NULL
 
@@ -388,87 +404,101 @@ class GameScheduler extends DurableObject {
 
     `);
 
-    const rows = [
+    const existing = sql
 
-      ...sql.exec(
+      .exec(
 
         "SELECT * FROM state WHERE id = 1"
 
-      ),
+      )
 
-    ];
+      .toArray();
 
-    if (!rows.length) {
-
-      const gameNumber = 1;
+    if (!existing.length) {
 
       const now = Date.now();
 
+      const ends = now + LOBBY_SECONDS * 1000;
+
+      const order = makeBallOrder(1);
+
       sql.exec(
 
-        `INSERT INTO state
+        `
 
-        (id, game_number, status, started_at, ball_index, ball_order)
+        INSERT INTO state
 
-        VALUES (?, ?, ?, ?, ?, ?)`,
+        (
 
-        1,
+          id,
 
-        gameNumber,
+          game_number,
 
-        "lobby",
+          status,
 
-        now,
+          lobby_ends_at,
 
-        -1,
+          started_at,
 
-        JSON.stringify(
+          ball_index,
 
-          makeBallOrder(gameNumber)
+          ball_order
 
         )
 
+        VALUES
+
+        (1, ?, 'lobby', ?, NULL, -1, ?)
+
+        `,
+
+        1,
+
+        ends,
+
+        JSON.stringify(order)
+
       );
 
-      await this.ctx.storage.setAlarm(
+      await this.scheduleNext(
 
-        now + LOBBY_SECONDS * 1000
+        LOBBY_SECONDS * 1000
+
+      );
+
+      return;
+
+    }
+
+    const state = existing[0];
+
+    if (state.status === "lobby") {
+
+      const remaining =
+
+        Math.max(
+
+          1000,
+
+          Number(state.lobby_ends_at || 0) -
+
+            Date.now()
+
+        );
+
+      await this.scheduleNext(
+
+        remaining
 
       );
 
     } else {
 
-      const state = rows[0];
+      await this.scheduleNext(
 
-      if (state.status === "lobby") {
+        BALL_INTERVAL
 
-        const elapsed =
-
-          Date.now() - state.started_at;
-
-        const remaining = Math.max(
-
-          1000,
-
-          LOBBY_SECONDS * 1000 - elapsed
-
-        );
-
-        await this.ctx.storage.setAlarm(
-
-          Date.now() + remaining
-
-        );
-
-      } else if (state.status === "live") {
-
-        await this.ctx.storage.setAlarm(
-
-          Date.now() + BALL_INTERVAL
-
-        );
-
-      }
+      );
 
     }
 
@@ -476,47 +506,43 @@ class GameScheduler extends DurableObject {
 
   getState() {
 
-    const rows = [
+    const rows = this.ctx.storage.sql
 
-      ...this.ctx.storage.sql.exec(
+      .exec(
 
         "SELECT * FROM state WHERE id = 1"
 
-      ),
+      )
 
-    ];
+      .toArray();
 
-    if (!rows.length) {
-
-      return null;
-
-    }
-
-    const state = rows[0];
-
-    return {
-
-      ...state,
-
-      ball_order: JSON.parse(
-
-        state.ball_order
-
-      ),
-
-    };
+    return rows[0] || null;
 
   }
 
   getCalledBalls(state) {
 
-    if (!state || state.ball_index < 0) {
+    if (!state) return [];
+
+    const order = JSON.parse(
+
+      state.ball_order
+
+    );
+
+    if (
+
+      state.status !== "live" ||
+
+      state.ball_index < 0
+
+    ) {
 
       return [];
 
     }
 
-    return state.ball_order.slice(
+    return order.slice(
 
       0,
 
@@ -530,7 +556,7 @@ class GameScheduler extends DurableObject {
 
     await this.ctx.storage.setAlarm(
 
-      Date.now() + Math.max(500, ms)
+      Date.now() + Math.max(1000, ms)
 
     );
 
@@ -548,29 +574,43 @@ class GameScheduler extends DurableObject {
 
     }
 
-    const sql = this.ctx.storage.sql;
+    const now = Date.now();
 
     if (state.status === "lobby") {
 
-      sql.exec(
+      const ends =
 
-        `UPDATE state
+        Number(state.lobby_ends_at || 0);
 
-        SET status = ?,
+      if (now < ends) {
 
-            started_at = ?,
+        await this.scheduleNext(
 
-            ball_index = ?
+          ends - now
 
-        WHERE id = 1`,
+        );
 
-        "live",
+        return;
 
-        Date.now(),
+      }
 
-        0
+      this.ctx.storage.sql.exec(`
 
-      );
+        UPDATE state
+
+        SET
+
+          status = 'live',
+
+          started_at = ?,
+
+          ball_index = -1,
+
+          lobby_ends_at = NULL
+
+        WHERE id = 1
+
+      `, now);
 
       await this.scheduleNext(
 
@@ -586,7 +626,7 @@ class GameScheduler extends DurableObject {
 
       const nextIndex =
 
-        state.ball_index + 1;
+        Number(state.ball_index) + 1;
 
       if (nextIndex >= TOTAL_BALLS) {
 
@@ -596,13 +636,17 @@ class GameScheduler extends DurableObject {
 
       }
 
-      sql.exec(
+      this.ctx.storage.sql.exec(
 
-        `UPDATE state
+        `
+
+        UPDATE state
 
         SET ball_index = ?
 
-        WHERE id = 1`,
+        WHERE id = 1
+
+        `,
 
         nextIndex
 
@@ -620,53 +664,69 @@ class GameScheduler extends DurableObject {
 
   async startNextGame() {
 
-    const oldState = this.getState();
+    const current = this.getState();
 
-    const gameNumber =
+    const nextGame =
 
-      Number(oldState.game_number) + 1;
+      Number(
+
+        current?.game_number || 0
+
+      ) + 1;
 
     const now = Date.now();
 
+    const lobbyEnds =
+
+      now + LOBBY_SECONDS * 1000;
+
+    const order =
+
+      makeBallOrder(nextGame);
+
     this.ctx.storage.sql.exec(
 
-      `DELETE FROM selected_cards
+      `
 
-       WHERE game_number < ?`,
+      DELETE FROM selected_cards
 
-      gameNumber - 2
+      WHERE game_number < ?
+
+      `,
+
+      nextGame
 
     );
 
     this.ctx.storage.sql.exec(
 
-      `UPDATE state
+      `
 
-       SET game_number = ?,
+      UPDATE state
 
-           status = ?,
+      SET
 
-           started_at = ?,
+        game_number = ?,
 
-           ball_index = ?,
+        status = 'lobby',
 
-           ball_order = ?
+        lobby_ends_at = ?,
 
-       WHERE id = 1`,
+        started_at = NULL,
 
-      gameNumber,
+        ball_index = -1,
 
-      "lobby",
+        ball_order = ?
 
-      now,
+      WHERE id = 1
 
-      -1,
+      `,
 
-      JSON.stringify(
+      nextGame,
 
-        makeBallOrder(gameNumber)
+      lobbyEnds,
 
-      )
+      JSON.stringify(order)
 
     );
 
@@ -678,7 +738,45 @@ class GameScheduler extends DurableObject {
 
   }
 
-  async game() {
+  getJackpot(gameNumber) {
+
+    const row = this.ctx.storage.sql
+
+      .exec(
+
+        `
+
+        SELECT COUNT(*) AS count
+
+        FROM selected_cards
+
+        WHERE game_number = ?
+
+        `,
+
+        gameNumber
+
+      )
+
+      .toArray()[0];
+
+    const count =
+
+      Number(row?.count || 0);
+
+    return {
+
+      selectedCount: count,
+
+      jackpot:
+
+        count * JACKPOT_PER_CARD
+
+    };
+
+  }
+
+  getGameResponse() {
 
     const state = this.getState();
 
@@ -692,13 +790,17 @@ class GameScheduler extends DurableObject {
 
         lobbyRemaining: LOBBY_SECONDS,
 
+        calledBalls: [],
+
+        calledCount: 0,
+
         currentBall: null,
 
         currentLetter: null,
 
-        calledBalls: [],
+        selectedCount: 0,
 
-        calledCount: 0,
+        jackpot: 0
 
       };
 
@@ -708,27 +810,9 @@ class GameScheduler extends DurableObject {
 
       this.getCalledBalls(state);
 
-    let lobbyRemaining = 0;
+    const order =
 
-    if (state.status === "lobby") {
-
-      lobbyRemaining = Math.max(
-
-        0,
-
-        LOBBY_SECONDS -
-
-          Math.floor(
-
-            (Date.now() - state.started_at) /
-
-              1000
-
-          )
-
-      );
-
-    }
+      JSON.parse(state.ball_order);
 
     const currentBall =
 
@@ -736,67 +820,77 @@ class GameScheduler extends DurableObject {
 
       state.ball_index >= 0
 
-        ? state.ball_order[
-
-            state.ball_index
-
-          ]
+        ? order[state.ball_index]
 
         : null;
+
+    const lobbyRemaining =
+
+      state.status === "lobby"
+
+        ? Math.max(
+
+            0,
+
+            Math.ceil(
+
+              (
+
+                Number(
+
+                  state.lobby_ends_at || 0
+
+                ) - Date.now()
+
+              ) / 1000
+
+            )
+
+          )
+
+        : 0;
+
+    const jackpot =
+
+      this.getJackpot(
+
+        state.game_number
+
+      );
 
     return {
 
       status: state.status,
 
-      gameNumber: state.game_number,
+      gameNumber:
+
+        Number(state.game_number),
 
       lobbyRemaining,
 
-      currentBall,
-
-      currentLetter: currentBall
-
-        ? ballLetter(currentBall)
-
-        : null,
-
       calledBalls,
 
-      calledCount: calledBalls.length,
+      calledCount:
 
-    };
+        calledBalls.length,
 
-  }
+      currentBall,
 
-  async cards() {
+      currentLetter:
 
-    const cards = [];
+        currentBall
 
-    for (
+          ? ballLetter(currentBall)
 
-      let i = 1;
+          : null,
 
-      i <= CARD_COUNT;
+      selectedCount:
 
-      i++
+        jackpot.selectedCount,
 
-    ) {
+      jackpot:
 
-      cards.push({
-
-        number: i,
-
-        available: true,
-
-      });
-
-    }
-
-    return {
-
-      cards,
-
-      total: CARD_COUNT,
+        jackpot.jackpot
 
     };
 
@@ -812,7 +906,7 @@ class GameScheduler extends DurableObject {
 
         ok: false,
 
-        error: "GAME_NOT_READY",
+        error: "NO_GAME"
 
       };
 
@@ -824,67 +918,109 @@ class GameScheduler extends DurableObject {
 
         ok: false,
 
-        error: "GAME_IN_PROGRESS",
+        error: "GAME_IN_PROGRESS"
 
       };
 
     }
 
-    const clean = [
+    let clean = Array.isArray(cards)
 
-      ...new Set(
+      ? cards
 
-        Array.isArray(cards)
+          .map(Number)
 
-          ? cards
+          .filter(
 
-              .map(Number)
+            (n) =>
 
-              .filter(cardNumberValid)
+              Number.isInteger(n) &&
 
-          : []
+              n >= 1 &&
 
-      ),
+              n <= CARD_COUNT
 
-    ].slice(
+          )
 
-      0,
+      : [];
+
+    clean = [
+
+      ...new Set(clean)
+
+    ];
+
+    if (
+
+      clean.length >
 
       MAX_CARDS_PER_PLAYER
 
+    ) {
+
+      return {
+
+        ok: false,
+
+        error: "MAX_CARDS"
+
+      };
+
+    }
+
+    this.ctx.storage.sql.exec(
+
+      `
+
+      DELETE FROM selected_cards
+
+      WHERE game_number = ?
+
+      AND user_id = ?
+
+      `,
+
+      state.game_number,
+
+      userId
+
     );
 
-    const sql = this.ctx.storage.sql;
+    const now = Date.now();
 
-    sql.exec(
+    for (const card of clean) {
 
-      `DELETE FROM selected_cards
+      this.ctx.storage.sql.exec(
 
-       WHERE user_id = ?
+        `
 
-       AND game_number = ?`,
+        INSERT OR IGNORE INTO
 
-      userId,
+        selected_cards
 
-      state.game_number
+        (
 
-    );
+          game_number,
 
-    for (const cardNumber of clean) {
+          user_id,
 
-      sql.exec(
+          card_number,
 
-        `INSERT OR IGNORE INTO selected_cards
+          selected_at
 
-         (user_id, game_number, card_number)
+        )
 
-         VALUES (?, ?, ?)`,
+        VALUES (?, ?, ?, ?)
 
-        userId,
+        `,
 
         state.game_number,
 
-        cardNumber
+        userId,
+
+        card,
+
+        now
 
       );
 
@@ -896,91 +1032,97 @@ class GameScheduler extends DurableObject {
 
       selected: clean,
 
-      gameNumber: state.game_number,
-
-    };
-
-  }
-
-  async userCards(userId) {
-
-    const state = this.getState();
-
-    if (!state) {
-
-      return {
-
-        selected: [],
-
-      };
-
-    }
-
-    const rows = [
-
-      ...this.ctx.storage.sql.exec(
-
-        `SELECT card_number
-
-         FROM selected_cards
-
-         WHERE user_id = ?
-
-         AND game_number = ?
-
-         ORDER BY card_number`,
-
-        userId,
+      ...this.getJackpot(
 
         state.game_number
 
-      ),
-
-    ];
-
-    return {
-
-      selected: rows.map(
-
-        (r) => Number(r.card_number)
-
-      ),
-
-      gameNumber: state.game_number,
+      )
 
     };
 
   }
 
-  async balance(userId) {
+  getUserCards(userId) {
 
-    const sql = this.ctx.storage.sql;
+    const state = this.getState();
 
-    const rows = [
+    if (!state) return [];
 
-      ...sql.exec(
+    const rows =
 
-        `SELECT balance
+      this.ctx.storage.sql
 
-         FROM balances
+        .exec(
 
-         WHERE user_id = ?`,
+          `
 
-        userId
+          SELECT card_number
 
-      ),
+          FROM selected_cards
 
-    ];
+          WHERE game_number = ?
 
-    if (!rows.length) {
+          AND user_id = ?
 
-      sql.exec(
+          ORDER BY card_number
 
-        `INSERT INTO balances
+          `,
 
-         (user_id, balance)
+          state.game_number,
 
-         VALUES (?, ?)`,
+          userId
+
+        )
+
+        .toArray();
+
+    return rows.map(
+
+      (row) =>
+
+        Number(row.card_number)
+
+    );
+
+  }
+
+  getBalance(userId) {
+
+    let row =
+
+      this.ctx.storage.sql
+
+        .exec(
+
+          `
+
+          SELECT balance
+
+          FROM balances
+
+          WHERE user_id = ?
+
+          `,
+
+          userId
+
+        )
+
+        .toArray()[0];
+
+    if (!row) {
+
+      this.ctx.storage.sql.exec(
+
+        `
+
+        INSERT INTO balances
+
+        (user_id, balance)
+
+        VALUES (?, ?)
+
+        `,
 
         userId,
 
@@ -988,23 +1130,15 @@ class GameScheduler extends DurableObject {
 
       );
 
-      return {
-
-        balance: PLAY_BALANCE_START,
-
-      };
+      return PLAY_BALANCE_START;
 
     }
 
-    return {
+    return Number(
 
-      balance: Number(
+      row.balance || 0
 
-        rows[0].balance
-
-      ),
-
-    };
+    );
 
   }
 
@@ -1012,27 +1146,35 @@ class GameScheduler extends DurableObject {
 
     userId,
 
-    method,
-
-    type,
-
-    amount
+    body
 
   ) {
 
-    const allowedMethods = [
+    const amount =
 
-      "Telebirr",
+      Number(body?.amount || 0);
 
-      "eBirr",
+    const type =
 
-      "M-PESA",
+      body?.type === "withdraw"
 
-    ];
+        ? "withdraw"
+
+        : "deposit";
+
+    const method =
+
+      String(
+
+        body?.method || "Demo"
+
+      );
 
     if (
 
-      !allowedMethods.includes(method)
+      !Number.isFinite(amount) ||
+
+      amount <= 0
 
     ) {
 
@@ -1040,119 +1182,93 @@ class GameScheduler extends DurableObject {
 
         ok: false,
 
-        error: "INVALID_METHOD",
+        error: "INVALID_AMOUNT"
 
       };
 
     }
-
-    const cleanAmount =
-
-      Math.floor(Number(amount));
-
-    if (
-
-      !Number.isFinite(cleanAmount) ||
-
-      cleanAmount <= 0 ||
-
-      cleanAmount > 100000
-
-    ) {
-
-      return {
-
-        ok: false,
-
-        error: "INVALID_AMOUNT",
-
-      };
-
-    }
-
-    const sql = this.ctx.storage.sql;
 
     const current =
 
-      await this.balance(userId);
+      this.getBalance(userId);
 
-    let newBalance =
+    if (
 
-      current.balance;
+      type === "withdraw" &&
 
-    if (type === "deposit") {
+      amount > current
 
-      newBalance += cleanAmount;
-
-    } else if (type === "withdraw") {
-
-      if (
-
-        cleanAmount >
-
-        current.balance
-
-      ) {
-
-        return {
-
-          ok: false,
-
-          error:
-
-            "INSUFFICIENT_BALANCE",
-
-          balance:
-
-            current.balance,
-
-        };
-
-      }
-
-      newBalance -= cleanAmount;
-
-    } else {
+    ) {
 
       return {
 
         ok: false,
 
-        error: "INVALID_TYPE",
+        error: "INSUFFICIENT_BALANCE"
 
       };
 
     }
 
-    sql.exec(
+    const next =
 
-      `UPDATE balances
+      type === "deposit"
 
-       SET balance = ?
+        ? current + amount
 
-       WHERE user_id = ?`,
+        : current - amount;
 
-      newBalance,
+    this.ctx.storage.sql.exec(
+
+      `
+
+      UPDATE balances
+
+      SET balance = ?
+
+      WHERE user_id = ?
+
+      `,
+
+      next,
 
       userId
 
     );
 
-    sql.exec(
+    this.ctx.storage.sql.exec(
 
-      `INSERT INTO transactions
+      `
 
-       (user_id, method, type, amount, created_at)
+      INSERT INTO transactions
 
-       VALUES (?, ?, ?, ?, ?)`,
+      (
+
+        user_id,
+
+        type,
+
+        method,
+
+        amount,
+
+        simulated,
+
+        created_at
+
+      )
+
+      VALUES (?, ?, ?, ?, 1, ?)
+
+      `,
 
       userId,
 
-      method,
-
       type,
 
-      cleanAmount,
+      method,
+
+      amount,
 
       Date.now()
 
@@ -1162,21 +1278,15 @@ class GameScheduler extends DurableObject {
 
       ok: true,
 
-      balance: newBalance,
-
-      method,
-
-      type,
-
-      amount: cleanAmount,
-
       simulated: true,
+
+      balance: next
 
     };
 
   }
 
-  async checkWinners(userId) {
+  async claim(userId) {
 
     const state = this.getState();
 
@@ -1184,51 +1294,27 @@ class GameScheduler extends DurableObject {
 
       return {
 
-        ok: false,
+        ok: true,
 
-        winner: false,
+        winner: false
 
       };
 
     }
 
-    const rows = [
-
-      ...this.ctx.storage.sql.exec(
-
-        `SELECT card_number
-
-         FROM selected_cards
-
-         WHERE user_id = ?
-
-         AND game_number = ?
-
-         ORDER BY card_number`,
-
-        userId,
-
-        state.game_number
-
-      ),
-
-    ];
-
     const called =
 
       this.getCalledBalls(state);
 
-    const winners = [];
+    const cards =
 
-    for (const row of rows) {
+      this.getUserCards(userId);
 
-      const cardNumber =
-
-        Number(row.card_number);
+    for (const number of cards) {
 
       const card =
 
-        makeCard(cardNumber);
+        makeCard(number);
 
       if (
 
@@ -1242,11 +1328,15 @@ class GameScheduler extends DurableObject {
 
       ) {
 
-        winners.push(
+        return {
 
-          cardNumber
+          ok: true,
 
-        );
+          winner: true,
+
+          card: number
+
+        };
 
       }
 
@@ -1256,15 +1346,7 @@ class GameScheduler extends DurableObject {
 
       ok: true,
 
-      winner:
-
-        winners.length > 0,
-
-      cards: winners,
-
-      gameNumber:
-
-        state.game_number,
+      winner: false
 
     };
 
@@ -1272,215 +1354,207 @@ class GameScheduler extends DurableObject {
 
   async fetch(request) {
 
-    const url = new URL(request.url);
+    const url =
 
-    const path = url.pathname;
+      new URL(request.url);
 
     const user =
 
       getTelegramUser(request);
 
-    try {
+    if (
 
-      if (path === "/do/game") {
+      url.pathname ===
 
-        return json(
+      "/do/game"
 
-          await this.game()
-
-        );
-
-      }
-
-      if (path === "/do/cards") {
-
-        return json(
-
-          await this.cards()
-
-        );
-
-      }
-
-      if (
-
-        path === "/do/user-cards"
-
-      ) {
-
-        return json(
-
-          await this.userCards(
-
-            user.id
-
-          )
-
-        );
-
-      }
-
-      if (
-
-        path === "/do/select-cards"
-
-      ) {
-
-        if (
-
-          request.method !== "POST"
-
-        ) {
-
-          return json(
-
-            {
-
-              error:
-
-                "METHOD_NOT_ALLOWED",
-
-            },
-
-            405
-
-          );
-
-        }
-
-        const body =
-
-          await request.json();
-
-        return json(
-
-          await this.selectCards(
-
-            user.id,
-
-            body.cards
-
-          )
-
-        );
-
-      }
-
-      if (
-
-        path === "/do/balance"
-
-      ) {
-
-        return json(
-
-          await this.balance(
-
-            user.id
-
-          )
-
-        );
-
-      }
-
-      if (
-
-        path === "/do/wallet"
-
-      ) {
-
-        if (
-
-          request.method !== "POST"
-
-        ) {
-
-          return json(
-
-            {
-
-              error:
-
-                "METHOD_NOT_ALLOWED",
-
-            },
-
-            405
-
-          );
-
-        }
-
-        const body =
-
-          await request.json();
-
-        return json(
-
-          await this.walletRequest(
-
-            user.id,
-
-            body.method,
-
-            body.type,
-
-            body.amount
-
-          )
-
-        );
-
-      }
-
-      if (path === "/do/claim") {
-
-        return json(
-
-          await this.checkWinners(
-
-            user.id
-
-          )
-
-        );
-
-      }
+    ) {
 
       return json(
 
-        {
-
-          error: "NOT_FOUND",
-
-        },
-
-        404
-
-      );
-
-    } catch (error) {
-
-      return json(
-
-        {
-
-          error: "SERVER_ERROR",
-
-          message:
-
-            error?.message ||
-
-            String(error),
-
-        },
-
-        500
+        this.getGameResponse()
 
       );
 
     }
+
+    if (
+
+      url.pathname ===
+
+      "/do/cards"
+
+    ) {
+
+      return json({
+
+        ok: true,
+
+        count: CARD_COUNT,
+
+        cards: Array.from(
+
+          { length: CARD_COUNT },
+
+          (_, i) => ({
+
+            number: i + 1,
+
+            available: true
+
+          })
+
+        )
+
+      });
+
+    }
+
+    if (
+
+      url.pathname ===
+
+      "/do/user-cards"
+
+    ) {
+
+      return json({
+
+        ok: true,
+
+        selected:
+
+          this.getUserCards(
+
+            user.id
+
+          )
+
+      });
+
+    }
+
+    if (
+
+      url.pathname ===
+
+      "/do/select-cards" &&
+
+      request.method === "POST"
+
+    ) {
+
+      let body = {};
+
+      try {
+
+        body =
+
+          await request.json();
+
+      } catch (_) {}
+
+      return json(
+
+        await this.selectCards(
+
+          user.id,
+
+          body.cards
+
+        )
+
+      );
+
+    }
+
+    if (
+
+      url.pathname ===
+
+      "/do/balance"
+
+    ) {
+
+      return json({
+
+        ok: true,
+
+        balance:
+
+          this.getBalance(user.id)
+
+      });
+
+    }
+
+    if (
+
+      url.pathname ===
+
+      "/do/wallet" &&
+
+      request.method === "POST"
+
+    ) {
+
+      let body = {};
+
+      try {
+
+        body =
+
+          await request.json();
+
+      } catch (_) {}
+
+      return json(
+
+        await this.walletRequest(
+
+          user.id,
+
+          body
+
+        )
+
+      );
+
+    }
+
+    if (
+
+      url.pathname ===
+
+      "/do/claim"
+
+    ) {
+
+      return json(
+
+        await this.claim(
+
+          user.id
+
+        )
+
+      );
+
+    }
+
+    return json(
+
+      {
+
+        ok: false,
+
+        error: "NOT_FOUND"
+
+      },
+
+      404
+
+    );
 
   }
 
@@ -1488,7 +1562,7 @@ class GameScheduler extends DurableObject {
 
 function pageHtml() {
 
-  return `<!DOCTYPE html>
+  return String.raw`<!DOCTYPE html>
 
 <html lang="am">
 
@@ -1496,7 +1570,9 @@ function pageHtml() {
 
 <meta charset="UTF-8">
 
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="viewport"
+
+  content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 
 <meta name="theme-color" content="#07090d">
 
@@ -1528,6 +1604,8 @@ function pageHtml() {
 
   --gold:#ffc857;
 
+  --blue:#4da3ff;
+
 }
 
 *{
@@ -1556,25 +1634,15 @@ body{
 
   min-height:100vh;
 
-  padding-bottom:92px;
-
-  background:
-
-    radial-gradient(
-
-      circle at 50% -10%,
-
-      rgba(229,9,20,.14),
-
-      transparent 38%
-
-    ),
-
-    var(--bg);
+  padding-bottom:82px;
 
 }
 
-button,input,select{
+button,
+
+input,
+
+select{
 
   font:inherit;
 
@@ -1590,9 +1658,11 @@ button{
 
   width:100%;
 
-  max-width:760px;
+  max-width:720px;
 
-  margin:auto;
+  margin:0 auto;
+
+  padding:12px 12px 90px;
 
 }
 
@@ -1602,7 +1672,205 @@ button{
 
   top:0;
 
-  z-index:20;
+  z-index:30;
+
+  margin:-12px -12px 0;
+
+  padding:12px;
+
+  background:rgba(7,9,13,.96);
+
+  backdrop-filter:blur(16px);
+
+  border-bottom:1px solid rgba(255,255,255,.05);
+
+}
+
+.topbar-row{
+
+  display:flex;
+
+  align-items:center;
+
+  gap:10px;
+
+}
+
+.logo-ball{
+
+  width:40px;
+
+  height:40px;
+
+  border-radius:50%;
+
+  background:linear-gradient(145deg,var(--red2),var(--red));
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+  font-weight:900;
+
+  font-size:18px;
+
+  box-shadow:0 8px 24px rgba(229,9,20,.28);
+
+}
+
+.brand{
+
+  flex:1;
+
+  min-width:0;
+
+}
+
+.brand-title{
+
+  font-size:18px;
+
+  line-height:20px;
+
+  font-weight:900;
+
+  letter-spacing:.4px;
+
+}
+
+.brand-sub{
+
+  color:var(--muted);
+
+  font-size:9px;
+
+  letter-spacing:1.3px;
+
+  margin-top:2px;
+
+}
+
+.language-mini{
+
+  display:flex;
+
+  border:1px solid var(--line);
+
+  border-radius:9px;
+
+  overflow:hidden;
+
+}
+
+.language-mini button{
+
+  border:0;
+
+  background:transparent;
+
+  color:var(--muted);
+
+  padding:7px 8px;
+
+  font-size:11px;
+
+  font-weight:800;
+
+}
+
+.language-mini button.active{
+
+  color:#fff;
+
+  background:var(--red);
+
+}
+
+.balance-area{
+
+  margin-top:10px;
+
+  display:grid;
+
+  grid-template-columns:1fr 1fr;
+
+  gap:8px;
+
+}
+
+.balance-box{
+
+  background:linear-gradient(145deg,#111721,#0d1118);
+
+  border:1px solid var(--line);
+
+  border-radius:12px;
+
+  padding:8px 10px;
+
+}
+
+.balance-label{
+
+  color:var(--muted);
+
+  font-size:9px;
+
+}
+
+.balance-value{
+
+  margin-top:2px;
+
+  font-weight:900;
+
+  font-size:14px;
+
+}
+
+.hero{
+
+  margin-top:14px;
+
+}
+
+.status-box{
+
+  position:relative;
+
+  overflow:hidden;
+
+  border-radius:18px;
+
+  padding:17px;
+
+  background:
+
+    radial-gradient(circle at 100% 0%,rgba(229,9,20,.28),transparent 40%),
+
+    linear-gradient(145deg,#171c26,#0e1219);
+
+  border:1px solid #30394a;
+
+  box-shadow:0 12px 35px rgba(0,0,0,.25);
+
+}
+
+.status-box.lobby{
+
+  border-color:rgba(255,200,87,.35);
+
+}
+
+.status-box.live{
+
+  border-color:rgba(38,208,124,.28);
+
+}
+
+.status-top{
 
   display:flex;
 
@@ -1612,149 +1880,27 @@ button{
 
   gap:10px;
 
-  padding:
-
-    calc(10px + env(safe-area-inset-top))
-
-    14px
-
-    10px;
-
-  background:rgba(7,9,13,.94);
-
-  backdrop-filter:blur(18px);
-
-  border-bottom:1px solid rgba(255,255,255,.06);
-
 }
 
-.brand{
+.status-pill{
 
-  display:flex;
+  display:inline-flex;
 
   align-items:center;
 
-  gap:9px;
+  gap:6px;
 
-  min-width:0;
+  padding:5px 9px;
 
-}
+  border-radius:999px;
 
-.brand-ball{
-
-  width:38px;
-
-  height:38px;
-
-  border-radius:50%;
-
-  display:grid;
-
-  place-items:center;
-
-  background:
-
-    radial-gradient(
-
-      circle at 32% 25%,
-
-      #ff5960,
-
-      var(--red) 50%,
-
-      #a50009
-
-    );
-
-  box-shadow:0 5px 18px rgba(229,9,20,.32);
-
-  font-size:18px;
-
-}
-
-.brand-name{
-
-  font-size:15px;
-
-  font-weight:950;
-
-  letter-spacing:.7px;
-
-}
-
-.brand-sub{
-
-  margin-top:3px;
-
-  color:var(--muted);
-
-  font-size:9px;
-
-}
-
-.balance-pill{
+  background:#0a0e14;
 
   border:1px solid var(--line);
 
-  background:var(--surface);
-
-  border-radius:999px;
-
-  padding:8px 11px;
-
-  font-size:11px;
-
-  font-weight:900;
-
-  white-space:nowrap;
-
-}
-
-.balance-pill span{
-
-  color:var(--gold);
-
-}
-
-.hero{
-
-  padding:18px 14px 8px;
-
-}
-
-.status-row{
-
-  display:flex;
-
-  align-items:center;
-
-  justify-content:space-between;
-
-  margin-bottom:12px;
-
-}
-
-.status-badge{
-
-  display:flex;
-
-  align-items:center;
-
-  gap:7px;
-
-  border-radius:999px;
-
-  padding:7px 10px;
-
-  color:var(--green);
-
-  background:rgba(38,208,124,.1);
-
-  border:1px solid rgba(38,208,124,.25);
-
   font-size:10px;
 
-  font-weight:950;
+  font-weight:900;
 
 }
 
@@ -1766,15 +1912,71 @@ button{
 
   border-radius:50%;
 
-  background:currentColor;
-
-  box-shadow:0 0 10px currentColor;
+  background:var(--gold);
 
 }
 
-.game-number{
+.live .status-dot{
+
+  background:var(--green);
+
+  box-shadow:0 0 10px rgba(38,208,124,.7);
+
+}
+
+.game-no{
 
   color:var(--muted);
+
+  font-size:10px;
+
+  font-weight:700;
+
+}
+
+.status-title{
+
+  font-size:20px;
+
+  font-weight:900;
+
+  margin-top:14px;
+
+}
+
+.status-message{
+
+  color:#b3bccb;
+
+  font-size:12px;
+
+  margin-top:5px;
+
+}
+
+.jackpot{
+
+  margin-top:15px;
+
+  padding:13px 14px;
+
+  border-radius:14px;
+
+  background:
+
+    linear-gradient(135deg,
+
+      rgba(229,9,20,.17),
+
+      rgba(255,200,87,.08));
+
+  border:1px solid rgba(255,200,87,.28);
+
+}
+
+.jackpot-label{
+
+  color:#d8c48d;
 
   font-size:10px;
 
@@ -1782,97 +1984,105 @@ button{
 
 }
 
-.hero-card{
+.jackpot-row{
 
-  position:relative;
+  display:flex;
 
-  overflow:hidden;
+  align-items:flex-end;
 
-  padding:17px;
+  justify-content:space-between;
 
-  border:1px solid var(--line);
-
-  border-radius:24px;
-
-  background:
-
-    linear-gradient(
-
-      145deg,
-
-      rgba(255,255,255,.055),
-
-      rgba(255,255,255,.015)
-
-    ),
-
-    var(--surface);
-
-  box-shadow:0 15px 40px rgba(0,0,0,.3);
+  gap:10px;
 
 }
 
-.hero-title{
+.jackpot-value{
 
-  text-align:center;
+  font-size:27px;
 
-  font-size:13px;
+  line-height:30px;
 
   font-weight:950;
 
-}
-
-.hero-message{
-
-  margin-top:6px;
-
-  min-height:18px;
-
-  text-align:center;
-
-  color:var(--muted);
-
-  font-size:11px;
-
-  line-height:1.5;
+  letter-spacing:-.7px;
 
 }
 
 .countdown{
 
-  margin:10px 0;
+  color:#fff;
 
-  text-align:center;
+  font-size:18px;
 
-  color:var(--gold);
+  font-weight:950;
+
+}
+
+.countdown small{
+
+  color:var(--muted);
+
+  font-size:9px;
+
+  font-weight:700;
+
+}
+
+.live-message{
+
+  display:none;
+
+  margin-top:15px;
+
+  padding:14px;
+
+  border-radius:12px;
+
+  background:rgba(38,208,124,.08);
+
+  border:1px solid rgba(38,208,124,.2);
+
+  color:#d8ffe9;
+
+  font-weight:800;
 
   font-size:13px;
 
-  font-weight:900;
+  line-height:20px;
 
 }
 
-.countdown strong{
+.live .live-message{
 
-  font-size:22px;
+  display:block;
 
 }
 
-.ball-area{
+.live .jackpot,
 
-  display:flex;
+.live .lobby-selection{
 
-  justify-content:center;
-
-  padding:8px 0 14px;
+  display:none;
 
 }
 
 .current-ball{
 
-  width:140px;
+  margin-top:15px;
 
-  height:140px;
+  display:flex;
+
+  align-items:center;
+
+  gap:12px;
+
+}
+
+.ball{
+
+  width:68px;
+
+  height:68px;
 
   border-radius:50%;
 
@@ -1880,113 +2090,83 @@ button{
 
   flex-direction:column;
 
-  justify-content:center;
-
   align-items:center;
+
+  justify-content:center;
 
   background:
 
-    radial-gradient(
+    radial-gradient(circle at 32% 25%,#fff,#f1f1f1 12%,#e50914 14%,#97040b 80%);
 
-      circle at 32% 22%,
-
-      #fff,
-
-      #eee 18%,
-
-      #d0d3d8 52%,
-
-      #92969d
-
-    );
-
-  color:#090b10;
-
-  border:8px solid #272c34;
+  color:#fff;
 
   box-shadow:
 
-    0 0 0 5px rgba(229,9,20,.13),
+    inset -7px -9px 14px rgba(0,0,0,.28),
 
-    0 20px 45px rgba(0,0,0,.45);
-
-}
-
-.current-ball-letter{
-
-  color:var(--red);
-
-  font-size:18px;
-
-  font-weight:1000;
+    0 12px 28px rgba(229,9,20,.28);
 
 }
 
-.current-ball-number{
+.ball-letter{
 
-  margin-top:3px;
-
-  font-size:50px;
-
-  line-height:1;
-
-  font-weight:1000;
-
-}
-
-.ball-caption{
-
-  margin-top:5px;
-
-  color:#626a77;
-
-  font-size:8px;
+  font-size:10px;
 
   font-weight:900;
 
-  letter-spacing:.7px;
+}
+
+.ball-number{
+
+  font-size:22px;
+
+  line-height:22px;
+
+  font-weight:950;
 
 }
 
-.recent-row{
+.ball-info{
+
+  color:var(--muted);
+
+  font-size:10px;
+
+}
+
+.recent{
+
+  margin-top:13px;
 
   display:flex;
 
   gap:6px;
 
-  overflow-x:auto;
-
-  scrollbar-width:none;
-
-}
-
-.recent-row::-webkit-scrollbar{
-
-  display:none;
+  overflow:hidden;
 
 }
 
 .mini-ball{
 
-  width:31px;
+  min-width:29px;
 
-  height:31px;
-
-  flex:none;
-
-  display:grid;
-
-  place-items:center;
+  height:29px;
 
   border-radius:50%;
 
-  background:var(--surface3);
+  background:#202733;
 
-  border:1px solid var(--line);
+  border:1px solid #323c4c;
 
-  font-size:9px;
+  display:flex;
 
-  font-weight:900;
+  align-items:center;
+
+  justify-content:center;
+
+  font-size:10px;
+
+  font-weight:800;
 
 }
 
@@ -1994,147 +2174,271 @@ button{
 
   background:var(--red);
 
-  border-color:var(--red);
+  border-color:var(--red2);
 
 }
 
-.stats{
+.selection-panel{
 
-  display:grid;
-
-  grid-template-columns:repeat(3,1fr);
-
-  gap:8px;
-
-  padding:8px 14px 14px;
-
-}
-
-.stat{
-
-  padding:11px 7px;
-
-  text-align:center;
+  margin-top:13px;
 
   background:var(--surface);
 
   border:1px solid var(--line);
 
-  border-radius:15px;
+  border-radius:17px;
+
+  padding:14px;
 
 }
 
-.stat-value{
+.selection-head{
 
-  font-size:17px;
+  display:flex;
 
-  font-weight:950;
+  justify-content:space-between;
 
-}
+  align-items:center;
 
-.stat-label{
-
-  margin-top:4px;
-
-  color:var(--muted);
-
-  font-size:8px;
-
-  font-weight:700;
+  gap:10px;
 
 }
 
-.tabs{
+.selection-title{
 
-  display:grid;
-
-  grid-template-columns:repeat(3,1fr);
-
-  gap:5px;
-
-  margin:0 14px 14px;
-
-  padding:5px;
-
-  background:var(--surface);
-
-  border:1px solid var(--line);
-
-  border-radius:16px;
-
-}
-
-.tab{
-
-  border:0;
-
-  border-radius:11px;
-
-  padding:10px 5px;
-
-  background:transparent;
-
-  color:var(--muted);
-
-  font-size:10px;
+  font-size:14px;
 
   font-weight:900;
 
 }
 
-.tab.active{
+.selection-title span{
 
-  background:var(--surface3);
+  color:var(--gold);
+
+}
+
+.selection-count{
+
+  font-size:12px;
+
+  color:#dce2eb;
+
+  font-weight:900;
+
+  white-space:nowrap;
+
+}
+
+.card-grid{
+
+  margin-top:12px;
+
+  display:grid;
+
+  grid-template-columns:repeat(10,minmax(0,1fr));
+
+  gap:5px;
+
+}
+
+.card-select{
+
+  min-width:0;
+
+  height:31px;
+
+  padding:0;
+
+  border-radius:7px;
+
+  border:1px solid #2a3444;
+
+  background:#141a23;
+
+  color:#aeb8c8;
+
+  font-size:9px;
+
+  font-weight:800;
+
+}
+
+.card-select:active{
+
+  transform:scale(.95);
+
+}
+
+.card-select.selected{
+
+  background:var(--red);
+
+  border-color:#ff4b52;
 
   color:#fff;
 
-}
-
-.section{
-
-  display:none;
-
-  padding:0 14px;
+  box-shadow:0 4px 12px rgba(229,9,20,.25);
 
 }
 
-.section.active{
+.selected-previews{
 
-  display:block;
-
-}
-
-.panel{
-
-  margin-bottom:12px;
-
-  padding:15px;
-
-  background:var(--surface);
-
-  border:1px solid var(--line);
-
-  border-radius:19px;
+  margin-top:13px;
 
 }
 
-.panel-title{
-
-  font-size:13px;
-
-  font-weight:950;
-
-}
-
-.panel-sub{
-
-  margin:4px 0 13px;
+.selected-previews-title{
 
   color:var(--muted);
 
   font-size:10px;
 
-  line-height:1.6;
+  font-weight:800;
+
+  margin-bottom:8px;
+
+}
+
+.preview-grid{
+
+  display:grid;
+
+  grid-template-columns:repeat(2,minmax(0,1fr));
+
+  gap:8px;
+
+}
+
+.bingo-card{
+
+  background:#0d1118;
+
+  border:1px solid #303949;
+
+  border-radius:12px;
+
+  padding:7px;
+
+}
+
+.bingo-card-head{
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:space-between;
+
+  margin-bottom:6px;
+
+}
+
+.card-number-label{
+
+  color:#b7c0ce;
+
+  font-size:9px;
+
+  font-weight:900;
+
+}
+
+.card-state{
+
+  color:var(--green);
+
+  font-size:10px;
+
+}
+
+.bingo-grid{
+
+  display:grid;
+
+  grid-template-columns:repeat(5,1fr);
+
+  gap:3px;
+
+}
+
+.bingo-cell{
+
+  aspect-ratio:1;
+
+  border-radius:4px;
+
+  background:#181f2a;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+  font-size:8px;
+
+  font-weight:850;
+
+  color:#c5ccd7;
+
+}
+
+.bingo-cell.called{
+
+  background:rgba(229,9,20,.85);
+
+  color:#fff;
+
+}
+
+.bingo-cell.free{
+
+  background:#252d39;
+
+  color:var(--gold);
+
+  font-size:7px;
+
+}
+
+.panels{
+
+  margin-top:13px;
+
+}
+
+.panel{
+
+  background:var(--surface);
+
+  border:1px solid var(--line);
+
+  border-radius:17px;
+
+  padding:15px;
+
+  margin-bottom:12px;
+
+}
+
+.panel-title{
+
+  font-size:14px;
+
+  font-weight:900;
+
+}
+
+.panel-sub{
+
+  color:var(--muted);
+
+  font-size:10px;
+
+  line-height:16px;
+
+  margin-top:3px;
 
 }
 
@@ -2142,21 +2446,23 @@ button{
 
   display:grid;
 
-  grid-template-columns:repeat(2,1fr);
+  grid-template-columns:1fr 1fr;
 
   gap:8px;
+
+  margin-top:12px;
 
 }
 
 .info-box{
 
-  padding:12px;
+  background:#0d1118;
 
-  background:var(--surface2);
+  border:1px solid #252e3d;
 
-  border:1px solid var(--line);
+  border-radius:11px;
 
-  border-radius:13px;
+  padding:10px;
 
 }
 
@@ -2170,167 +2476,23 @@ button{
 
 .info-box-text{
 
-  margin-top:4px;
-
   color:var(--muted);
-
-  font-size:9px;
-
-  line-height:1.5;
-
-}
-
-.bingo-card{
-
-  margin-bottom:10px;
-
-  padding:11px;
-
-  background:var(--surface2);
-
-  border:1px solid var(--line);
-
-  border-radius:16px;
-
-}
-
-.bingo-card-head{
-
-  display:flex;
-
-  justify-content:space-between;
-
-  margin-bottom:8px;
-
-}
-
-.card-number-label{
-
-  font-size:10px;
-
-  font-weight:950;
-
-}
-
-.card-state{
-
-  color:var(--green);
 
   font-size:8px;
 
-  font-weight:900;
+  line-height:13px;
 
-}
-
-.bingo-grid{
-
-  display:grid;
-
-  grid-template-columns:repeat(5,1fr);
-
-  gap:4px;
-
-}
-
-.bingo-cell{
-
-  min-height:36px;
-
-  display:grid;
-
-  place-items:center;
-
-  background:#0e131b;
-
-  border:1px solid #242d3b;
-
-  border-radius:6px;
-
-  font-size:10px;
-
-  font-weight:850;
-
-}
-
-.bingo-cell.called{
-
-  background:var(--red);
-
-  border-color:var(--red);
-
-}
-
-.bingo-cell.free{
-
-  color:var(--gold);
-
-  background:rgba(255,200,87,.12);
-
-  border-color:rgba(255,200,87,.3);
-
-  font-size:7px;
-
-}
-
-.primary-btn,
-
-.secondary-btn{
-
-  width:100%;
-
-  border-radius:13px;
-
-  padding:12px;
-
-  font-size:11px;
-
-  font-weight:950;
-
-}
-
-.primary-btn{
-
-  border:0;
-
-  background:linear-gradient(
-
-    135deg,
-
-    var(--red),
-
-    var(--red2)
-
-  );
-
-  color:#fff;
-
-}
-
-.secondary-btn{
-
-  border:1px solid var(--line);
-
-  background:var(--surface2);
-
-  color:#fff;
-
-}
-
-.btn-row{
-
-  display:grid;
-
-  grid-template-columns:1fr 1fr;
-
-  gap:8px;
+  margin-top:4px;
 
 }
 
 .called-grid{
 
+  margin-top:12px;
+
   display:grid;
 
-  grid-template-columns:repeat(10,1fr);
+  grid-template-columns:repeat(15,1fr);
 
   gap:4px;
 
@@ -2340,21 +2502,23 @@ button{
 
   aspect-ratio:1;
 
-  display:grid;
+  border-radius:5px;
 
-  place-items:center;
+  background:#161c25;
 
-  border-radius:6px;
+  border:1px solid #252e3c;
 
-  background:var(--surface2);
+  display:flex;
 
-  border:1px solid var(--line);
+  align-items:center;
 
-  color:var(--muted);
+  justify-content:center;
+
+  color:#667184;
 
   font-size:8px;
 
-  font-weight:900;
+  font-weight:800;
 
 }
 
@@ -2362,125 +2526,69 @@ button{
 
   background:var(--red);
 
-  border-color:var(--red);
+  border-color:var(--red2);
 
   color:#fff;
 
 }
 
-.letter-heading{
+.primary-btn{
 
-  display:grid;
+  width:100%;
 
-  grid-template-columns:repeat(5,1fr);
+  border:0;
 
-  gap:4px;
+  border-radius:12px;
 
-  margin-bottom:5px;
+  padding:12px;
 
-}
+  background:linear-gradient(135deg,var(--red2),var(--red));
 
-.letter-heading div{
-
-  text-align:center;
-
-  color:var(--red);
-
-  font-size:9px;
-
-  font-weight:1000;
-
-}
-
-.selected-list{
-
-  display:flex;
-
-  flex-wrap:wrap;
-
-  gap:5px;
-
-  margin-bottom:11px;
-
-}
-
-.selected-pill{
-
-  padding:6px 8px;
-
-  border-radius:999px;
-
-  color:var(--green);
-
-  background:rgba(38,208,124,.09);
-
-  border:1px solid rgba(38,208,124,.28);
-
-  font-size:9px;
-
-  font-weight:900;
-
-}
-
-.card-grid{
-
-  display:grid;
-
-  grid-template-columns:repeat(10,minmax(0,1fr));
-
-  gap:4px;
-
-}
-
-.card-select{
-
-  min-width:0;
-
-  aspect-ratio:1;
-
-  padding:0;
-
-  border:1px solid var(--line);
-
-  border-radius:6px;
-
-  background:#0d1219;
-
-  color:#dfe3e9;
-
-  font-size:8px;
+  color:#fff;
 
   font-weight:950;
 
+  font-size:12px;
+
+  box-shadow:0 8px 22px rgba(229,9,20,.2);
+
 }
 
-.card-select.selected{
+.secondary-btn{
 
-  background:var(--red);
+  width:100%;
 
-  border-color:var(--red);
+  border:1px solid var(--line);
+
+  border-radius:12px;
+
+  padding:11px;
+
+  background:#151b25;
 
   color:#fff;
+
+  font-weight:850;
 
 }
 
 .wallet-balance{
+
+  margin-top:12px;
+
+  padding:15px;
+
+  border-radius:14px;
+
+  background:linear-gradient(135deg,#171e29,#0d1219);
+
+  border:1px solid var(--line);
 
   display:flex;
 
   justify-content:space-between;
 
   align-items:center;
-
-  margin-bottom:12px;
-
-  padding:14px;
-
-  border:1px solid var(--line);
-
-  border-radius:15px;
-
-  background:var(--surface2);
 
 }
 
@@ -2494,13 +2602,11 @@ button{
 
 .wallet-value{
 
-  margin-top:2px;
+  font-size:23px;
 
-  color:var(--gold);
+  font-weight:950;
 
-  font-size:22px;
-
-  font-weight:1000;
+  margin-top:3px;
 
 }
 
@@ -2510,31 +2616,23 @@ button{
 
   grid-template-columns:1fr 1fr;
 
-  gap:5px;
+  gap:7px;
 
-  margin-bottom:10px;
-
-  padding:4px;
-
-  border:1px solid var(--line);
-
-  border-radius:12px;
-
-  background:var(--surface2);
+  margin-top:12px;
 
 }
 
 .type-btn{
 
-  border:0;
+  border:1px solid var(--line);
 
-  border-radius:9px;
+  border-radius:10px;
+
+  background:#121821;
+
+  color:#8e99aa;
 
   padding:10px;
-
-  background:transparent;
-
-  color:var(--muted);
 
   font-size:10px;
 
@@ -2544,15 +2642,17 @@ button{
 
 .type-btn.active{
 
-  background:var(--surface3);
+  background:var(--red);
 
   color:#fff;
+
+  border-color:var(--red2);
 
 }
 
 .field{
 
-  margin-bottom:9px;
+  margin-top:10px;
 
 }
 
@@ -2560,13 +2660,11 @@ button{
 
   display:block;
 
-  margin:0 0 5px 3px;
-
   color:var(--muted);
 
   font-size:9px;
 
-  font-weight:800;
+  margin-bottom:5px;
 
 }
 
@@ -2576,19 +2674,37 @@ button{
 
   width:100%;
 
-  padding:11px;
-
-  outline:none;
-
   border:1px solid var(--line);
 
-  border-radius:11px;
+  border-radius:10px;
 
   background:#0c1118;
 
   color:#fff;
 
-  font-size:12px;
+  padding:11px;
+
+  outline:none;
+
+}
+
+.note{
+
+  margin-top:10px;
+
+  color:#9ca6b5;
+
+  background:#0c1118;
+
+  border:1px solid #252d39;
+
+  border-radius:10px;
+
+  padding:10px;
+
+  font-size:9px;
+
+  line-height:14px;
 
 }
 
@@ -2598,7 +2714,9 @@ button{
 
   grid-template-columns:1fr 1fr;
 
-  gap:7px;
+  gap:8px;
+
+  margin-top:12px;
 
 }
 
@@ -2606,15 +2724,15 @@ button{
 
   border:1px solid var(--line);
 
-  border-radius:11px;
+  border-radius:10px;
 
-  padding:10px;
+  padding:11px;
 
-  background:var(--surface2);
+  background:#121821;
 
-  color:var(--muted);
+  color:#9ba5b4;
 
-  font-size:10px;
+  font-size:11px;
 
   font-weight:900;
 
@@ -2622,37 +2740,47 @@ button{
 
 .language-btn.active{
 
-  border-color:var(--red);
+  background:var(--red);
 
-  background:rgba(229,9,20,.12);
+  border-color:var(--red2);
 
   color:#fff;
 
 }
 
-.note{
-
-  margin-top:10px;
-
-  color:#727b89;
-
-  font-size:8px;
-
-  line-height:1.6;
+.simple-page{
 
   text-align:center;
+
+  padding:35px 12px;
 
 }
 
-.empty{
+.simple-icon{
 
-  padding:25px 10px;
+  font-size:34px;
+
+}
+
+.simple-title{
+
+  font-size:18px;
+
+  font-weight:950;
+
+  margin-top:10px;
+
+}
+
+.simple-text{
 
   color:var(--muted);
 
-  text-align:center;
+  font-size:11px;
 
-  font-size:10px;
+  line-height:18px;
+
+  margin-top:6px;
 
 }
 
@@ -2666,35 +2794,25 @@ button{
 
   bottom:0;
 
-  z-index:40;
+  z-index:50;
 
-  padding:
+  background:rgba(10,13,18,.97);
 
-    8px
-
-    12px
-
-    calc(8px + env(safe-area-inset-bottom));
-
-  background:rgba(7,9,13,.95);
+  border-top:1px solid #222a36;
 
   backdrop-filter:blur(18px);
-
-  border-top:1px solid rgba(255,255,255,.07);
 
 }
 
 .bottom-inner{
 
-  display:grid;
-
-  grid-template-columns:repeat(3,1fr);
-
-  gap:6px;
-
-  max-width:500px;
+  max-width:720px;
 
   margin:auto;
+
+  display:grid;
+
+  grid-template-columns:repeat(4,1fr);
 
 }
 
@@ -2702,25 +2820,47 @@ button{
 
   border:0;
 
-  border-radius:11px;
-
-  padding:8px;
-
   background:transparent;
 
-  color:var(--muted);
+  color:#707b8d;
 
-  font-size:9px;
+  padding:8px 4px 9px;
 
-  font-weight:900;
+  font-size:10px;
+
+  font-weight:850;
 
 }
 
 .bottom-btn.active{
 
-  background:var(--surface2);
-
   color:#fff;
+
+}
+
+.bottom-btn.active .nav-icon{
+
+  color:var(--red2);
+
+}
+
+.nav-icon{
+
+  font-size:17px;
+
+  line-height:19px;
+
+}
+
+.section{
+
+  display:none;
+
+}
+
+.section.active{
+
+  display:block;
 
 }
 
@@ -2730,69 +2870,77 @@ button{
 
   left:50%;
 
-  bottom:95px;
-
-  z-index:100;
-
-  width:min(92%,420px);
+  bottom:86px;
 
   transform:translate(-50%,20px);
-
-  padding:12px 14px;
-
-  border-radius:13px;
-
-  background:#f5f6f8;
-
-  color:#090b10;
-
-  text-align:center;
-
-  font-size:10px;
-
-  font-weight:850;
 
   opacity:0;
 
   pointer-events:none;
 
+  z-index:100;
+
+  background:#202733;
+
+  color:#fff;
+
+  border:1px solid #3a4557;
+
+  border-radius:10px;
+
+  padding:10px 14px;
+
+  font-size:10px;
+
+  font-weight:800;
+
   transition:.22s;
+
+  max-width:85%;
+
+  text-align:center;
 
 }
 
 .toast.show{
 
-  transform:translate(-50%,0);
-
   opacity:1;
+
+  transform:translate(-50%,0);
 
 }
 
-@media(max-width:480px){
-
-  .current-ball{
-
-    width:128px;
-
-    height:128px;
-
-  }
-
-  .current-ball-number{
-
-    font-size:45px;
-
-  }
+@media(max-width:420px){
 
   .card-grid{
 
-    gap:3px;
+    gap:4px;
 
   }
 
   .card-select{
 
+    height:29px;
+
+    font-size:8px;
+
+  }
+
+  .called-grid{
+
+    gap:3px;
+
+  }
+
+  .called-number{
+
     font-size:7px;
+
+  }
+
+  .preview-grid{
+
+    grid-template-columns:1fr;
 
   }
 
@@ -2808,25 +2956,21 @@ button{
 
 <header class="topbar">
 
-  <div class="brand">
+  <div class="topbar-row">
 
-    <div class="brand-ball">8</div>
+    <div class="logo-ball">8</div>
 
-    <div>
+    <div class="brand">
 
-      <div class="brand-name">
+      <div class="brand-title">
 
         FAST BINGO
 
       </div>
 
-      <div
+      <div class="brand-sub"
 
-        class="brand-sub"
-
-        id="brandSub"
-
-      >
+           id="brandSub">
 
         75 BALL • LIVE BINGO
 
@@ -2834,17 +2978,69 @@ button{
 
     </div>
 
+    <div class="language-mini">
+
+      <button id="miniAm"
+
+              class="active">
+
+        አማ
+
+      </button>
+
+      <button id="miniEn">
+
+        EN
+
+      </button>
+
+    </div>
+
   </div>
 
-  <div class="balance-pill">
+  <div class="balance-area">
 
-    💰
+    <div class="balance-box">
 
-    <span id="topBalance">
+      <div class="balance-label">
 
-      2,500
+        Play Balance
 
-    </span>
+      </div>
+
+      <div class="balance-value"
+
+           id="topBalance">
+
+        00.00 ETB
+
+      </div>
+
+    </div>
+
+    <div class="balance-box">
+
+      <div class="balance-label"
+
+           id="mainBalanceLabel">
+
+        ዋና ሂሳብ
+
+      </div>
+
+      <div class="balance-value">
+
+        <span id="mainBalance">
+
+          00.00
+
+        </span>
+
+        ETB
+
+      </div>
+
+    </div>
 
   </div>
 
@@ -2852,499 +3048,225 @@ button{
 
 <main>
 
-<section class="hero">
-
-  <div class="status-row">
-
-    <div
-
-      class="status-badge"
-
-      id="statusBadge"
-
-    >
-
-      <span class="status-dot"></span>
-
-      <span id="statusText">
-
-        በመጠበቅ ላይ
-
-      </span>
-
-    </div>
-
-    <div
-
-      class="game-number"
-
-      id="gameNumber"
-
-    >
-
-      GAME #1
-
-    </div>
-
-  </div>
-
-  <div class="hero-card">
-
-    <div
-
-      class="hero-title"
-
-      id="heroTitle"
-
-    >
-
-      የቀጣዩ ጨዋታ ዝግጁ ነው
-
-    </div>
-
-    <div
-
-      class="hero-message"
-
-      id="heroMessage"
-
-    >
-
-      ካርድዎን ይምረጡ
-
-    </div>
-
-    <div
-
-      class="countdown"
-
-      id="countdown"
-
-    >
-
-      <strong>45</strong>
-
-    </div>
-
-    <div class="ball-area">
-
-      <div class="current-ball">
-
-        <div
-
-          class="current-ball-letter"
-
-          id="ballLetter"
-
-        >
-
-          B
-
-        </div>
-
-        <div
-
-          class="current-ball-number"
-
-          id="ballNumber"
-
-        >
-
-          —
-
-        </div>
-
-        <div
-
-          class="ball-caption"
-
-          id="ballCaption"
-
-        >
-
-          CURRENT BALL
-
-        </div>
-
-      </div>
-
-    </div>
-
-    <div
-
-      class="recent-row"
-
-      id="recentBalls"
-
-    ></div>
-
-  </div>
-
-</section>
-
-<section class="stats">
-
-  <div class="stat">
-
-    <div
-
-      class="stat-value"
-
-      id="calledCount"
-
-    >
-
-      0
-
-    </div>
-
-    <div
-
-      class="stat-label"
-
-      id="calledLabel"
-
-    >
-
-      የተጠሩ
-
-    </div>
-
-  </div>
-
-  <div class="stat">
-
-    <div class="stat-value">
-
-      400
-
-    </div>
-
-    <div
-
-      class="stat-label"
-
-      id="cardsLabel"
-
-    >
-
-      ካርዶች
-
-    </div>
-
-  </div>
-
-  <div class="stat">
-
-    <div class="stat-value">
-
-      4
-
-    </div>
-
-    <div
-
-      class="stat-label"
-
-      id="maxLabel"
-
-    >
-
-      ከፍተኛ
-
-    </div>
-
-  </div>
-
-</section>
-
-<nav class="tabs">
-
-  <button
-
-    class="tab active"
-
-    data-section="play"
-
-  >
-
-    🎮 <span id="tabPlay">ጨዋታ</span>
-
-  </button>
-
-  <button
-
-    class="tab"
-
-    data-section="cards"
-
-  >
-
-    🎫 <span id="tabCards">ካርዶች</span>
-
-  </button>
-
-  <button
-
-    class="tab"
-
-    data-section="balance"
-
-  >
-
-    💰 <span id="tabBalance">ሂሳብ</span>
-
-  </button>
-
-</nav>
-
 <section
+
+  id="section-home"
 
   class="section active"
 
-  id="section-play"
-
 >
 
-  <div class="panel">
+  <div class="hero">
 
     <div
 
-      class="panel-title"
+      class="status-box lobby"
 
-      id="yourGameTitle"
-
-    >
-
-      የእርስዎ ጨዋታ
-
-    </div>
-
-    <div
-
-      class="panel-sub"
-
-      id="yourGameSub"
+      id="statusBox"
 
     >
 
-      ካርድዎን ይምረጡና ጨዋታውን ይከታተሉ።
+      <div class="status-top">
 
-    </div>
+        <div class="status-pill">
 
-    <div class="info-grid">
+          <span
 
-      <div class="info-box">
+            class="status-dot"
 
-        <div
+            id="statusDot"
 
-          class="info-box-title"
+          ></span>
 
-          id="rule75"
+          <span id="statusText">
 
-        >
+            በመጠበቅ ላይ
 
-          75 Ball Bingo
+          </span>
 
         </div>
 
         <div
 
-          class="info-box-text"
+          class="game-no"
 
-          id="rule75Text"
+          id="gameNumber"
 
         >
 
-          B 1–15 • I 16–30 • N 31–45 • G 46–60 • O 61–75
+          GAME #1
 
         </div>
 
       </div>
 
-      <div class="info-box">
+      <div
 
-        <div
+        class="status-title"
 
-          class="info-box-title"
+        id="statusTitle"
 
-          id="ruleLines"
+      >
 
-        >
+        ካርቴላ ይምረጡ
 
-          2 Lines
+      </div>
+
+      <div
+
+        class="status-message"
+
+        id="statusMessage"
+
+      >
+
+        45 ሰከንድ ውስጥ ቀጣዩ ጨዋታ ይጀምራል።
+
+      </div>
+
+      <div class="jackpot">
+
+        <div class="jackpot-label">
+
+          ደራሽ
 
         </div>
 
-        <div
+        <div class="jackpot-row">
 
-          class="info-box-text"
+          <div
 
-          id="ruleLinesText"
+            class="jackpot-value"
 
-        >
+            id="jackpotValue"
 
-          ሁለት መስመሮች ሲሞሉ Bingo ይሆናል።
+          >
+
+            00 ETB
+
+          </div>
+
+          <div
+
+            class="countdown"
+
+            id="countdown"
+
+          >
+
+            45s
+
+          </div>
 
         </div>
 
       </div>
 
+      <div class="live-message"
+
+           id="liveMessage">
+
+        ጨዋታው ጀምሯል።
+
+        ቀጣዩን ዙር ይጠብቁ።
+
+      </div>
+
+      <div class="current-ball"
+
+           id="currentBallArea">
+
+        <div class="ball">
+
+          <div
+
+            class="ball-letter"
+
+            id="ballLetter"
+
+          >
+
+            B
+
+          </div>
+
+          <div
+
+            class="ball-number"
+
+            id="ballNumber"
+
+          >
+
+            —
+
+          </div>
+
+        </div>
+
+        <div class="ball-info">
+
+          <div>
+
+            CURRENT BALL
+
+          </div>
+
+          <div
+
+            id="calledInfo"
+
+            style="margin-top:5px"
+
+          >
+
+            0 / 75
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <div
+
+        class="recent"
+
+        id="recentBalls"
+
+      ></div>
+
     </div>
 
   </div>
 
-  <div class="panel">
+  <div class="selection-panel"
 
-    <div
+       id="selectionPanel">
 
-      class="panel-title"
+    <div class="selection-head">
 
-      id="myCardsTitle"
+      <div class="selection-title">
 
-    >
+        ካርቴላ ይምረጡ
 
-      የእኔ ካርዶች
+        <span>( 10 ብር )</span>
 
-    </div>
+      </div>
 
-    <div
+      <div
 
-      class="panel-sub"
+        class="selection-count"
 
-      id="myCardsSub"
+        id="selectionCount"
 
-    >
+      >
 
-      እስከ 4 ካርዶች መምረጥ ይችላሉ።
-
-    </div>
-
-    <div
-
-      class="my-cards"
-
-      id="myCards"
-
-    >
-
-      <div class="empty">
-
-        ካርድ አልመረጡም።
+        0/4
 
       </div>
 
     </div>
-
-    <div style="height:8px"></div>
-
-    <button
-
-      class="primary-btn"
-
-      id="claimBtn"
-
-    >
-
-      🏆 BINGO
-
-    </button>
-
-  </div>
-
-  <div class="panel">
-
-    <div
-
-      class="panel-title"
-
-      id="calledTitle"
-
-    >
-
-      የተጠሩ ኳሶች
-
-    </div>
-
-    <div
-
-      class="panel-sub"
-
-      id="calledSub"
-
-    >
-
-      የተጠሩትን ኳሶች እዚህ ይመልከቱ።
-
-    </div>
-
-    <div class="letter-heading">
-
-      <div>B</div>
-
-      <div>I</div>
-
-      <div>N</div>
-
-      <div>G</div>
-
-      <div>O</div>
-
-    </div>
-
-    <div
-
-      class="called-grid"
-
-      id="calledGrid"
-
-    ></div>
-
-  </div>
-
-</section>
-
-<section
-
-  class="section"
-
-  id="section-cards"
-
->
-
-  <div class="panel">
-
-    <div
-
-      class="panel-title"
-
-      id="chooseTitle"
-
-    >
-
-      ካርድ ይምረጡ
-
-    </div>
-
-    <div
-
-      class="panel-sub"
-
-      id="chooseSub"
-
-    >
-
-      በአንድ ጨዋታ እስከ 4 ካርዶች ይምረጡ።
-
-    </div>
-
-    <div
-
-      class="selected-list"
-
-      id="selectedList"
-
-    ></div>
 
     <div
 
@@ -3354,19 +3276,61 @@ button{
 
     ></div>
 
-    <div style="height:12px"></div>
+  </div>
 
-    <button
+  <div
 
-      class="primary-btn"
+    class="selected-previews"
 
-      id="saveCardsBtn"
+    id="selectedPreviewArea"
+
+  >
+
+    <div class="selected-previews-title">
+
+      የመረጡት ካርዶች
+
+    </div>
+
+    <div
+
+      class="preview-grid"
+
+      id="previewGrid"
 
     >
 
-      ✓ ካርዶችን አስቀምጥ
+    </div>
 
-    </button>
+  </div>
+
+  <div class="panel"
+
+       style="margin-top:13px">
+
+    <div
+
+      class="panel-title"
+
+      id="rulesTitle"
+
+    >
+
+      Fast Bingo
+
+    </div>
+
+    <div
+
+      class="panel-sub"
+
+      id="rulesText"
+
+    >
+
+      75 Ball Bingo • B 1–15 • I 16–30 • N 31–45 • G 46–60 • O 61–75
+
+    </div>
 
   </div>
 
@@ -3374,9 +3338,115 @@ button{
 
 <section
 
+  id="section-rank"
+
   class="section"
 
-  id="section-balance"
+>
+
+  <div class="panel simple-page">
+
+    <div class="simple-icon">
+
+      🏆
+
+    </div>
+
+    <div class="simple-title"
+
+         id="rankTitle">
+
+      ደረጃ
+
+    </div>
+
+    <div class="simple-text"
+
+         id="rankText">
+
+      የFast Bingo ደረጃዎ እዚህ ይታያል።
+
+    </div>
+
+  </div>
+
+</section>
+
+<section
+
+  id="section-profile"
+
+  class="section"
+
+>
+
+  <div class="panel simple-page">
+
+    <div class="simple-icon">
+
+      👤
+
+    </div>
+
+    <div class="simple-title"
+
+         id="profileTitle">
+
+      ፕሮፋይል
+
+    </div>
+
+    <div class="simple-text"
+
+         id="profileText">
+
+      የTelegram መለያዎ መረጃ እዚህ ይታያል።
+
+    </div>
+
+    <div
+
+      class="wallet-balance"
+
+      style="text-align:left"
+
+    >
+
+      <div>
+
+        <div class="wallet-label">
+
+          PLAYER
+
+        </div>
+
+        <div
+
+          class="wallet-value"
+
+          id="playerName"
+
+          style="font-size:17px"
+
+        >
+
+          Guest
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</section>
+
+<section
+
+  id="section-wallet"
+
+  class="section"
 
 >
 
@@ -3386,11 +3456,11 @@ button{
 
       class="panel-title"
 
-      id="balanceTitle"
+      id="walletTitle"
 
     >
 
-      የእኔ ሂሳብ
+      ቦርሳ
 
     </div>
 
@@ -3398,11 +3468,11 @@ button{
 
       class="panel-sub"
 
-      id="balanceSub"
+      id="walletSub"
 
     >
 
-      ይህ የጨዋታ ሙከራ ሂሳብ ነው።
+      ይህ የሙከራ ሂሳብ ብቻ ነው።
 
     </div>
 
@@ -3410,15 +3480,9 @@ button{
 
       <div>
 
-        <div
+        <div class="wallet-label">
 
-          class="wallet-label"
-
-          id="walletLabel"
-
-        >
-
-          የጨዋታ ሂሳብ
+          PLAY BALANCE
 
         </div>
 
@@ -3430,13 +3494,17 @@ button{
 
         >
 
-          2,500 ETB
+          00.00 ETB
 
         </div>
 
       </div>
 
-      <div>💰</div>
+      <div style="font-size:24px">
+
+        💰
+
+      </div>
 
     </div>
 
@@ -3478,21 +3546,27 @@ button{
 
       <select id="walletMethod">
 
+        <option value="Demo">
+
+          Demo
+
+        </option>
+
         <option value="Telebirr">
 
-          Telebirr
+          Telebirr (Demo)
 
         </option>
 
         <option value="eBirr">
 
-          eBirr
+          eBirr (Demo)
 
         </option>
 
         <option value="M-PESA">
 
-          M-PESA
+          M-PESA (Demo)
 
         </option>
 
@@ -3529,6 +3603,8 @@ button{
       class="primary-btn"
 
       id="walletSubmit"
+
+      style="margin-top:10px"
 
     >
 
@@ -3622,19 +3698,13 @@ button{
 
       class="bottom-btn active"
 
-      data-section="play"
+      data-section="home"
 
     >
 
-      🎮
+      <div class="nav-icon">⌂</div>
 
-      <br>
-
-      <span id="bottomPlay">
-
-        ጨዋታ
-
-      </span>
+      <span id="navHome">መነሻ</span>
 
     </button>
 
@@ -3642,19 +3712,13 @@ button{
 
       class="bottom-btn"
 
-      data-section="cards"
+      data-section="rank"
 
     >
 
-      🎫
+      <div class="nav-icon">♛</div>
 
-      <br>
-
-      <span id="bottomCards">
-
-        ካርዶች
-
-      </span>
+      <span id="navRank">ደረጃ</span>
 
     </button>
 
@@ -3662,19 +3726,27 @@ button{
 
       class="bottom-btn"
 
-      data-section="balance"
+      data-section="profile"
 
     >
 
-      💰
+      <div class="nav-icon">◉</div>
 
-      <br>
+      <span id="navProfile">ፕሮፋይል</span>
 
-      <span id="bottomBalance">
+    </button>
 
-        ሂሳብ
+    <button
 
-      </span>
+      class="bottom-btn"
+
+      data-section="wallet"
+
+    >
+
+      <div class="nav-icon">▣</div>
+
+      <span id="navWallet">ቦርሳ</span>
 
     </button>
 
@@ -3694,13 +3766,15 @@ button{
 
 (function(){
 
-  var tg = window.Telegram &&
+  var tg =
+
+    window.Telegram &&
 
     window.Telegram.WebApp
 
-    ? window.Telegram.WebApp
+      ? window.Telegram.WebApp
 
-    : null;
+      : null;
 
   if(tg){
 
@@ -3752,95 +3826,79 @@ button{
 
       brandSub:"75 BALL • LIVE BINGO",
 
+      mainBalance:"ዋና ሂሳብ",
+
       lobby:"በመጠበቅ ላይ",
 
-      live:"ጨዋታው ቀጥሏል",
+      live:"LIVE",
 
-      lobbyTitle:"የቀጣዩ ጨዋታ ዝግጁ ነው",
+      lobbyTitle:"ካርቴላ ይምረጡ",
 
-      liveTitle:"GAME IN PROGRESS",
+      liveTitle:"ጨዋታው ጀምሯል",
 
-      lobbyMessage:"ካርድዎን ይምረጡ",
+      lobbyMessage:"45 ሰከንድ ውስጥ ቀጣዩ ጨዋታ ይጀምራል።",
 
-      liveMessage:"ኳሎቹ እየተጠሩ ነው።",
+      liveMessage:"ጨዋታው ጀምሯል። ቀጣዩን ዙር ይጠብቁ።",
 
-      currentBall:"CURRENT BALL",
+      jackpot:"ደራሽ",
 
-      called:"የተጠሩ",
+      select:"ካርቴላ ይምረጡ",
 
-      cards:"ካርዶች",
+      price:"10 ብር",
 
-      maximum:"ከፍተኛ",
+      selected:"የመረጡት ካርዶች",
 
-      play:"ጨዋታ",
+      rules:"Fast Bingo",
 
-      cardsTab:"ካርዶች",
+      rulesText:"75 Ball Bingo • B 1–15 • I 16–30 • N 31–45 • G 46–60 • O 61–75",
 
-      balance:"ሂሳብ",
+      home:"መነሻ",
 
-      yourGame:"የእርስዎ ጨዋታ",
+      rank:"ደረጃ",
 
-      yourGameSub:"ካርድዎን ይምረጡና ጨዋታውን ይከታተሉ።",
+      profile:"ፕሮፋይል",
 
-      twoLines:"2 Lines",
+      wallet:"ቦርሳ",
 
-      twoLinesText:"ሁለት መስመሮች ሲሞሉ Bingo ይሆናል።",
+      rankText:"የFast Bingo ደረጃዎ እዚህ ይታያል።",
 
-      myCards:"የእኔ ካርዶች",
+      profileText:"የTelegram መለያዎ መረጃ እዚህ ይታያል።",
 
-      myCardsSub:"እስከ 4 ካርዶች መምረጥ ይችላሉ።",
-
-      noCards:"ካርድ አልመረጡም።",
-
-      bingo:"🏆 BINGO",
-
-      calledBalls:"የተጠሩ ኳሶች",
-
-      calledSub:"የተጠሩትን ኳሶች እዚህ ይመልከቱ።",
-
-      choose:"ካርድ ይምረጡ",
-
-      chooseSub:"በአንድ ጨዋታ እስከ 4 ካርዶች ይምረጡ።",
-
-      save:"✓ ካርዶችን አስቀምጥ",
-
-      balanceTitle:"የእኔ ሂሳብ",
-
-      balanceSub:"ይህ የጨዋታ ሙከራ ሂሳብ ነው።",
-
-      wallet:"የጨዋታ ሂሳብ",
-
-      deposit:"+ ገቢ",
-
-      withdraw:"− ወጪ",
+      walletSub:"ይህ የሙከራ ሂሳብ ብቻ ነው።",
 
       method:"ዘዴ",
 
       amount:"መጠን",
 
+      deposit:"+ ገቢ",
+
+      withdraw:"− ወጪ",
+
       depositAction:"ገቢ አድርግ",
 
       withdrawAction:"ወጪ አድርግ",
-
-      walletNote:"⚠️ ይህ የሙከራ ሂሳብ ብቻ ነው። ትክክለኛ ገንዘብ አይላክም ወይም አይቀበልም።",
 
       language:"ቋንቋ",
 
       languageSub:"የመተግበሪያውን ቋንቋ ይምረጡ።",
 
+      walletNote:"⚠️ ይህ የሙከራ ሂሳብ ብቻ ነው። ትክክለኛ ገንዘብ አይላክም ወይም አይቀበልም።",
+
       saved:"ካርዶችዎ ተቀምጠዋል።",
 
-      lobbyOnly:"ካርድ መምረጥ የሚቻለው በLobby ጊዜ ብቻ ነው።",
+      lobbyOnly:"ካርድ መምረጥ የሚቻለው Lobby ጊዜ ብቻ ነው።",
 
       maxCards:"እስከ 4 ካርዶች ብቻ መምረጥ ይችላሉ።",
 
-      gameProgress:"ጨዋታው ቀጥሏል። የሚቀጥለውን Lobby ይጠብቁ።",
-
-      balanceUpdated:"ሂሳቡ ተዘምኗል።",
+      gameProgress:"ጨዋታው ጀምሯል። ቀጣዩን ዙር ይጠብቁ።",
 
       invalidAmount:"ትክክለኛ መጠን ያስገቡ።",
 
-      winner:"🎉 Bingo! የሚያሸንፉ ካርዶች ተገኝተዋል።",
+      insufficient:"በቂ ሂሳብ የለዎትም።",
+
+      balanceUpdated:"ሂሳቡ ተዘምኗል።",
+
+      winner:"🎉 Bingo! አሸናፊ ካርድ ተገኝቷል።",
 
       notWinner:"እስካሁን 2 መስመር ያሟላ ካርድ የለም።"
 
@@ -3850,81 +3908,63 @@ button{
 
       brandSub:"75 BALL • LIVE BINGO",
 
+      mainBalance:"Main Balance",
+
       lobby:"LOBBY",
 
-      live:"LIVE GAME",
+      live:"LIVE",
 
-      lobbyTitle:"Next game is getting ready",
+      lobbyTitle:"Choose your cards",
 
-      liveTitle:"GAME IN PROGRESS",
+      liveTitle:"GAME STARTED",
 
-      lobbyMessage:"Choose your cards",
+      lobbyMessage:"The next game starts after the 45-second lobby.",
 
-      liveMessage:"Balls are being called.",
+      liveMessage:"Game has started. Wait for the next round.",
 
-      currentBall:"CURRENT BALL",
+      jackpot:"JACKPOT",
 
-      called:"Called",
+      select:"Choose Cards",
 
-      cards:"Cards",
+      price:"10 ETB",
 
-      maximum:"Maximum",
+      selected:"Selected Cards",
 
-      play:"PLAY",
+      rules:"Fast Bingo",
 
-      cardsTab:"CARDS",
+      rulesText:"75 Ball Bingo • B 1–15 • I 16–30 • N 31–45 • G 46–60 • O 61–75",
 
-      balance:"BALANCE",
+      home:"HOME",
 
-      yourGame:"Your Game",
+      rank:"RANK",
 
-      yourGameSub:"Choose your cards and follow the live game.",
+      profile:"PROFILE",
 
-      twoLines:"2 Lines",
+      wallet:"WALLET",
 
-      twoLinesText:"Bingo is reached when two lines are completed.",
+      rankText:"Your Fast Bingo rank will appear here.",
 
-      myCards:"My Cards",
+      profileText:"Your Telegram profile information appears here.",
 
-      myCardsSub:"You can select up to 4 cards.",
-
-      noCards:"No cards selected.",
-
-      bingo:"🏆 BINGO",
-
-      calledBalls:"Called Balls",
-
-      calledSub:"See all called balls here.",
-
-      choose:"Choose Cards",
-
-      chooseSub:"Select up to 4 cards for this game.",
-
-      save:"✓ SAVE SELECTED CARDS",
-
-      balanceTitle:"My Balance",
-
-      balanceSub:"This is a simulated play balance.",
-
-      wallet:"Play Balance",
-
-      deposit:"+ DEPOSIT",
-
-      withdraw:"− WITHDRAW",
+      walletSub:"This is a simulated play-money balance only.",
 
       method:"Method",
 
       amount:"Amount",
 
+      deposit:"+ DEPOSIT",
+
+      withdraw:"− WITHDRAW",
+
       depositAction:"ADD BALANCE",
 
       withdrawAction:"WITHDRAW",
 
-      walletNote:"⚠️ This is a simulated play-money balance only. No real money is sent or received.",
-
       language:"Language",
 
       languageSub:"Choose your application language.",
+
+      walletNote:"⚠️ This is simulated play-money only. No real money is sent or received.",
 
       saved:"Your cards have been saved.",
 
@@ -3932,13 +3972,15 @@ button{
 
       maxCards:"You can select up to 4 cards.",
 
-      gameProgress:"Game is already in progress. Wait for the next lobby.",
-
-      balanceUpdated:"Balance updated.",
+      gameProgress:"Game has started. Wait for the next round.",
 
       invalidAmount:"Enter a valid amount.",
 
-      winner:"🎉 Bingo! Winning card(s) found.",
+      insufficient:"Insufficient balance.",
+
+      balanceUpdated:"Balance updated.",
+
+      winner:"🎉 Bingo! Winning card found.",
 
       notWinner:"No card has completed 2 lines yet."
 
@@ -4016,9 +4058,15 @@ button{
 
     var toast =
 
-      document.getElementById("toast");
+      document.getElementById(
 
-    toast.textContent = message;
+        "toast"
+
+      );
+
+    toast.textContent =
+
+      message;
 
     toast.classList.add("show");
 
@@ -4057,22 +4105,6 @@ button{
           section.id ===
 
             "section-" + name
-
-        );
-
-      });
-
-    document
-
-      .querySelectorAll(".tab")
-
-      .forEach(function(button){
-
-        button.classList.toggle(
-
-          "active",
-
-          button.dataset.section === name
 
         );
 
@@ -4128,13 +4160,47 @@ button{
 
     });
 
+  function seededShuffle(arr, seed){
+
+    var a = arr.slice();
+
+    var s = seed >>> 0;
+
+    for(
+
+      var i=a.length-1;
+
+      i>0;
+
+      i--
+
+    ){
+
+      s =
+
+        (s * 1664525 +
+
+        1013904223) >>> 0;
+
+      var j =
+
+        s % (i+1);
+
+      var tmp =
+
+        a[i];
+
+      a[i]=a[j];
+
+      a[j]=tmp;
+
+    }
+
+    return a;
+
+  }
+
   function makeClientCard(number){
-
-    var seed =
-
-      100000 +
-
-      number * 7919;
 
     var ranges = [
 
@@ -4162,23 +4228,13 @@ button{
 
     ){
 
-      var from =
-
-        ranges[c][0];
-
-      var to =
-
-        ranges[c][1];
-
-      var values =
-
-        [];
+      var values=[];
 
       for(
 
-        var n=from;
+        var n=ranges[c][0];
 
-        n<=to;
+        n<=ranges[c][1];
 
         n++
 
@@ -4188,23 +4244,25 @@ button{
 
       }
 
-      values =
+      columns.push(
 
         seededShuffle(
 
           values,
 
-          seed + c * 97
+          100000 +
 
-        ).slice(0,5);
+          number * 7919 +
 
-      columns.push(values);
+          c * 97
+
+        ).slice(0,5)
+
+      );
 
     }
 
-    var grid =
-
-      [];
+    var grid=[];
 
     for(
 
@@ -4248,50 +4306,6 @@ button{
 
   }
 
-  function seededShuffle(arr, seed){
-
-    var a =
-
-      arr.slice();
-
-    var s =
-
-      seed >>> 0;
-
-    for(
-
-      var i=a.length-1;
-
-      i>0;
-
-      i--
-
-    ){
-
-      s =
-
-        (s * 1664525 +
-
-        1013904223) >>> 0;
-
-      var j =
-
-        s % (i+1);
-
-      var tmp =
-
-        a[i];
-
-      a[i]=a[j];
-
-      a[j]=tmp;
-
-    }
-
-    return a;
-
-  }
-
   function renderBingoCard(card){
 
     var html =
@@ -4302,15 +4316,13 @@ button{
 
       '<div class="card-number-label">' +
 
-      'CARD #' + card.number +
+      'CARD #' +
+
+      card.number +
 
       '</div>' +
 
-      '<div class="card-state">' +
-
-      '✓' +
-
-      '</div>' +
+      '<div class="card-state">✓</div>' +
 
       '</div>' +
 
@@ -4390,99 +4402,7 @@ button{
 
   }
 
-  function renderMyCards(){
-
-    var container =
-
-      document.getElementById(
-
-        "myCards"
-
-      );
-
-    if(!selected.length){
-
-      container.innerHTML =
-
-        '<div class="empty">' +
-
-        t("noCards") +
-
-        "</div>";
-
-      return;
-
-    }
-
-    var html="";
-
-    selected.forEach(
-
-      function(number){
-
-        html +=
-
-          renderBingoCard(
-
-            makeClientCard(
-
-              number
-
-            )
-
-          );
-
-      }
-
-    );
-
-    container.innerHTML =
-
-      html;
-
-  }
-
-  function renderSelected(){
-
-    var list =
-
-      document.getElementById(
-
-        "selectedList"
-
-      );
-
-    if(!selected.length){
-
-      list.innerHTML="";
-
-      return;
-
-    }
-
-    var html="";
-
-    selected.forEach(
-
-      function(number){
-
-        html +=
-
-          '<div class="selected-pill">' +
-
-          "#" + number +
-
-          "</div>";
-
-      }
-
-    );
-
-    list.innerHTML=html;
-
-  }
-
-  function loadCards(){
+  function renderCards(){
 
     var grid =
 
@@ -4538,11 +4458,7 @@ button{
 
     grid
 
-      .querySelectorAll(
-
-        ".card-select"
-
-      )
+      .querySelectorAll(".card-select")
 
       .forEach(function(button){
 
@@ -4567,6 +4483,74 @@ button{
         );
 
       });
+
+  }
+
+  function renderPreviews(){
+
+    var grid =
+
+      document.getElementById(
+
+        "previewGrid"
+
+      );
+
+    if(!selected.length){
+
+      grid.innerHTML =
+
+        '<div style="grid-column:1/-1;color:#667184;font-size:10px;padding:8px 0">' +
+
+        (
+
+          language === "am"
+
+            ? "ካርድ አልመረጡም።"
+
+            : "No cards selected."
+
+        ) +
+
+        "</div>";
+
+      return;
+
+    }
+
+    var html="";
+
+    selected.forEach(
+
+      function(number){
+
+        html +=
+
+          renderBingoCard(
+
+            makeClientCard(number)
+
+          );
+
+      }
+
+    );
+
+    grid.innerHTML=html;
+
+  }
+
+  function updateSelectionCount(){
+
+    document.getElementById(
+
+      "selectionCount"
+
+    ).textContent =
+
+      selected.length +
+
+      "/4";
 
   }
 
@@ -4606,13 +4590,7 @@ button{
 
     }else{
 
-      if(
-
-        selected.length >=
-
-        4
-
-      ){
+      if(selected.length >= 4){
 
         showToast(
 
@@ -4638,33 +4616,17 @@ button{
 
     }
 
-    renderSelected();
+    updateSelectionCount();
 
-    loadCards();
+    renderCards();
 
-    renderMyCards();
+    renderPreviews();
+
+    saveCardsSilently();
 
   }
 
-  function saveCards(){
-
-    if(
-
-      !currentGame ||
-
-      currentGame.status !== "lobby"
-
-    ){
-
-      showToast(
-
-        t("gameProgress")
-
-      );
-
-      return;
-
-    }
+  function saveCardsSilently(){
 
     api(
 
@@ -4686,59 +4648,27 @@ button{
 
       if(data.ok){
 
-        selected =
-
-          data.selected || [];
-
-        renderSelected();
-
-        loadCards();
-
-        renderMyCards();
-
-        showToast(
-
-          t("saved")
-
-        );
-
-      }else{
-
         if(
 
-          data.error ===
+          Array.isArray(
 
-          "GAME_IN_PROGRESS"
+            data.selected
+
+          )
 
         ){
 
-          showToast(
+          selected =
 
-            t("gameProgress")
-
-          );
-
-        }else{
-
-          showToast(
-
-            "Error"
-
-          );
+            data.selected.map(Number);
 
         }
 
+        updateSelectionCount();
+
       }
 
-    }).catch(function(){
-
-      showToast(
-
-        "Connection error"
-
-      );
-
-    });
+    }).catch(function(){});
 
   }
 
@@ -4758,83 +4688,17 @@ button{
 
         )
 
-          ? data.selected.map(
-
-              Number
-
-            )
+          ? data.selected.map(Number)
 
           : [];
 
-      renderSelected();
+      updateSelectionCount();
 
-      loadCards();
+      renderCards();
 
-      renderMyCards();
+      renderPreviews();
 
     });
-
-  }
-
-  function renderCalledBalls(){
-
-    var grid =
-
-      document.getElementById(
-
-        "calledGrid"
-
-      );
-
-    var called =
-
-      currentGame &&
-
-      currentGame.calledBalls
-
-        ? currentGame.calledBalls
-
-        : [];
-
-    var html="";
-
-    for(
-
-      var i=1;
-
-      i<=75;
-
-      i++
-
-    ){
-
-      var active =
-
-        called.indexOf(i) >= 0;
-
-      html +=
-
-        '<div class="called-number' +
-
-        (
-
-          active
-
-            ? " active"
-
-            : ""
-
-        ) +
-
-        '">' +
-
-        i +
-
-        "</div>";
-
-    }
-
-    grid.innerHTML=html;
 
   }
 
@@ -4848,41 +4712,43 @@ button{
 
     var live =
 
-      currentGame.status ===
+      currentGame.status === "live";
 
-      "live";
-
-    var statusText =
+    var statusBox =
 
       document.getElementById(
 
-        "statusText"
+        "statusBox"
 
       );
 
-    var statusBadge =
+    statusBox.classList.toggle(
 
-      document.getElementById(
+      "live",
 
-        "statusBadge"
+      live
 
-      );
+    );
 
-    statusText.textContent =
+    statusBox.classList.toggle(
+
+      "lobby",
+
+      !live
+
+    );
+
+    document.getElementById(
+
+      "statusText"
+
+    ).textContent =
 
       live
 
         ? t("live")
 
         : t("lobby");
-
-    statusBadge.style.color =
-
-      live
-
-        ? "#26d07c"
-
-        : "#ffc857";
 
     document.getElementById(
 
@@ -4896,7 +4762,7 @@ button{
 
     document.getElementById(
 
-      "heroTitle"
+      "statusTitle"
 
     ).textContent =
 
@@ -4908,7 +4774,7 @@ button{
 
     document.getElementById(
 
-      "heroMessage"
+      "statusMessage"
 
     ).textContent =
 
@@ -4917,6 +4783,24 @@ button{
         ? t("liveMessage")
 
         : t("lobbyMessage");
+
+    var jackpot =
+
+      Number(
+
+        currentGame.jackpot || 0
+
+      );
+
+    document.getElementById(
+
+      "jackpotValue"
+
+    ).textContent =
+
+      jackpot.toLocaleString() +
+
+      " ETB";
 
     var countdown =
 
@@ -4934,7 +4818,7 @@ button{
 
         currentGame.calledCount +
 
-        "</strong> / 75";
+        '</strong> / 75';
 
     }else{
 
@@ -4950,7 +4834,7 @@ button{
 
         ) +
 
-        "</strong> sec";
+        's</strong>';
 
     }
 
@@ -4978,19 +4862,37 @@ button{
 
     document.getElementById(
 
-      "ballCaption"
+      "calledInfo"
 
     ).textContent =
 
-      t("currentBall");
+      currentGame.calledCount +
+
+      " / 75";
 
     document.getElementById(
 
-      "calledCount"
+      "selectionPanel"
 
-    ).textContent =
+    ).style.display =
 
-      currentGame.calledCount;
+      live
+
+        ? "none"
+
+        : "block";
+
+    document.getElementById(
+
+      "selectedPreviewArea"
+
+    ).style.display =
+
+      selected.length
+
+        ? "block"
+
+        : "block";
 
     var recent =
 
@@ -5046,9 +4948,7 @@ button{
 
       recentHtml;
 
-    renderCalledBalls();
-
-    renderMyCards();
+    renderPreviews();
 
   }
 
@@ -5060,9 +4960,7 @@ button{
 
     ).then(function(data){
 
-      currentGame =
-
-        data;
+      currentGame = data;
 
       updateGameUI();
 
@@ -5090,13 +4988,27 @@ button{
 
         );
 
+      var formatted =
+
+        balance.toFixed(2) +
+
+        " ETB";
+
       document.getElementById(
 
         "topBalance"
 
       ).textContent =
 
-        balance.toLocaleString();
+        formatted;
+
+      document.getElementById(
+
+        "mainBalance"
+
+      ).textContent =
+
+        balance.toFixed(2);
 
       document.getElementById(
 
@@ -5104,11 +5016,9 @@ button{
 
       ).textContent =
 
-        balance.toLocaleString() +
+        formatted;
 
-        " ETB";
-
-    });
+    }).catch(function(){});
 
   }
 
@@ -5116,37 +5026,29 @@ button{
 
     walletType=type;
 
-    document
+    document.getElementById(
 
-      .getElementById(
+      "depositBtn"
 
-        "depositBtn"
+    ).classList.toggle(
 
-      )
+      "active",
 
-      .classList.toggle(
+      type === "deposit"
 
-        "active",
+    );
 
-        type === "deposit"
+    document.getElementById(
 
-      );
+      "withdrawBtn"
 
-    document
+    ).classList.toggle(
 
-      .getElementById(
+      "active",
 
-        "withdrawBtn"
+      type === "withdraw"
 
-      )
-
-      .classList.toggle(
-
-        "active",
-
-        type === "withdraw"
-
-      );
+    );
 
     document.getElementById(
 
@@ -5240,67 +5142,25 @@ button{
 
         );
 
+      }else if(
+
+        data.error ===
+
+        "INSUFFICIENT_BALANCE"
+
+      ){
+
+        showToast(
+
+          t("insufficient")
+
+        );
+
       }else{
 
-        if(
-
-          data.error ===
-
-          "INSUFFICIENT_BALANCE"
-
-        ){
-
-          showToast(
-
-            language === "am"
-
-              ? "በቂ ሂሳብ የለዎትም።"
-
-              : "Insufficient balance."
-
-          );
-
-        }else{
-
-          showToast(
-
-            "Error"
-
-          );
-
-        }
+        showToast("Error");
 
       }
-
-    }).catch(function(){
-
-      showToast(
-
-        "Connection error"
-
-      );
-
-    });
-
-  }
-
-  function claim(){
-
-    api(
-
-      "/api/claim"
-
-    ).then(function(data){
-
-      showToast(
-
-        data.winner
-
-          ? t("winner")
-
-          : t("notWinner")
-
-      );
 
     }).catch(function(){
 
@@ -5336,195 +5196,195 @@ button{
 
     document.getElementById(
 
-      "calledLabel"
+      "mainBalanceLabel"
 
     ).textContent =
 
-      x.called;
+      x.mainBalance;
 
     document.getElementById(
 
-      "cardsLabel"
+      "navHome"
 
     ).textContent =
 
-      x.cards;
+      x.home;
 
     document.getElementById(
 
-      "maxLabel"
+      "navRank"
 
     ).textContent =
 
-      x.maximum;
+      x.rank;
 
     document.getElementById(
 
-      "tabPlay"
+      "navProfile"
 
     ).textContent =
 
-      x.play;
+      x.profile;
 
     document.getElementById(
 
-      "tabCards"
-
-    ).textContent =
-
-      x.cardsTab;
-
-    document.getElementById(
-
-      "tabBalance"
-
-    ).textContent =
-
-      x.balance;
-
-    document.getElementById(
-
-      "bottomPlay"
-
-    ).textContent =
-
-      x.play;
-
-    document.getElementById(
-
-      "bottomCards"
-
-    ).textContent =
-
-      x.cardsTab;
-
-    document.getElementById(
-
-      "bottomBalance"
-
-    ).textContent =
-
-      x.balance;
-
-    document.getElementById(
-
-      "yourGameTitle"
-
-    ).textContent =
-
-      x.yourGame;
-
-    document.getElementById(
-
-      "yourGameSub"
-
-    ).textContent =
-
-      x.yourGameSub;
-
-    document.getElementById(
-
-      "ruleLines"
-
-    ).textContent =
-
-      x.twoLines;
-
-    document.getElementById(
-
-      "ruleLinesText"
-
-    ).textContent =
-
-      x.twoLinesText;
-
-    document.getElementById(
-
-      "myCardsTitle"
-
-    ).textContent =
-
-      x.myCards;
-
-    document.getElementById(
-
-      "myCardsSub"
-
-    ).textContent =
-
-      x.myCardsSub;
-
-    document.getElementById(
-
-      "claimBtn"
-
-    ).textContent =
-
-      x.bingo;
-
-    document.getElementById(
-
-      "calledTitle"
-
-    ).textContent =
-
-      x.calledBalls;
-
-    document.getElementById(
-
-      "calledSub"
-
-    ).textContent =
-
-      x.calledSub;
-
-    document.getElementById(
-
-      "chooseTitle"
-
-    ).textContent =
-
-      x.choose;
-
-    document.getElementById(
-
-      "chooseSub"
-
-    ).textContent =
-
-      x.chooseSub;
-
-    document.getElementById(
-
-      "saveCardsBtn"
-
-    ).textContent =
-
-      x.save;
-
-    document.getElementById(
-
-      "balanceTitle"
-
-    ).textContent =
-
-      x.balanceTitle;
-
-    document.getElementById(
-
-      "balanceSub"
-
-    ).textContent =
-
-      x.balanceSub;
-
-    document.getElementById(
-
-      "walletLabel"
+      "navWallet"
 
     ).textContent =
 
       x.wallet;
+
+    document.getElementById(
+
+      "statusText"
+
+    ).textContent =
+
+      currentGame &&
+
+      currentGame.status === "live"
+
+        ? x.live
+
+        : x.lobby;
+
+    document.getElementById(
+
+      "statusTitle"
+
+    ).textContent =
+
+      currentGame &&
+
+      currentGame.status === "live"
+
+        ? x.liveTitle
+
+        : x.lobbyTitle;
+
+    document.getElementById(
+
+      "statusMessage"
+
+    ).textContent =
+
+      currentGame &&
+
+      currentGame.status === "live"
+
+        ? x.liveMessage
+
+        : x.lobbyMessage;
+
+    document.querySelector(
+
+      ".jackpot-label"
+
+    ).textContent =
+
+      x.jackpot;
+
+    document.querySelector(
+
+      ".selection-title"
+
+    ).innerHTML =
+
+      x.select +
+
+      ' <span>( ' +
+
+      x.price +
+
+      ' )</span>';
+
+    document.querySelector(
+
+      ".selected-previews-title"
+
+    ).textContent =
+
+      x.selected;
+
+    document.getElementById(
+
+      "rulesTitle"
+
+    ).textContent =
+
+      x.rules;
+
+    document.getElementById(
+
+      "rulesText"
+
+    ).textContent =
+
+      x.rulesText;
+
+    document.getElementById(
+
+      "rankTitle"
+
+    ).textContent =
+
+      x.rank;
+
+    document.getElementById(
+
+      "rankText"
+
+    ).textContent =
+
+      x.rankText;
+
+    document.getElementById(
+
+      "profileTitle"
+
+    ).textContent =
+
+      x.profile;
+
+    document.getElementById(
+
+      "profileText"
+
+    ).textContent =
+
+      x.profileText;
+
+    document.getElementById(
+
+      "walletTitle"
+
+    ).textContent =
+
+      x.wallet;
+
+    document.getElementById(
+
+      "walletSub"
+
+    ).textContent =
+
+      x.walletSub;
+
+    document.getElementById(
+
+      "methodLabel"
+
+    ).textContent =
+
+      x.method;
+
+    document.getElementById(
+
+      "amountLabel"
+
+    ).textContent =
+
+      x.amount;
 
     document.getElementById(
 
@@ -5544,19 +5404,15 @@ button{
 
     document.getElementById(
 
-      "methodLabel"
+      "walletSubmit"
 
     ).textContent =
 
-      x.method;
+      walletType === "deposit"
 
-    document.getElementById(
+        ? x.depositAction
 
-      "amountLabel"
-
-    ).textContent =
-
-      x.amount;
+        : x.withdrawAction;
 
     document.getElementById(
 
@@ -5584,6 +5440,30 @@ button{
 
     document.getElementById(
 
+      "miniAm"
+
+    ).classList.toggle(
+
+      "active",
+
+      language === "am"
+
+    );
+
+    document.getElementById(
+
+      "miniEn"
+
+    ).classList.toggle(
+
+      "active",
+
+      language === "en"
+
+    );
+
+    document.getElementById(
+
       "amBtn"
 
     ).classList.toggle(
@@ -5606,43 +5486,11 @@ button{
 
     );
 
-    setWalletType(
-
-      walletType
-
-    );
-
-    renderSelected();
-
-    renderMyCards();
+    renderPreviews();
 
     updateGameUI();
 
   }
-
-  document.getElementById(
-
-    "saveCardsBtn"
-
-  ).addEventListener(
-
-    "click",
-
-    saveCards
-
-  );
-
-  document.getElementById(
-
-    "claimBtn"
-
-  ).addEventListener(
-
-    "click",
-
-    claim
-
-  );
 
   document.getElementById(
 
@@ -5728,11 +5576,57 @@ button{
 
   );
 
+  document.getElementById(
+
+    "miniAm"
+
+  ).addEventListener(
+
+    "click",
+
+    function(){
+
+      setLanguage("am");
+
+    }
+
+  );
+
+  document.getElementById(
+
+    "miniEn"
+
+  ).addEventListener(
+
+    "click",
+
+    function(){
+
+      setLanguage("en");
+
+    }
+
+  );
+
+  document.getElementById(
+
+    "playerName"
+
+  ).textContent =
+
+    telegramUser.first_name ||
+
+    telegramUser.username ||
+
+    "Guest";
+
   function boot(){
 
     setLanguage("am");
 
-    loadCards();
+    renderCards();
+
+    renderPreviews();
 
     Promise.all([
 
@@ -5748,7 +5642,7 @@ button{
 
         refreshGame,
 
-        2500
+        1000
 
       );
 
@@ -5912,132 +5806,32 @@ export default {
 
     }
 
-    if(
+    const apiRoutes = [
 
-      url.pathname ===
+      "/api/game",
 
-      "/api/game"
+      "/api/cards",
 
-    ){
+      "/api/user-cards",
 
-      return proxyToGame(
+      "/api/select-cards",
 
-        request,
+      "/api/balance",
 
-        env,
-
-        "/api/game"
-
-      );
-
-    }
-
-    if(
-
-      url.pathname ===
-
-      "/api/cards"
-
-    ){
-
-      return proxyToGame(
-
-        request,
-
-        env,
-
-        "/api/cards"
-
-      );
-
-    }
-
-    if(
-
-      url.pathname ===
-
-      "/api/user-cards"
-
-    ){
-
-      return proxyToGame(
-
-        request,
-
-        env,
-
-        "/api/user-cards"
-
-      );
-
-    }
-
-    if(
-
-      url.pathname ===
-
-      "/api/select-cards"
-
-    ){
-
-      return proxyToGame(
-
-        request,
-
-        env,
-
-        "/api/select-cards"
-
-      );
-
-    }
-
-    if(
-
-      url.pathname ===
-
-      "/api/balance"
-
-    ){
-
-      return proxyToGame(
-
-        request,
-
-        env,
-
-        "/api/balance"
-
-      );
-
-    }
-
-    if(
-
-      url.pathname ===
-
-      "/api/wallet"
-
-    ){
-
-      return proxyToGame(
-
-        request,
-
-        env,
-
-        "/api/wallet"
-
-      );
-
-    }
-
-    if(
-
-      url.pathname ===
+      "/api/wallet",
 
       "/api/claim"
 
+    ];
+
+    if(
+
+      apiRoutes.includes(
+
+        url.pathname
+
+      )
+
     ){
 
       return proxyToGame(
@@ -6046,41 +5840,37 @@ export default {
 
         env,
 
-        "/api/claim"
+        url.pathname
 
       );
 
     }
 
-    if(
+    const doRoutes = [
 
-      url.pathname ===
+      "/do/game",
 
-      "/do/game" ||
+      "/do/cards",
 
-      url.pathname ===
+      "/do/user-cards",
 
-      "/do/cards" ||
+      "/do/select-cards",
 
-      url.pathname ===
+      "/do/balance",
 
-      "/do/user-cards" ||
-
-      url.pathname ===
-
-      "/do/select-cards" ||
-
-      url.pathname ===
-
-      "/do/balance" ||
-
-      url.pathname ===
-
-      "/do/wallet" ||
-
-      url.pathname ===
+      "/do/wallet",
 
       "/do/claim"
+
+    ];
+
+    if(
+
+      doRoutes.includes(
+
+        url.pathname
+
+      )
 
     ){
 
@@ -6116,7 +5906,11 @@ export default {
 
         null,
 
-        {status:204}
+        {
+
+          status:204
+
+        }
 
       );
 
@@ -6131,4 +5925,5 @@ export default {
   }
 
 };
+
 export { GameScheduler };
