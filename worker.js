@@ -4266,9 +4266,10 @@ if (!hasPlayBalance) {
           )
 
         );
+
       }
 
-   /* =========================================================
+/* =========================================================
 
    WALLET REQUEST
 
@@ -4278,13 +4279,7 @@ if (!hasPlayBalance) {
 
 async walletRequest(userId, body) {
 
-  const amount =
-
-    Number(
-
-      body?.amount || 0
-
-    );
+  const amount = Number(body?.amount || 0);
 
   const type =
 
@@ -4294,21 +4289,11 @@ async walletRequest(userId, body) {
 
       : "deposit";
 
-  const method =
+  const method = String(
 
-    String(
+    body?.method || "Telebirr"
 
-      body?.method || "Telebirr"
-
-    );
-
-  /*
-
-   * Demo minimum amount.
-
-   * No real money is transferred.
-
-   */
+  );
 
   if (
 
@@ -4330,15 +4315,159 @@ async walletRequest(userId, body) {
 
   }
 
-  const current =
+  const balances =
 
-    this.getBalance(userId);
+    this.getBalances(userId);
+
+  if (type === "withdraw") {
+
+    if (balances.playBalance <= 100) {
+
+      return {
+
+        ok: false,
+
+        error: "WITHDRAW_MIN_BALANCE",
+
+        minimumBalance: 100
+
+      };
+
+    }
+
+    if (
+
+      amount >
+
+      balances.playBalance
+
+    ) {
+
+      return {
+
+        ok: false,
+
+        error: "INSUFFICIENT_PLAY_BALANCE"
+
+      };
+
+    }
+
+    const nextPlay =
+
+      balances.playBalance - amount;
+
+    this.ctx.storage.sql.exec(
+
+      `
+
+      UPDATE balances
+
+      SET
+
+        play_balance = ?,
+
+        balance = ?
+
+      WHERE user_id = ?
+
+      `,
+
+      nextPlay,
+
+      nextPlay,
+
+      userId
+
+    );
+
+    this.ctx.storage.sql.exec(
+
+      `
+
+      INSERT INTO wallet_requests
+
+      (
+
+        user_id,
+
+        type,
+
+        method,
+
+        amount,
+
+        status,
+
+        created_at
+
+      )
+
+      VALUES (?, ?, ?, ?, 'pending', ?)
+
+      `,
+
+      userId,
+
+      "withdraw",
+
+      method,
+
+      amount,
+
+      Date.now()
+
+    );
+
+    return {
+
+      ok: true,
+
+      pending: true,
+
+      type: "withdraw",
+
+      amount,
+
+      method,
+
+      mainBalance:
+
+        balances.mainBalance,
+
+      playBalance: nextPlay
+
+    };
+
+  }
+
+  const screenshot =
+
+    body?.screenshot_data || "";
+
+  const screenshotMime =
+
+    body?.screenshot_mime ||
+
+    "image/jpeg";
+
+  if (!screenshot) {
+
+    return {
+
+      ok: false,
+
+      error: "SCREENSHOT_REQUIRED"
+
+    };
+
+  }
 
   if (
 
-    type === "withdraw" &&
+    screenshot.length >
 
-    amount > current
+    300 * 1024 * 2
 
   ) {
 
@@ -4346,49 +4475,19 @@ async walletRequest(userId, body) {
 
       ok: false,
 
-      error: "INSUFFICIENT_BALANCE"
+      error: "SCREENSHOT_TOO_LARGE",
+
+      maximum: "300KB"
 
     };
 
   }
 
-  /*
-
-   * DEMO BALANCE ONLY
-
-   */
-
-  const next =
-
-    type === "deposit"
-
-      ? current + amount
-
-      : current - amount;
-
   this.ctx.storage.sql.exec(
 
     `
 
-    UPDATE balances
-
-    SET balance = ?
-
-    WHERE user_id = ?
-
-    `,
-
-    next,
-
-    userId
-
-  );
-
-  this.ctx.storage.sql.exec(
-
-    `
-
-    INSERT INTO transactions
+    INSERT INTO wallet_requests
 
     (
 
@@ -4400,23 +4499,31 @@ async walletRequest(userId, body) {
 
       amount,
 
-      simulated,
+      status,
+
+      screenshot_data,
+
+      screenshot_mime,
 
       created_at
 
     )
 
-    VALUES (?, ?, ?, ?, 1, ?)
+    VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)
 
     `,
 
     userId,
 
-    type,
+    "deposit",
 
     method,
 
     amount,
+
+    screenshot,
+
+    screenshotMime,
 
     Date.now()
 
@@ -4426,11 +4533,21 @@ async walletRequest(userId, body) {
 
     ok: true,
 
-    simulated: true,
+    pending: true,
 
-    balance: next,
+    type: "deposit",
 
-    method: method
+    amount,
+
+    method,
+
+    mainBalance:
+
+      balances.mainBalance,
+
+    playBalance:
+
+      balances.playBalance
 
   };
 
@@ -4444,17 +4561,37 @@ async walletRequest(userId, body) {
 
 async claim(userId) {
 
-  const state =
+  const state = this.getState();
 
-    this.getState();
+  if (
 
-  if (!state) {
+    !state ||
+
+    state.status !== "live"
+
+  ) {
 
     return {
 
-      ok: true,
+      ok: false,
 
-      winner: false
+      error: "GAME_NOT_LIVE"
+
+    };
+
+  }
+
+  const cards =
+
+    this.getUserCards(userId);
+
+  if (!cards.length) {
+
+    return {
+
+      ok: false,
+
+      error: "NO_CARD"
 
     };
 
@@ -4464,39 +4601,23 @@ async claim(userId) {
 
     this.getCalledBalls(state);
 
-  const cards =
+  const winner =
 
-    this.getUserCards(userId);
+    cards.find(card =>
 
-  for (const number of cards) {
+      hasTwoLines(card, called)
 
-    const card =
+    );
 
-      makeCard(number);
+  if (!winner) {
 
-    if (
+    return {
 
-      hasTwoLines(
+      ok: false,
 
-        card,
+      error: "NOT_WINNING"
 
-        called
-
-      )
-
-    ) {
-
-      return {
-
-        ok: true,
-
-        winner: true,
-
-        card: number
-
-      };
-
-    }
+    };
 
   }
 
@@ -4504,7 +4625,9 @@ async claim(userId) {
 
     ok: true,
 
-    winner: false
+    winner: true,
+
+    card: winner
 
   };
 
@@ -4528,9 +4651,7 @@ async fetch(request) {
 
   if (
 
-    url.pathname ===
-
-    "/do/game"
+    url.pathname === "/do/game"
 
   ) {
 
@@ -4544,9 +4665,7 @@ async fetch(request) {
 
   if (
 
-    url.pathname ===
-
-    "/do/cards"
+    url.pathname === "/do/cards"
 
   ) {
 
@@ -4554,27 +4673,15 @@ async fetch(request) {
 
       ok: true,
 
-      count: CARD_COUNT,
+      cards: Array.from(
 
-      cards:
+        { length: CARD_COUNT },
 
-        Array.from(
+        (_, i) =>
 
-          {
+          makeCard(i + 1)
 
-            length: CARD_COUNT
-
-          },
-
-          (_, i) => ({
-
-            number: i + 1,
-
-            available: true
-
-          })
-
-        )
+      )
 
     });
 
@@ -4592,13 +4699,9 @@ async fetch(request) {
 
       ok: true,
 
-      selected:
+      cards:
 
-        this.getUserCards(
-
-          user.id
-
-        )
+        this.getUserCards(user.id)
 
     });
 
@@ -4630,7 +4733,11 @@ async fetch(request) {
 
         user.id,
 
-        body.cards
+        Array.isArray(body.cards)
+
+          ? body.cards
+
+          : []
 
       )
 
@@ -4646,17 +4753,25 @@ async fetch(request) {
 
   ) {
 
+    const balances =
+
+      this.getBalances(user.id);
+
     return json({
 
       ok: true,
 
+      mainBalance:
+
+        balances.mainBalance,
+
+      playBalance:
+
+        balances.playBalance,
+
       balance:
 
-        this.getBalance(
-
-          user.id
-
-        )
+        balances.playBalance
 
     });
 
@@ -4674,13 +4789,157 @@ async fetch(request) {
 
     let body = {};
 
+    const contentType =
+
+      request.headers.get(
+
+        "content-type"
+
+      ) || "";
+
     try {
 
-      body =
+      if (
 
-        await request.json();
+        contentType.includes(
 
-    } catch (_) {}
+          "multipart/form-data"
+
+        )
+
+      ) {
+
+        const form =
+
+          await request.formData();
+
+        const screenshot =
+
+          form.get("screenshot");
+
+        let screenshotData = "";
+
+        let screenshotMime =
+
+          "image/jpeg";
+
+        if (
+
+          screenshot &&
+
+          typeof screenshot !==
+
+            "string"
+
+        ) {
+
+          const bytes =
+
+            new Uint8Array(
+
+              await screenshot.arrayBuffer()
+
+            );
+
+          let binary = "";
+
+          for (
+
+            let i = 0;
+
+            i < bytes.length;
+
+            i += 0x8000
+
+          ) {
+
+            binary += String.fromCharCode(
+
+              ...bytes.subarray(
+
+                i,
+
+                i + 0x8000
+
+              )
+
+            );
+
+          }
+
+          screenshotData =
+
+            `data:${screenshot.type || "image/jpeg"};base64,` +
+
+            btoa(binary);
+
+          screenshotMime =
+
+            screenshot.type ||
+
+            "image/jpeg";
+
+        }
+
+        body = {
+
+          type:
+
+            String(
+
+              form.get("type") ||
+
+              "deposit"
+
+            ),
+
+          method:
+
+            String(
+
+              form.get("method") ||
+
+              "Telebirr"
+
+            ),
+
+          amount:
+
+            Number(
+
+              form.get("amount") || 0
+
+            ),
+
+          screenshot_data:
+
+            screenshotData,
+
+          screenshot_mime:
+
+            screenshotMime
+
+        };
+
+      } else {
+
+        body =
+
+          await request.json();
+
+      }
+
+    } catch (_) {
+
+      body = {};
+
+    }
+
+    await this.saveTelegramUser(
+
+      user
+
+    );
 
     return json(
 
@@ -4706,11 +4965,7 @@ async fetch(request) {
 
     return json(
 
-      await this.claim(
-
-        user.id
-
-      )
+      await this.claim(user.id)
 
     );
 
