@@ -443,6 +443,150 @@ class GameScheduler extends DurableObject {
 
     `);
 
+sql.exec(`
+
+  CREATE TABLE IF NOT EXISTS users (
+
+    user_id TEXT PRIMARY KEY,
+
+    first_name TEXT,
+
+    username TEXT,
+
+    created_at INTEGER NOT NULL,
+
+    updated_at INTEGER NOT NULL
+
+  )
+
+`);
+
+sql.exec(`
+
+  CREATE TABLE IF NOT EXISTS wallet_requests (
+
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    user_id TEXT NOT NULL,
+
+    type TEXT NOT NULL,
+
+    method TEXT,
+
+    amount REAL NOT NULL,
+
+    status TEXT NOT NULL DEFAULT 'pending',
+
+    screenshot_data TEXT,
+
+    screenshot_mime TEXT,
+
+    created_at INTEGER NOT NULL,
+
+    reviewed_at INTEGER,
+
+    reviewed_by TEXT
+
+  )
+
+`);
+
+sql.exec(`
+
+  CREATE INDEX IF NOT EXISTS idx_wallet_requests_status
+
+  ON wallet_requests(status)
+
+`);
+
+sql.exec(`
+
+  CREATE INDEX IF NOT EXISTS idx_wallet_requests_user
+
+  ON wallet_requests(user_id)
+
+`);
+
+sql.exec(`
+
+  CREATE TABLE IF NOT EXISTS app_control (
+
+    id INTEGER PRIMARY KEY,
+
+    paused INTEGER NOT NULL DEFAULT 0
+
+  )
+
+`);
+
+sql.exec(`
+
+  INSERT OR IGNORE INTO app_control
+
+  (id, paused)
+
+  VALUES (1, 0)
+
+`);
+
+const balanceColumns =
+
+  sql.exec(`
+
+    PRAGMA table_info(balances)
+
+  `).toArray();
+
+const hasMainBalance =
+
+  balanceColumns.some(
+
+    c => c.name === "main_balance"
+
+  );
+
+const hasPlayBalance =
+
+  balanceColumns.some(
+
+    c => c.name === "play_balance"
+
+  );
+
+if (!hasMainBalance) {
+
+  sql.exec(`
+
+    ALTER TABLE balances
+
+    ADD COLUMN main_balance REAL NOT NULL DEFAULT 0
+
+  `);
+
+}
+
+if (!hasPlayBalance) {
+
+  sql.exec(`
+
+    ALTER TABLE balances
+
+    ADD COLUMN play_balance REAL
+
+  `);
+
+  sql.exec(`
+
+    UPDATE balances
+
+    SET play_balance = balance
+
+    WHERE play_balance IS NULL
+
+  `);
+
+}
+     
     sql.exec(`
 
       CREATE TABLE IF NOT EXISTS selected_cards (
