@@ -4838,11 +4838,11 @@ export function getPaymentMethods() {
 
       name:
 
-        PAYMENT_DISPLAY.telebirr.name,
+        PAYMENT_DISPLAY.Hanza,
 
       number:
 
-        PAYMENT_DISPLAY.telebirr.number,
+        PAYMENT_DISPLAY.0999960421,
 
       minDeposit:
 
@@ -4854,11 +4854,11 @@ export function getPaymentMethods() {
 
       name:
 
-        PAYMENT_DISPLAY.ebirr.name,
+        PAYMENT_DISPLAY.Tesema,
 
       number:
 
-        PAYMENT_DISPLAY.ebirr.number,
+        PAYMENT_DISPLAY.0999960421,
 
       minDeposit:
 
@@ -4870,11 +4870,11 @@ export function getPaymentMethods() {
 
       name:
 
-        PAYMENT_DISPLAY.mpesa.name,
+        PAYMENT_DISPLAY.Gemechu,
 
       number:
 
-        PAYMENT_DISPLAY.mpesa.number,
+        PAYMENT_DISPLAY.0786192665,
 
       minDeposit:
 
