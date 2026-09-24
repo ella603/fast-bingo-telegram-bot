@@ -184,6 +184,54 @@ function makeBallOrder(gameNumber) {
 
 }
 
+function isValidBallOrder(value) {
+
+  if (typeof value !== "string") return false;
+
+  try {
+
+    const order = JSON.parse(value);
+
+    if (
+
+      !Array.isArray(order) ||
+
+      order.length !== TOTAL_BALLS
+
+    ) {
+
+      return false;
+
+    }
+
+    const unique = new Set(order);
+
+    if (unique.size !== TOTAL_BALLS) {
+
+      return false;
+
+    }
+
+    return order.every(
+
+      (n) =>
+
+        Number.isInteger(n) &&
+
+        n >= 1 &&
+
+        n <= TOTAL_BALLS
+
+    );
+
+  } catch (_) {
+
+    return false;
+
+  }
+
+}
+
 function hasTwoLines(card, called) {
 
   const calledSet = new Set(called);
@@ -306,6 +354,18 @@ class GameScheduler extends DurableObject {
 
     this.env = env;
 
+    /*
+
+     * IMPORTANT:
+
+     * Do not blindly replace an existing alarm from
+
+     * the constructor. Cloudflare may construct the
+
+     * Durable Object immediately before an alarm fires.
+
+     */
+
     ctx.blockConcurrencyWhile(
 
       async () => {
@@ -404,7 +464,7 @@ class GameScheduler extends DurableObject {
 
     `);
 
-    const existing = sql
+    let existing = sql
 
       .exec(
 
@@ -418,7 +478,9 @@ class GameScheduler extends DurableObject {
 
       const now = Date.now();
 
-      const ends = now + LOBBY_SECONDS * 1000;
+      const ends =
+
+        now + LOBBY_SECONDS * 1000;
 
       const order = makeBallOrder(1);
 
@@ -470,21 +532,155 @@ class GameScheduler extends DurableObject {
 
     }
 
-    const state = existing[0];
+    let state = existing[0];
+
+    /*
+
+     * Repair invalid state if necessary.
+
+     */
+
+    if (
+
+      state.status !== "lobby" &&
+
+      state.status !== "live"
+
+    ) {
+
+      const nextGame =
+
+        Number(state.game_number || 0) + 1;
+
+      const now = Date.now();
+
+      const ends =
+
+        now + LOBBY_SECONDS * 1000;
+
+      sql.exec(
+
+        `
+
+        UPDATE state
+
+        SET
+
+          game_number = ?,
+
+          status = 'lobby',
+
+          lobby_ends_at = ?,
+
+          started_at = NULL,
+
+          ball_index = -1,
+
+          ball_order = ?
+
+        WHERE id = 1
+
+        `,
+
+        nextGame,
+
+        ends,
+
+        JSON.stringify(
+
+          makeBallOrder(nextGame)
+
+        )
+
+      );
+
+      state = this.getState();
+
+    }
+
+    /*
+
+     * Repair an invalid/missing ball order.
+
+     */
+
+    if (
+
+      state &&
+
+      !isValidBallOrder(state.ball_order)
+
+    ) {
+
+      const gameNumber =
+
+        Number(state.game_number || 1);
+
+      sql.exec(
+
+        `
+
+        UPDATE state
+
+        SET ball_order = ?
+
+        WHERE id = 1
+
+        `,
+
+        JSON.stringify(
+
+          makeBallOrder(gameNumber)
+
+        )
+
+      );
+
+      state = this.getState();
+
+    }
+
+    /*
+
+     * CRITICAL FIX:
+
+     * If this constructor was created because an alarm
+
+     * is already scheduled, do not replace that alarm.
+
+     */
+
+    const existingAlarm =
+
+      await this.ctx.storage.getAlarm();
+
+    if (existingAlarm !== null) {
+
+      return;
+
+    }
+
+    if (!state) {
+
+      await this.createFreshLobby();
+
+      return;
+
+    }
 
     if (state.status === "lobby") {
 
+      const ends =
+
+        Number(state.lobby_ends_at || 0);
+
       const remaining =
 
-        Math.max(
+        ends > Date.now()
 
-          1000,
+          ? ends - Date.now()
 
-          Number(state.lobby_ends_at || 0) -
-
-            Date.now()
-
-        );
+          : 1000;
 
       await this.scheduleNext(
 
@@ -492,29 +688,65 @@ class GameScheduler extends DurableObject {
 
       );
 
-    } else {
-
-      await this.scheduleNext(
-
-        BALL_INTERVAL
-
-      );
+      return;
 
     }
+
+    /*
+
+     * Live game:
+
+     * make sure the scheduler continues.
+
+     */
+
+    const index =
+
+      Number(state.ball_index);
+
+    if (
+
+      !Number.isInteger(index) ||
+
+      index < 0 ||
+
+      index >= TOTAL_BALLS
+
+    ) {
+
+      sql.exec(`
+
+        UPDATE state
+
+        SET ball_index = 0
+
+        WHERE id = 1
+
+      `);
+
+    }
+
+    await this.scheduleNext(
+
+      BALL_INTERVAL
+
+    );
 
   }
 
   getState() {
 
-    const rows = this.ctx.storage.sql
+    const rows =
 
-      .exec(
+      this.ctx.storage.sql
 
-        "SELECT * FROM state WHERE id = 1"
+        .exec(
 
-      )
+          "SELECT * FROM state WHERE id = 1"
 
-      .toArray();
+        )
+
+        .toArray();
 
     return rows[0] || null;
 
@@ -524,17 +756,27 @@ class GameScheduler extends DurableObject {
 
     if (!state) return [];
 
-    const order = JSON.parse(
+    let order = [];
 
-      state.ball_order
+    try {
 
-    );
+      order = JSON.parse(
+
+        state.ball_order
+
+      );
+
+    } catch (_) {
+
+      return [];
+
+    }
 
     if (
 
       state.status !== "live" ||
 
-      state.ball_index < 0
+      Number(state.ball_index) < 0
 
     ) {
 
@@ -546,7 +788,7 @@ class GameScheduler extends DurableObject {
 
       0,
 
-      state.ball_index + 1
+      Number(state.ball_index) + 1
 
     );
 
@@ -554,87 +796,79 @@ class GameScheduler extends DurableObject {
 
   async scheduleNext(ms) {
 
+    const delay = Math.max(
+
+      1000,
+
+      Number(ms) || 1000
+
+    );
+
     await this.ctx.storage.setAlarm(
 
-      Date.now() + Math.max(1000, ms)
+      Date.now() + delay
 
     );
 
   }
 
-  async alarm() {
-
-    const state = this.getState();
-
-    if (!state) {
-
-      await this.init();
-
-      return;
-
-    }
+  async createFreshLobby(gameNumber = 1) {
 
     const now = Date.now();
 
-    if (state.status === "lobby") {
+    const lobbyEnds =
 
-      const ends =
+      now + LOBBY_SECONDS * 1000;
 
-        Number(state.lobby_ends_at || 0);
+    const order =
 
-      if (now < ends) {
+      makeBallOrder(gameNumber);
 
-        await this.scheduleNext(
+    const state =
 
-          ends - now
+      this.getState();
 
-        );
+    if (!state) {
 
-        return;
+      this.ctx.storage.sql.exec(
 
-      }
+        `
 
-      this.ctx.storage.sql.exec(`
+        INSERT INTO state
 
-        UPDATE state
+        (
 
-        SET
+          id,
 
-          status = 'live',
+          game_number,
 
-          started_at = ?,
+          status,
 
-          ball_index = -1,
+          lobby_ends_at,
 
-          lobby_ends_at = NULL
+          started_at,
 
-        WHERE id = 1
+          ball_index,
 
-      `, now);
+          ball_order
 
-      await this.scheduleNext(
+        )
 
-        BALL_INTERVAL
+        VALUES
+
+        (1, ?, 'lobby', ?, NULL, -1, ?)
+
+        `,
+
+        gameNumber,
+
+        lobbyEnds,
+
+        JSON.stringify(order)
 
       );
 
-      return;
-
-    }
-
-    if (state.status === "live") {
-
-      const nextIndex =
-
-        Number(state.ball_index) + 1;
-
-      if (nextIndex >= TOTAL_BALLS) {
-
-        await this.startNextGame();
-
-        return;
-
-      }
+    } else {
 
       this.ctx.storage.sql.exec(
 
@@ -642,21 +876,479 @@ class GameScheduler extends DurableObject {
 
         UPDATE state
 
-        SET ball_index = ?
+        SET
+
+          game_number = ?,
+
+          status = 'lobby',
+
+          lobby_ends_at = ?,
+
+          started_at = NULL,
+
+          ball_index = -1,
+
+          ball_order = ?
 
         WHERE id = 1
 
         `,
 
-        nextIndex
+        gameNumber,
+
+        lobbyEnds,
+
+        JSON.stringify(order)
 
       );
 
-      await this.scheduleNext(
+    }
 
-        BALL_INTERVAL
+    await this.scheduleNext(
+
+      LOBBY_SECONDS * 1000
+
+    );
+
+  }
+
+  async recoverScheduler() {
+
+    try {
+
+      const state =
+
+        this.getState();
+
+      if (!state) {
+
+        await this.createFreshLobby(1);
+
+        return;
+
+      }
+
+      if (state.status === "lobby") {
+
+        const ends =
+
+          Number(
+
+            state.lobby_ends_at || 0
+
+          );
+
+        const remaining =
+
+          ends > Date.now()
+
+            ? ends - Date.now()
+
+            : 1000;
+
+        await this.scheduleNext(
+
+          remaining
+
+        );
+
+        return;
+
+      }
+
+      if (state.status === "live") {
+
+        let index =
+
+          Number(state.ball_index);
+
+        if (
+
+          !Number.isInteger(index) ||
+
+          index < 0
+
+        ) {
+
+          this.ctx.storage.sql.exec(`
+
+            UPDATE state
+
+            SET
+
+              status = 'live',
+
+              started_at = COALESCE(
+
+                started_at,
+
+                ?
+
+              ),
+
+              ball_index = 0,
+
+              lobby_ends_at = NULL
+
+            WHERE id = 1
+
+          `, Date.now());
+
+          index = 0;
+
+        }
+
+        if (
+
+          index >= TOTAL_BALLS
+
+        ) {
+
+          await this.startNextGame();
+
+          return;
+
+        }
+
+        await this.scheduleNext(
+
+          2000
+
+        );
+
+        return;
+
+      }
+
+      await this.createFreshLobby(
+
+        Number(state.game_number || 0) + 1
 
       );
+
+    } catch (recoveryError) {
+
+      console.error(
+
+        "Fast Bingo scheduler recovery failed:",
+
+        recoveryError
+
+      );
+
+      /*
+
+       * Last retry path.
+
+       * This keeps the scheduler alive instead of
+
+       * allowing the alarm retry counter to exhaust.
+
+       */
+
+      try {
+
+        await this.ctx.storage.setAlarm(
+
+          Date.now() + 5000
+
+        );
+
+      } catch (_) {}
+
+    }
+
+  }
+
+  async alarm(alarmInfo) {
+
+    try {
+
+      const state =
+
+        this.getState();
+
+      if (!state) {
+
+        await this.createFreshLobby(1);
+
+        return;
+
+      }
+
+      const now = Date.now();
+
+      /*
+
+       * LOBBY -> LIVE
+
+       *
+
+       * The first ball is called immediately.
+
+       * Therefore the UI goes directly to 1 / 75
+
+       * instead of staying at 0 / 75.
+
+       */
+
+      if (state.status === "lobby") {
+
+        const ends =
+
+          Number(
+
+            state.lobby_ends_at || 0
+
+          );
+
+        if (now < ends) {
+
+          await this.scheduleNext(
+
+            ends - now
+
+          );
+
+          return;
+
+        }
+
+        let order = [];
+
+        if (
+
+          isValidBallOrder(
+
+            state.ball_order
+
+          )
+
+        ) {
+
+          order =
+
+            JSON.parse(
+
+              state.ball_order
+
+            );
+
+        } else {
+
+          order =
+
+            makeBallOrder(
+
+              Number(
+
+                state.game_number || 1
+
+              )
+
+            );
+
+        }
+
+        this.ctx.storage.sql.exec(
+
+          `
+
+          UPDATE state
+
+          SET
+
+            status = 'live',
+
+            started_at = ?,
+
+            ball_index = 0,
+
+            lobby_ends_at = NULL,
+
+            ball_order = ?
+
+          WHERE id = 1
+
+          `,
+
+          now,
+
+          JSON.stringify(order)
+
+        );
+
+        await this.scheduleNext(
+
+          BALL_INTERVAL
+
+        );
+
+        return;
+
+      }
+
+      /*
+
+       * LIVE GAME
+
+       */
+
+      if (state.status === "live") {
+
+        let currentIndex =
+
+          Number(state.ball_index);
+
+        if (
+
+          !Number.isInteger(
+
+            currentIndex
+
+          ) ||
+
+          currentIndex < 0
+
+        ) {
+
+          this.ctx.storage.sql.exec(
+
+            `
+
+            UPDATE state
+
+            SET
+
+              ball_index = 0,
+
+              started_at = COALESCE(
+
+                started_at,
+
+                ?
+
+              ),
+
+              lobby_ends_at = NULL
+
+            WHERE id = 1
+
+            `,
+
+            now
+
+          );
+
+          await this.scheduleNext(
+
+            BALL_INTERVAL
+
+          );
+
+          return;
+
+        }
+
+        /*
+
+         * After ball 75, immediately create the
+
+         * next 45-second lobby.
+
+         */
+
+        if (
+
+          currentIndex >=
+
+          TOTAL_BALLS - 1
+
+        ) {
+
+          await this.startNextGame();
+
+          return;
+
+        }
+
+        /*
+
+         * Call next ball.
+
+         */
+
+        const nextIndex =
+
+          currentIndex + 1;
+
+        this.ctx.storage.sql.exec(
+
+          `
+
+          UPDATE state
+
+          SET ball_index = ?
+
+          WHERE id = 1
+
+          `,
+
+          nextIndex
+
+        );
+
+        await this.scheduleNext(
+
+          BALL_INTERVAL
+
+        );
+
+        return;
+
+      }
+
+      /*
+
+       * Unknown status:
+
+       * recover into a fresh lobby.
+
+       */
+
+      await this.createFreshLobby(
+
+        Number(
+
+          state.game_number || 0
+
+        ) + 1
+
+      );
+
+    } catch (error) {
+
+      console.error(
+
+        "Fast Bingo alarm error:",
+
+        error,
+
+        "retry:",
+
+        alarmInfo?.retryCount || 0
+
+      );
+
+      /*
+
+       * Do not let Cloudflare's limited alarm retries
+
+       * permanently stop the 24/7 game loop.
+
+       */
+
+      await this.recoverScheduler();
 
     }
 
@@ -664,7 +1356,9 @@ class GameScheduler extends DurableObject {
 
   async startNextGame() {
 
-    const current = this.getState();
+    const current =
+
+      this.getState();
 
     const nextGame =
 
@@ -683,6 +1377,14 @@ class GameScheduler extends DurableObject {
     const order =
 
       makeBallOrder(nextGame);
+
+    /*
+
+     * Remove old card selections.
+
+     * Current/new game selections remain available.
+
+     */
 
     this.ctx.storage.sql.exec(
 
@@ -740,25 +1442,27 @@ class GameScheduler extends DurableObject {
 
   getJackpot(gameNumber) {
 
-    const row = this.ctx.storage.sql
+    const row =
 
-      .exec(
+      this.ctx.storage.sql
 
-        `
+        .exec(
 
-        SELECT COUNT(*) AS count
+          `
 
-        FROM selected_cards
+          SELECT COUNT(*) AS count
 
-        WHERE game_number = ?
+          FROM selected_cards
 
-        `,
+          WHERE game_number = ?
 
-        gameNumber
+          `,
 
-      )
+          gameNumber
 
-      .toArray()[0];
+        )
+
+        .toArray()[0];
 
     const count =
 
@@ -778,7 +1482,9 @@ class GameScheduler extends DurableObject {
 
   getGameResponse() {
 
-    const state = this.getState();
+    const state =
+
+      this.getState();
 
     if (!state) {
 
@@ -788,7 +1494,9 @@ class GameScheduler extends DurableObject {
 
         gameNumber: 1,
 
-        lobbyRemaining: LOBBY_SECONDS,
+        lobbyRemaining:
+
+          LOBBY_SECONDS,
 
         calledBalls: [],
 
@@ -810,17 +1518,45 @@ class GameScheduler extends DurableObject {
 
       this.getCalledBalls(state);
 
-    const order =
+    let order = [];
 
-      JSON.parse(state.ball_order);
+    try {
+
+      order =
+
+        JSON.parse(
+
+          state.ball_order
+
+        );
+
+    } catch (_) {
+
+      order =
+
+        makeBallOrder(
+
+          Number(
+
+            state.game_number || 1
+
+          )
+
+        );
+
+    }
 
     const currentBall =
 
       state.status === "live" &&
 
-      state.ball_index >= 0
+      Number(state.ball_index) >= 0
 
-        ? order[state.ball_index]
+        ? order[
+
+            Number(state.ball_index)
+
+          ]
 
         : null;
 
@@ -898,7 +1634,9 @@ class GameScheduler extends DurableObject {
 
   async selectCards(userId, cards) {
 
-    const state = this.getState();
+    const state =
+
+      this.getState();
 
     if (!state) {
 
@@ -912,7 +1650,11 @@ class GameScheduler extends DurableObject {
 
     }
 
-    if (state.status !== "lobby") {
+    if (
+
+      state.status !== "lobby"
+
+    ) {
 
       return {
 
@@ -924,25 +1666,27 @@ class GameScheduler extends DurableObject {
 
     }
 
-    let clean = Array.isArray(cards)
+    let clean =
 
-      ? cards
+      Array.isArray(cards)
 
-          .map(Number)
+        ? cards
 
-          .filter(
+            .map(Number)
 
-            (n) =>
+            .filter(
 
-              Number.isInteger(n) &&
+              (n) =>
 
-              n >= 1 &&
+                Number.isInteger(n) &&
 
-              n <= CARD_COUNT
+                n >= 1 &&
 
-          )
+                n <= CARD_COUNT
 
-      : [];
+            )
+
+        : [];
 
     clean = [
 
@@ -1044,7 +1788,9 @@ class GameScheduler extends DurableObject {
 
   getUserCards(userId) {
 
-    const state = this.getState();
+    const state =
+
+      this.getState();
 
     if (!state) return [];
 
@@ -1152,7 +1898,11 @@ class GameScheduler extends DurableObject {
 
     const amount =
 
-      Number(body?.amount || 0);
+      Number(
+
+        body?.amount || 0
+
+      );
 
     const type =
 
@@ -1288,7 +2038,9 @@ class GameScheduler extends DurableObject {
 
   async claim(userId) {
 
-    const state = this.getState();
+    const state =
+
+      this.getState();
 
     if (!state) {
 
@@ -1438,7 +2190,7 @@ class GameScheduler extends DurableObject {
 
       url.pathname ===
 
-      "/do/select-cards" &&
+        "/do/select-cards" &&
 
       request.method === "POST"
 
@@ -1492,7 +2244,7 @@ class GameScheduler extends DurableObject {
 
       url.pathname ===
 
-      "/do/wallet" &&
+        "/do/wallet" &&
 
       request.method === "POST"
 
@@ -3298,9 +4050,7 @@ button{
 
       id="previewGrid"
 
-    >
-
-    </div>
+    ></div>
 
   </div>
 
