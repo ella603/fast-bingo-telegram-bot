@@ -6672,6 +6672,40 @@ export default {
 
     );
 
+  },
+
+  async scheduled(
+
+    event,
+
+    env,
+
+    ctx
+
+  ){
+
+    const id =
+
+      env.GAME_SCHEDULER.idFromName(
+
+        "main-game"
+
+      );
+
+    const stub =
+
+      env.GAME_SCHEDULER.get(id);
+
+    ctx.waitUntil(
+
+      stub.fetch(
+
+        "https://fast-bingo.internal/do/game"
+
+      )
+
+    );
+
   }
 
 };
