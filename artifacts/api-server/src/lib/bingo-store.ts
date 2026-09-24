@@ -4,7 +4,13 @@ import path from "node:path";
 
 import { DatabaseSync } from "node:sqlite";
 
-export type BingoCategory = "normal" | "vip" | "vvip";
+export type BingoCategory =
+
+  | "normal"
+
+  | "vip"
+
+  | "vvip";
 
 export type BingoGameStatus =
 
@@ -152,6 +158,68 @@ export type BingoWallet = {
 
 };
 
+/* =========================================================
+
+   FAST BINGO — DEMO PAYMENT DISPLAY SETTINGS
+
+   CHANGE ONLY THE VALUES BELOW.
+
+   This is DISPLAY / DEMO configuration only.
+
+   It does NOT transfer real money.
+
+   ========================================================= */
+
+export const PAYMENT_DISPLAY = {
+
+  telebirr: {
+
+    name: "Hanza",
+
+    number: "0999960421",
+
+  },
+
+  ebirr: {
+
+    name: "Belay",
+
+    number: "0999960421",
+
+  },
+
+  mpesa: {
+
+    name: "Gemechu",
+
+    number: "0786192665",
+
+  },
+
+} as const;
+
+/* =========================================================
+
+   WALLET SETTINGS
+
+   ========================================================= */
+
+const MIN_DEPOSIT_AMOUNT = 50;
+
+const REGISTRATION_BONUS = 20;
+
+const DEPOSIT_BONUS_PERCENT = 5;
+
+const INITIAL_PLAY_BALANCE = 0;
+
+const INITIAL_MAIN_BALANCE = 0;
+
+/* =========================================================
+
+   BINGO SETTINGS
+
+   ========================================================= */
+
 const CARD_PRICE = 10;
 
 const PRIZE_PER_CARD = 8;
@@ -169,6 +237,12 @@ const TOTAL_CARDS = 400;
 const TOTAL_NUMBERS = 75;
 
 const WINNING_LINES = 2;
+
+/* =========================================================
+
+   DATABASE
+
+   ========================================================= */
 
 const dataDir = path.resolve(
 
@@ -195,12 +269,6 @@ const database = new DatabaseSync(
   ),
 
 );
-
-/* =========================================================
-
-   DATABASE
-
-   ========================================================= */
 
 database.exec(`
 
@@ -318,9 +386,15 @@ database.exec(`
 
     telegram_id TEXT PRIMARY KEY,
 
-    balance REAL NOT NULL DEFAULT 2500,
+    balance REAL NOT NULL DEFAULT 0,
 
-    currency TEXT NOT NULL DEFAULT 'ETB'
+    currency TEXT NOT NULL DEFAULT 'ETB',
+
+    main_balance REAL NOT NULL DEFAULT 0,
+
+    play_balance REAL NOT NULL DEFAULT 0,
+
+    registration_bonus_received INTEGER NOT NULL DEFAULT 0
 
   );
 
@@ -338,7 +412,57 @@ database.exec(`
 
     status TEXT NOT NULL,
 
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+
+    balance_type TEXT NOT NULL DEFAULT 'play',
+
+    bonus REAL NOT NULL DEFAULT 0
+
+  );
+
+  CREATE TABLE IF NOT EXISTS deposit_requests (
+
+    id TEXT PRIMARY KEY,
+
+    telegram_id TEXT NOT NULL,
+
+    amount REAL NOT NULL,
+
+    method TEXT NOT NULL,
+
+    status TEXT NOT NULL DEFAULT 'pending',
+
+    bonus REAL NOT NULL DEFAULT 0,
+
+    created_at TEXT NOT NULL,
+
+    reviewed_at TEXT
+
+  );
+
+  CREATE TABLE IF NOT EXISTS withdrawal_requests (
+
+    id TEXT PRIMARY KEY,
+
+    telegram_id TEXT NOT NULL,
+
+    amount REAL NOT NULL,
+
+    method TEXT NOT NULL,
+
+    status TEXT NOT NULL DEFAULT 'pending',
+
+    created_at TEXT NOT NULL,
+
+    reviewed_at TEXT
+
+  );
+
+  CREATE TABLE IF NOT EXISTS games_admin (
+
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+
+    updated_at TEXT
 
   );
 
@@ -382,6 +506,156 @@ database.exec(`
 
 /* =========================================================
 
+   DATABASE MIGRATION HELPERS
+
+   ========================================================= */
+
+function getTableColumns(
+
+  table: string,
+
+): Array<Record<string, unknown>> {
+
+  return database
+
+    .prepare(
+
+      `PRAGMA table_info(${table})`,
+
+    )
+
+    .all() as Array<
+
+    Record<string, unknown>
+
+  >;
+
+}
+
+function hasColumn(
+
+  table: string,
+
+  column: string,
+
+): boolean {
+
+  return getTableColumns(table).some(
+
+    (item) =>
+
+      String(item.name) === column,
+
+  );
+
+}
+
+function addColumnIfMissing(
+
+  table: string,
+
+  column: string,
+
+  definition: string,
+
+): void {
+
+  if (!hasColumn(table, column)) {
+
+    database.exec(
+
+      `ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`,
+
+    );
+
+  }
+
+}
+
+/* =========================================================
+
+   WALLET DATABASE MIGRATION
+
+   ========================================================= */
+
+function migrateWalletTables(): void {
+
+  addColumnIfMissing(
+
+    "telegram_wallets",
+
+    "main_balance",
+
+    "REAL NOT NULL DEFAULT 0",
+
+  );
+
+  addColumnIfMissing(
+
+    "telegram_wallets",
+
+    "play_balance",
+
+    "REAL NOT NULL DEFAULT 0",
+
+  );
+
+  addColumnIfMissing(
+
+    "telegram_wallets",
+
+    "registration_bonus_received",
+
+    "INTEGER NOT NULL DEFAULT 0",
+
+  );
+
+  addColumnIfMissing(
+
+    "telegram_wallet_entries",
+
+    "balance_type",
+
+    "TEXT NOT NULL DEFAULT 'play'",
+
+  );
+
+  addColumnIfMissing(
+
+    "telegram_wallet_entries",
+
+    "bonus",
+
+    "REAL NOT NULL DEFAULT 0",
+
+  );
+
+  /*
+
+   * Existing old balance becomes Play Balance.
+
+   * This keeps old users' existing demo balance.
+
+   */
+
+  database.exec(`
+
+    UPDATE telegram_wallets
+
+    SET play_balance = balance
+
+    WHERE
+
+      play_balance = 0
+
+      AND balance != 0
+
+  `);
+
+}
+
+/* =========================================================
+
    OLD DATABASE MIGRATION
 
    ========================================================= */
@@ -402,13 +676,15 @@ function migrateGamePlayerLinks(): void {
 
   >;
 
-  const primaryKeys = columns.filter(
+  const primaryKeys =
 
-    (column) =>
+    columns.filter(
 
-      Number(column.pk) > 0,
+      (column) =>
 
-  );
+        Number(column.pk) > 0,
+
+    );
 
   const alreadySupportsMultipleCards =
 
@@ -468,13 +744,29 @@ function migrateGamePlayerLinks(): void {
 
       player_id TEXT NOT NULL,
 
-      PRIMARY KEY (game_id, telegram_id, player_id)
+      PRIMARY KEY (
+
+        game_id,
+
+        telegram_id,
+
+        player_id
+
+      )
 
     );
 
     INSERT OR IGNORE INTO game_player_links
 
-      (game_id, telegram_id, player_id)
+      (
+
+        game_id,
+
+        telegram_id,
+
+        player_id
+
+      )
 
     SELECT
 
@@ -508,13 +800,15 @@ function migrateGameWinners(): void {
 
   >;
 
-  const primaryKeys = columns.filter(
+  const primaryKeys =
 
-    (column) =>
+    columns.filter(
 
-      Number(column.pk) > 0,
+      (column) =>
 
-  );
+        Number(column.pk) > 0,
+
+    );
 
   const supportsMultipleWinnerCards =
 
@@ -578,7 +872,15 @@ function migrateGameWinners(): void {
 
       created_at TEXT NOT NULL,
 
-      PRIMARY KEY (game_id, telegram_id, player_id)
+      PRIMARY KEY (
+
+        game_id,
+
+        telegram_id,
+
+        player_id
+
+      )
 
     );
 
@@ -621,6 +923,8 @@ function migrateGameWinners(): void {
 migrateGamePlayerLinks();
 
 migrateGameWinners();
+
+migrateWalletTables();
 
 /* =========================================================
 
@@ -1044,7 +1348,7 @@ function seedWallet(): void {
 
           1,
 
-          2500,
+          0,
 
           'ETB'
 
@@ -1148,7 +1452,7 @@ function seedActivities(): void {
 
     "Balance added",
 
-    "Wallet credited with 500 ETB",
+    "Demo wallet activity",
 
     "21 min ago",
 
@@ -1862,6 +2166,14 @@ function settleWinners(
 
     getPrizePool(game);
 
+  /*
+
+   * IMPORTANT:
+
+   * All winners share the same prize pool equally.
+
+   */
+
   const prizePerWinner =
 
     Number(
@@ -1882,35 +2194,11 @@ function settleWinners(
 
   ) {
 
-    database
+    ensureTelegramWallet(
 
-      .prepare(`
+      winner.telegramId,
 
-        INSERT OR IGNORE INTO
-
-          telegram_wallets
-
-          (
-
-            telegram_id,
-
-            balance,
-
-            currency
-
-          )
-
-        VALUES
-
-          (?, 0, 'ETB')
-
-      `)
-
-      .run(
-
-        winner.telegramId,
-
-      );
+    );
 
     database
 
@@ -1918,15 +2206,23 @@ function settleWinners(
 
         UPDATE telegram_wallets
 
-        SET balance =
+        SET
 
-          balance + ?
+          play_balance =
+
+            play_balance + ?,
+
+          balance =
+
+            play_balance + ?
 
         WHERE telegram_id = ?
 
       `)
 
       .run(
+
+        prizePerWinner,
 
         prizePerWinner,
 
@@ -1956,7 +2252,11 @@ function settleWinners(
 
             status,
 
-            created_at
+            created_at,
+
+            balance_type,
+
+            bonus
 
           )
 
@@ -1976,7 +2276,11 @@ function settleWinners(
 
             'completed',
 
-            ?
+            ?,
+
+            'play',
+
+            0
 
           )
 
@@ -2219,6 +2523,250 @@ seedWallet();
 seedActivities();
 
 seedGame();
+
+/* =========================================================
+
+   TELEGRAM WALLET INTERNAL HELPERS
+
+   ========================================================= */
+
+function ensureTelegramWallet(
+
+  telegramId: string,
+
+): void {
+
+  database
+
+    .prepare(`
+
+      INSERT OR IGNORE INTO
+
+        telegram_wallets
+
+        (
+
+          telegram_id,
+
+          balance,
+
+          currency,
+
+          main_balance,
+
+          play_balance,
+
+          registration_bonus_received
+
+        )
+
+      VALUES
+
+        (?, ?, 'ETB', ?, ?, 0)
+
+    `)
+
+    .run(
+
+      telegramId,
+
+      INITIAL_PLAY_BALANCE,
+
+      INITIAL_MAIN_BALANCE,
+
+      INITIAL_PLAY_BALANCE,
+
+    );
+
+  /*
+
+   * Keep old "balance" compatible with Play Balance.
+
+   */
+
+  database
+
+    .prepare(`
+
+      UPDATE telegram_wallets
+
+      SET balance = play_balance
+
+      WHERE telegram_id = ?
+
+    `)
+
+    .run(
+
+      telegramId,
+
+    );
+
+}
+
+function giveRegistrationBonus(
+
+  telegramId: string,
+
+): void {
+
+  ensureTelegramWallet(
+
+    telegramId,
+
+  );
+
+  const wallet =
+
+    database
+
+      .prepare(`
+
+        SELECT
+
+          registration_bonus_received
+
+        FROM telegram_wallets
+
+        WHERE telegram_id = ?
+
+      `)
+
+      .get(
+
+        telegramId,
+
+      ) as
+
+      | Record<
+
+          string,
+
+          unknown
+
+        >
+
+      | undefined;
+
+  if (
+
+    Number(
+
+      wallet?.registration_bonus_received ??
+
+        0,
+
+    ) === 1
+
+  ) {
+
+    return;
+
+  }
+
+  database
+
+    .prepare(`
+
+      UPDATE telegram_wallets
+
+      SET
+
+        play_balance =
+
+          play_balance + ?,
+
+        balance =
+
+          play_balance + ?,
+
+        registration_bonus_received = 1
+
+      WHERE telegram_id = ?
+
+    `)
+
+    .run(
+
+      REGISTRATION_BONUS,
+
+      REGISTRATION_BONUS,
+
+      telegramId,
+
+    );
+
+  database
+
+    .prepare(`
+
+      INSERT INTO
+
+        telegram_wallet_entries
+
+        (
+
+          id,
+
+          telegram_id,
+
+          type,
+
+          amount,
+
+          method,
+
+          status,
+
+          created_at,
+
+          balance_type,
+
+          bonus
+
+        )
+
+      VALUES
+
+        (
+
+          ?,
+
+          ?,
+
+          'deposit',
+
+          ?,
+
+          'telebirr',
+
+          'completed',
+
+          ?,
+
+          'play',
+
+          ?
+
+        )
+
+    `)
+
+    .run(
+
+      randomId("signup"),
+
+      telegramId,
+
+      REGISTRATION_BONUS,
+
+      now(),
+
+      REGISTRATION_BONUS,
+
+    );
+
+}
 
 /* =========================================================
 
@@ -2494,55 +3042,55 @@ export function createGame(
 
     BingoPlayer = {
 
-      id: randomId(
+    id: randomId(
 
-        "player",
+      "player",
 
-      ),
+    ),
 
-      name: "You",
+    name: "You",
 
-      initials: "YO",
+    initials: "YO",
 
-      category,
+    category,
 
-      cardLabel:
+    cardLabel:
 
-        card.label,
+      card.label,
 
-      joinedAt: now(),
+    joinedAt: now(),
 
-    };
+  };
 
   const game:
 
     BingoGame = {
 
-      id,
+    id,
 
-      name,
+    name,
 
-      status: "waiting",
+    status: "waiting",
 
-      hostName: "You",
+    hostName: "You",
 
-      players: [player],
+    players: [player],
 
-      calledNumbers: [],
+    calledNumbers: [],
 
-      currentNumber: 0,
+    currentNumber: 0,
 
-      nextCallIn:
+    nextCallIn:
 
-        LOBBY_SECONDS,
+      LOBBY_SECONDS,
 
-      shareCode,
+    shareCode,
 
-      winnerCount: 0,
+    winnerCount: 0,
 
-      startedAt: now(),
+    startedAt: now(),
 
-    };
+  };
 
   database
 
@@ -2888,15 +3436,23 @@ export function joinTelegramGame(
 
       UPDATE telegram_wallets
 
-      SET balance =
+      SET
 
-        balance - ?
+        play_balance =
+
+          play_balance - ?,
+
+        balance =
+
+          play_balance - ?
 
       WHERE telegram_id = ?
 
     `)
 
     .run(
+
+      CARD_PRICE,
 
       CARD_PRICE,
 
@@ -2926,7 +3482,11 @@ export function joinTelegramGame(
 
           status,
 
-          created_at
+          created_at,
+
+          balance_type,
+
+          bonus
 
         )
 
@@ -2946,7 +3506,11 @@ export function joinTelegramGame(
 
           'completed',
 
-          ?
+          ?,
+
+          'play',
+
+          0
 
         )
 
@@ -2968,31 +3532,31 @@ export function joinTelegramGame(
 
     BingoPlayer = {
 
-      id: randomId(
+    id: randomId(
 
-        "player",
+      "player",
 
-      ),
+    ),
 
-      name: playerName,
+    name: playerName,
 
-      initials:
+    initials:
 
-        playerName
+      playerName
 
-          .slice(0, 2)
+        .slice(0, 2)
 
-          .toUpperCase(),
+        .toUpperCase(),
 
-      category,
+    category,
 
-      cardLabel:
+    cardLabel:
 
-        card.label,
+      card.label,
 
-      joinedAt: now(),
+    joinedAt: now(),
 
-    };
+  };
 
   game.players.push(
 
@@ -3244,7 +3808,7 @@ export function selectTelegramCard(
 
 /* =========================================================
 
-   TELEGRAM CARDS — NEW
+   TELEGRAM CARDS
 
    ========================================================= */
 
@@ -3588,6 +4152,14 @@ export function upsertTelegramUser(
 
 ): void {
 
+  const isNew =
+
+    !hasTelegramUser(
+
+      telegramId,
+
+    );
+
   database
 
     .prepare(`
@@ -3644,35 +4216,31 @@ export function upsertTelegramUser(
 
     );
 
-  database
+  ensureTelegramWallet(
 
-    .prepare(`
+    telegramId,
 
-      INSERT OR IGNORE INTO
+  );
 
-        telegram_wallets
+  /*
 
-        (
+   * Only a genuinely new Telegram
 
-          telegram_id,
+   * account receives the 20 ETB
 
-          balance,
+   * demo registration bonus.
 
-          currency
+   */
 
-        )
+  if (isNew) {
 
-      VALUES
-
-        (?, 2500, 'ETB')
-
-    `)
-
-    .run(
+    giveRegistrationBonus(
 
       telegramId,
 
     );
+
+  }
 
   database
 
@@ -3994,6 +4562,12 @@ export function getTelegramWallet(
 
 ): BingoWallet {
 
+  ensureTelegramWallet(
+
+    telegramId,
+
+  );
+
   const wallet =
 
     database
@@ -4002,7 +4576,7 @@ export function getTelegramWallet(
 
         SELECT
 
-          balance,
+          play_balance,
 
           currency
 
@@ -4132,9 +4706,9 @@ export function getTelegramWallet(
 
     balance: Number(
 
-      wallet?.balance ??
+      wallet?.play_balance ??
 
-        2500,
+        INITIAL_PLAY_BALANCE,
 
     ),
 
@@ -4152,21 +4726,193 @@ export function getTelegramWallet(
 
 }
 
-export function telegramWalletAction(
+/* =========================================================
+
+   BALANCE DETAILS
+
+   ========================================================= */
+
+export function getTelegramBalances(
 
   telegramId: string,
 
-  type:
+): {
 
-    | "deposit"
+  mainBalance: number;
 
-    | "withdrawal",
+  playBalance: number;
+
+  currency: string;
+
+} {
+
+  ensureTelegramWallet(
+
+    telegramId,
+
+  );
+
+  const row =
+
+    database
+
+      .prepare(`
+
+        SELECT
+
+          main_balance,
+
+          play_balance,
+
+          currency
+
+        FROM telegram_wallets
+
+        WHERE telegram_id = ?
+
+      `)
+
+      .get(
+
+        telegramId,
+
+      ) as
+
+      | Record<
+
+          string,
+
+          unknown
+
+        >
+
+      | undefined;
+
+  return {
+
+    mainBalance:
+
+      Number(
+
+        row?.main_balance ??
+
+          0,
+
+      ),
+
+    playBalance:
+
+      Number(
+
+        row?.play_balance ??
+
+          0,
+
+      ),
+
+    currency:
+
+      String(
+
+        row?.currency ??
+
+          "ETB",
+
+      ),
+
+  };
+
+}
+
+/* =========================================================
+
+   PAYMENT METHODS
+
+   ========================================================= */
+
+export function getPaymentMethods() {
+
+  return {
+
+    telebirr: {
+
+      name:
+
+        PAYMENT_DISPLAY.telebirr.name,
+
+      number:
+
+        PAYMENT_DISPLAY.telebirr.number,
+
+      minDeposit:
+
+        MIN_DEPOSIT_AMOUNT,
+
+    },
+
+    ebirr: {
+
+      name:
+
+        PAYMENT_DISPLAY.ebirr.name,
+
+      number:
+
+        PAYMENT_DISPLAY.ebirr.number,
+
+      minDeposit:
+
+        MIN_DEPOSIT_AMOUNT,
+
+    },
+
+    mpesa: {
+
+      name:
+
+        PAYMENT_DISPLAY.mpesa.name,
+
+      number:
+
+        PAYMENT_DISPLAY.mpesa.number,
+
+      minDeposit:
+
+        MIN_DEPOSIT_AMOUNT,
+
+    },
+
+  };
+
+}
+
+/* =========================================================
+
+   DEMO DEPOSIT REQUEST
+
+   ========================================================= */
+
+export function createDepositRequest(
+
+  telegramId: string,
 
   amount: number,
 
   method: WalletMethod,
 
-): BingoWallet {
+): {
+
+  id: string;
+
+  status: "pending";
+
+  amount: number;
+
+  bonus: number;
+
+  totalAfterApproval: number;
+
+} {
 
   if (
 
@@ -4176,83 +4922,215 @@ export function telegramWalletAction(
 
     ) ||
 
-    amount <= 0
+    amount < MIN_DEPOSIT_AMOUNT
 
   ) {
 
     throw new Error(
 
-      "Amount must be greater than zero",
+      `Minimum deposit is ${MIN_DEPOSIT_AMOUNT} ETB`,
 
     );
 
   }
 
-  const wallet =
+  const requestId =
 
-    getTelegramWallet(
+    randomId("deposit");
 
-      telegramId,
+  const bonus =
 
-    );
+    Number(
 
-  const nextBalance =
+      (
 
-    type === "deposit"
+        amount *
 
-      ? wallet.balance +
+        (DEPOSIT_BONUS_PERCENT /
 
-        amount
+          100)
 
-      : wallet.balance -
-
-        amount;
-
-  if (
-
-    nextBalance < 0
-
-  ) {
-
-    throw new Error(
-
-      "Insufficient balance for this withdrawal",
+      ).toFixed(2),
 
     );
-
-  }
 
   database
 
     .prepare(`
 
-      INSERT OR IGNORE INTO
-
-        telegram_wallets
+      INSERT INTO deposit_requests
 
         (
 
+          id,
+
           telegram_id,
 
-          balance,
+          amount,
 
-          currency
+          method,
+
+          status,
+
+          bonus,
+
+          created_at
 
         )
 
       VALUES
 
-        (?, ?, 'ETB')
+        (?, ?, ?, ?, 'pending', ?, ?)
 
     `)
 
     .run(
 
+      requestId,
+
       telegramId,
 
-      nextBalance,
+      amount,
+
+      method,
+
+      bonus,
+
+      now(),
 
     );
+
+  return {
+
+    id: requestId,
+
+    status: "pending",
+
+    amount,
+
+    bonus,
+
+    totalAfterApproval:
+
+      amount + bonus,
+
+  };
+
+}
+
+/* =========================================================
+
+   DEMO ADMIN — APPROVE DEPOSIT
+
+   ========================================================= */
+
+export function approveDepositRequest(
+
+  requestId: string,
+
+): {
+
+  ok: boolean;
+
+  amount?: number;
+
+  bonus?: number;
+
+  total?: number;
+
+} {
+
+  const request =
+
+    database
+
+      .prepare(`
+
+        SELECT *
+
+        FROM deposit_requests
+
+        WHERE id = ?
+
+      `)
+
+      .get(
+
+        requestId,
+
+      ) as
+
+      | Record<
+
+          string,
+
+          unknown
+
+        >
+
+      | undefined;
+
+  if (!request) {
+
+    return {
+
+      ok: false,
+
+    };
+
+  }
+
+  if (
+
+    String(
+
+      request.status,
+
+    ) !== "pending"
+
+  ) {
+
+    return {
+
+      ok: false,
+
+    };
+
+  }
+
+  const telegramId =
+
+    String(
+
+      request.telegram_id,
+
+    );
+
+  const amount =
+
+    Number(
+
+      request.amount,
+
+    );
+
+  const bonus =
+
+    Number(
+
+      request.bonus,
+
+    );
+
+  ensureTelegramWallet(
+
+    telegramId,
+
+  );
+
+  const total =
+
+    amount + bonus;
 
   database
 
@@ -4260,7 +5138,9 @@ export function telegramWalletAction(
 
       UPDATE telegram_wallets
 
-      SET balance = ?
+      SET main_balance =
+
+        main_balance + ?
 
       WHERE telegram_id = ?
 
@@ -4268,9 +5148,33 @@ export function telegramWalletAction(
 
     .run(
 
-      nextBalance,
+      total,
 
       telegramId,
+
+    );
+
+  database
+
+    .prepare(`
+
+      UPDATE deposit_requests
+
+      SET
+
+        status = 'completed',
+
+        reviewed_at = ?
+
+      WHERE id = ?
+
+    `)
+
+    .run(
+
+      now(),
+
+      requestId,
 
     );
 
@@ -4296,27 +5200,247 @@ export function telegramWalletAction(
 
           status,
 
+          created_at,
+
+          balance_type,
+
+          bonus
+
+        )
+
+      VALUES
+
+        (
+
+          ?,
+
+          ?,
+
+          'deposit',
+
+          ?,
+
+          ?,
+
+          'completed',
+
+          ?,
+
+          'main',
+
+          ?
+
+        )
+
+    `)
+
+    .run(
+
+      randomId("deposit"),
+
+      telegramId,
+
+      amount,
+
+      String(
+
+        request.method,
+
+      ) as WalletMethod,
+
+      now(),
+
+      bonus,
+
+    );
+
+  return {
+
+    ok: true,
+
+    amount,
+
+    bonus,
+
+    total,
+
+  };
+
+}
+
+/* =========================================================
+
+   DEMO WITHDRAWAL REQUEST
+
+   ========================================================= */
+
+export function createWithdrawalRequest(
+
+  telegramId: string,
+
+  amount: number,
+
+  method: WalletMethod,
+
+): {
+
+  id: string;
+
+  status: "pending";
+
+  amount: number;
+
+} {
+
+  if (
+
+    !Number.isFinite(
+
+      amount,
+
+    ) ||
+
+    amount <= 0
+
+  ) {
+
+    throw new Error(
+
+      "Amount must be greater than zero",
+
+    );
+
+  }
+
+  ensureTelegramWallet(
+
+    telegramId,
+
+  );
+
+  const wallet =
+
+    getTelegramBalances(
+
+      telegramId,
+
+    );
+
+  /*
+
+   * Withdrawal is allowed ONLY
+
+   * from Play Balance.
+
+   */
+
+  if (
+
+    amount >
+
+    wallet.playBalance
+
+  ) {
+
+    throw new Error(
+
+      "Insufficient Play Balance",
+
+    );
+
+  }
+
+  /*
+
+   * Reserve the requested amount
+
+   * immediately so it cannot be
+
+   * withdrawn twice.
+
+   */
+
+  database
+
+    .prepare(`
+
+      UPDATE telegram_wallets
+
+      SET
+
+        play_balance =
+
+          play_balance - ?,
+
+        balance =
+
+          play_balance - ?
+
+      WHERE telegram_id = ?
+
+    `)
+
+    .run(
+
+      amount,
+
+      amount,
+
+      telegramId,
+
+    );
+
+  const requestId =
+
+    randomId("withdraw");
+
+  database
+
+    .prepare(`
+
+      INSERT INTO withdrawal_requests
+
+        (
+
+          id,
+
+          telegram_id,
+
+          amount,
+
+          method,
+
+          status,
+
           created_at
 
         )
 
       VALUES
 
-        (?, ?, ?, ?, ?, 'completed', ?)
+        (
+
+          ?,
+
+          ?,
+
+          ?,
+
+          ?,
+
+          'pending',
+
+          ?
+
+        )
 
     `)
 
     .run(
 
-      randomId(
-
-        "wallet",
-
-      ),
+      requestId,
 
       telegramId,
-
-      type,
 
       amount,
 
@@ -4325,6 +5449,284 @@ export function telegramWalletAction(
       now(),
 
     );
+
+  database
+
+    .prepare(`
+
+      INSERT INTO
+
+        telegram_wallet_entries
+
+        (
+
+          id,
+
+          telegram_id,
+
+          type,
+
+          amount,
+
+          method,
+
+          status,
+
+          created_at,
+
+          balance_type,
+
+          bonus
+
+        )
+
+      VALUES
+
+        (
+
+          ?,
+
+          ?,
+
+          'withdrawal',
+
+          ?,
+
+          ?,
+
+          'pending',
+
+          ?,
+
+          'play',
+
+          0
+
+        )
+
+    `)
+
+    .run(
+
+      randomId("withdraw"),
+
+      telegramId,
+
+      amount,
+
+      method,
+
+      now(),
+
+    );
+
+  return {
+
+    id: requestId,
+
+    status: "pending",
+
+    amount,
+
+  };
+
+}
+
+/* =========================================================
+
+   DEMO ADMIN — APPROVE WITHDRAWAL
+
+   ========================================================= */
+
+export function approveWithdrawalRequest(
+
+  requestId: string,
+
+): boolean {
+
+  const request =
+
+    database
+
+      .prepare(`
+
+        SELECT *
+
+        FROM withdrawal_requests
+
+        WHERE id = ?
+
+      `)
+
+      .get(
+
+        requestId,
+
+      ) as
+
+      | Record<
+
+          string,
+
+          unknown
+
+        >
+
+      | undefined;
+
+  if (!request) {
+
+    return false;
+
+  }
+
+  if (
+
+    String(
+
+      request.status,
+
+    ) !== "pending"
+
+  ) {
+
+    return false;
+
+  }
+
+  database
+
+    .prepare(`
+
+      UPDATE withdrawal_requests
+
+      SET
+
+        status = 'completed',
+
+        reviewed_at = ?
+
+      WHERE id = ?
+
+    `)
+
+    .run(
+
+      now(),
+
+      requestId,
+
+    );
+
+  database
+
+    .prepare(`
+
+      UPDATE telegram_wallet_entries
+
+      SET status = 'completed'
+
+      WHERE
+
+        telegram_id = ?
+
+        AND amount = ?
+
+        AND type = 'withdrawal'
+
+        AND status = 'pending'
+
+    `)
+
+    .run(
+
+      String(
+
+        request.telegram_id,
+
+      ),
+
+      Number(
+
+        request.amount,
+
+      ),
+
+    );
+
+  return true;
+
+}
+
+/* =========================================================
+
+   TELEGRAM WALLET ACTION
+
+   ========================================================= */
+
+export function telegramWalletAction(
+
+  telegramId: string,
+
+  type:
+
+    | "deposit"
+
+    | "withdrawal",
+
+  amount: number,
+
+  method: WalletMethod,
+
+): BingoWallet {
+
+  if (
+
+    type === "deposit"
+
+  ) {
+
+    /*
+
+     * Deposit is now a pending
+
+     * demo request.
+
+     */
+
+    createDepositRequest(
+
+      telegramId,
+
+      amount,
+
+      method,
+
+    );
+
+    return getTelegramWallet(
+
+      telegramId,
+
+    );
+
+  }
+
+  /*
+
+   * Withdrawal uses Play Balance.
+
+   */
+
+  createWithdrawalRequest(
+
+    telegramId,
+
+    amount,
+
+    method,
+
+  );
 
   return getTelegramWallet(
 
@@ -4774,18 +6176,6 @@ export function advanceGame(
 
       }
 
-      /*
-
-       * If all 75 numbers were called
-
-       * without a winner, complete this
-
-       * round so the next automatic lobby
-
-       * can begin.
-
-       */
-
       if (
 
         game.calledNumbers
@@ -4932,17 +6322,13 @@ export function advanceAutomaticGame(
 
   ) {
 
-    const updated =
+    return advanceGame(
 
-      advanceGame(
+      game.id,
 
-        game.id,
+      "start",
 
-        "start",
-
-      );
-
-    return updated;
+    );
 
   }
 
@@ -5368,6 +6754,22 @@ export function getBingoConfig() {
 
       MAX_CARDS_PER_USER,
 
+    minDepositAmount:
+
+      MIN_DEPOSIT_AMOUNT,
+
+    registrationBonus:
+
+      REGISTRATION_BONUS,
+
+    depositBonusPercent:
+
+      DEPOSIT_BONUS_PERCENT,
+
+    paymentMethods:
+
+      getPaymentMethods(),
+
   };
 
 }
@@ -5515,3 +6917,135 @@ export function getGameWinners(
     );
 
 }
+
+/* =========================================================
+
+   ADMIN / DEMO REQUEST READERS
+
+   ========================================================= */
+
+export function getPendingDeposits() {
+
+  return database
+
+    .prepare(`
+
+      SELECT
+
+        id,
+
+        telegram_id,
+
+        amount,
+
+        method,
+
+        status,
+
+        bonus,
+
+        created_at,
+
+        reviewed_at
+
+      FROM deposit_requests
+
+      WHERE status = 'pending'
+
+      ORDER BY created_at ASC
+
+    `)
+
+    .all();
+
+}
+
+export function getPendingWithdrawals() {
+
+  return database
+
+    .prepare(`
+
+      SELECT
+
+        id,
+
+        telegram_id,
+
+        amount,
+
+        method,
+
+        status,
+
+        created_at,
+
+        reviewed_at
+
+      FROM withdrawal_requests
+
+      WHERE status = 'pending'
+
+      ORDER BY created_at ASC
+
+    `)
+
+    .all();
+
+}
+
+/* =========================================================
+
+   DEMO ADMIN BALANCE VIEW
+
+   ========================================================= */
+
+export function getUserBalances(
+
+  telegramId: string,
+
+) {
+
+  return getTelegramBalances(
+
+    telegramId,
+
+  );
+
+}
+
+/* =========================================================
+
+   EXPORT DATABASE-LEVEL CONSTANTS
+
+   ========================================================= */
+
+export const FAST_BINGO_WALLET_CONFIG = {
+
+  minDeposit:
+
+    MIN_DEPOSIT_AMOUNT,
+
+  registrationBonus:
+
+    REGISTRATION_BONUS,
+
+  depositBonusPercent:
+
+    DEPOSIT_BONUS_PERCENT,
+
+  initialMainBalance:
+
+    INITIAL_MAIN_BALANCE,
+
+  initialPlayBalance:
+
+    INITIAL_PLAY_BALANCE,
+
+};
+
+/* =========================================================
+
+   END
+
+   ========================================================= */
