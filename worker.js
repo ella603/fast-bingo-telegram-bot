@@ -19,6 +19,44 @@ const JACKPOT_PER_CARD = 8;
 
 const PLAY_BALANCE_START = 0;
 
+/* =========================================================
+
+   FAST BINGO — PAYMENT DISPLAY SETTINGS
+
+   CHANGE ONLY THE VALUES BELOW.
+
+   These are display/demo settings only.
+
+   ========================================================= */
+
+const PAYMENT_DISPLAY = {
+
+  telebirr: {
+
+    name: "Hanza",
+
+    number: "0999960421"
+
+  },
+
+  ebirr: {
+
+    name: "Belay",
+
+    number: "0999960421"
+
+  },
+
+  mpesa: {
+
+    name: "Gemechu",
+
+    number: "0786192665"
+
+  }
+
+};
+
 function json(data, status = 200) {
 
   return new Response(JSON.stringify(data), {
@@ -1888,44 +1926,6 @@ class GameScheduler extends DurableObject {
     );
 
   }
-
-/* =========================================================
-
-   FAST BINGO — PAYMENT DISPLAY SETTINGS
-
-   CHANGE ONLY THE VALUES BELOW.
-
-   These are display/demo settings only.
-
-   ========================================================= */
-
-const PAYMENT_DISPLAY = {
-
-  telebirr: {
-
-    name: "Hanza",
-
-    number: "0999960421"
-
-  },
-
-  ebirr: {
-
-    name: "Belay",
-
-    number: "0999960421"
-
-  },
-
-  mpesa: {
-
-    name: "Gemechu",
-
-    number: "0786192665"
-
-  }
-
-};
 
 /* =========================================================
 
