@@ -1871,63 +1871,2295 @@ class GameScheduler extends DurableObject {
 
   }
 
-  getBalance(userId) {
+  /* =========================================================
 
-    let row =
+     BALANCES
 
-      this.ctx.storage.sql
+     ========================================================= */
 
-        .exec(
+  async ensureBalanceRow(userId) {
 
-          `
+    const sql = this.ctx.storage.sql;
 
-          SELECT balance
+    let row = sql.exec(`
 
-          FROM balances
+      SELECT user_id, balance, main_balance, play_balance
 
-          WHERE user_id = ?
+      FROM balances
 
-          `,
+      WHERE user_id = ?
 
-          userId
-
-        )
-
-        .toArray()[0];
+    `, userId).toArray()[0];
 
     if (!row) {
 
-      this.ctx.storage.sql.exec(
-
-        `
+      sql.exec(`
 
         INSERT INTO balances
 
-        (user_id, balance)
+        (
 
-        VALUES (?, ?)
+          user_id,
 
-        `,
+          balance,
+
+          main_balance,
+
+          play_balance
+
+        )
+
+        VALUES (?, ?, ?, ?)
+
+      `,
 
         userId,
+
+        PLAY_BALANCE_START,
+
+        0,
 
         PLAY_BALANCE_START
 
       );
 
-      return PLAY_BALANCE_START;
+      row = {
+
+        user_id: userId,
+
+        balance: PLAY_BALANCE_START,
+
+        main_balance: 0,
+
+        play_balance: PLAY_BALANCE_START
+
+      };
 
     }
 
-    return Number(
+    return row;
 
-      row.balance || 0
+  }
+
+  getBalances(userId) {
+
+    const sql = this.ctx.storage.sql;
+
+    let row = sql.exec(`
+
+      SELECT
+
+        user_id,
+
+        balance,
+
+        main_balance,
+
+        play_balance
+
+      FROM balances
+
+      WHERE user_id = ?
+
+    `, userId).toArray()[0];
+
+    if (!row) {
+
+      sql.exec(`
+
+        INSERT INTO balances
+
+        (
+
+          user_id,
+
+          balance,
+
+          main_balance,
+
+          play_balance
+
+        )
+
+        VALUES (?, ?, ?, ?)
+
+      `,
+
+        userId,
+
+        PLAY_BALANCE_START,
+
+        0,
+
+        PLAY_BALANCE_START
+
+      );
+
+      return {
+
+        mainBalance: 0,
+
+        playBalance: PLAY_BALANCE_START
+
+      };
+
+    }
+
+    return {
+
+      mainBalance: Number(row.main_balance || 0),
+
+      playBalance:
+
+        row.play_balance === null ||
+
+        row.play_balance === undefined
+
+          ? Number(row.balance || 0)
+
+          : Number(row.play_balance || 0)
+
+    };
+
+  }
+
+  getBalance(userId) {
+
+    return this.getBalances(userId).playBalance;
+
+  }
+
+  async saveTelegramUser(user) {
+
+    if (!user || !user.id) return;
+
+    const sql = this.ctx.storage.sql;
+
+    const now = Date.now();
+
+    sql.exec(`
+
+      INSERT INTO users
+
+      (
+
+        user_id,
+
+        first_name,
+
+        username,
+
+        created_at,
+
+        updated_at
+
+      )
+
+      VALUES (?, ?, ?, ?, ?)
+
+      ON CONFLICT(user_id)
+
+      DO UPDATE SET
+
+        first_name = excluded.first_name,
+
+        username = excluded.username,
+
+        updated_at = excluded.updated_at
+
+    `,
+
+      String(user.id),
+
+      String(user.first_name || "Player"),
+
+      String(user.username || ""),
+
+      now,
+
+      now
 
     );
 
   }
 
-/* =========================================================
+  /* =========================================================
+
+     WALLET — DEMO / PLAY-MONEY ONLY
+
+     ========================================================= */
+
+  async walletRequest(userId, body) {
+
+    const amount = Number(body?.amount || 0);
+
+    const type =
+
+      body?.type === "withdraw"
+
+        ? "withdraw"
+
+        : "deposit";
+
+    const method =
+
+      String(body?.method || "Telebirr");
+
+    if (!Number.isFinite(amount) || amount < 50) {
+
+      return {
+
+        ok: false,
+
+        error: "MINIMUM_AMOUNT",
+
+        minimum: 50
+
+      };
+
+    }
+
+    await this.ensureBalanceRow(userId);
+
+    const balances =
+
+      this.getBalances(userId);
+
+    /* =====================================================
+
+       WITHDRAW
+
+       Must have MORE THAN 100 ETB Play Balance.
+
+       ===================================================== */
+
+    if (type === "withdraw") {
+
+      if (balances.playBalance <= 100) {
+
+        return {
+
+          ok: false,
+
+          error: "PLAY_BALANCE_TOO_LOW",
+
+          minimumBalance: 100
+
+        };
+
+      }
+
+      if (amount > balances.playBalance) {
+
+        return {
+
+          ok: false,
+
+          error: "INSUFFICIENT_BALANCE",
+
+          balance: balances.playBalance
+
+        };
+
+      }
+
+      const nextPlay =
+
+        balances.playBalance - amount;
+
+      this.ctx.storage.sql.exec(`
+
+        UPDATE balances
+
+        SET
+
+          balance = ?,
+
+          play_balance = ?
+
+        WHERE user_id = ?
+
+      `,
+
+        nextPlay,
+
+        nextPlay,
+
+        userId
+
+      );
+
+      this.ctx.storage.sql.exec(`
+
+        INSERT INTO wallet_requests
+
+        (
+
+          user_id,
+
+          type,
+
+          method,
+
+          amount,
+
+          status,
+
+          screenshot_data,
+
+          screenshot_mime,
+
+          created_at
+
+        )
+
+        VALUES (?, 'withdraw', ?, ?, 'pending', NULL, NULL, ?)
+
+      `,
+
+        userId,
+
+        method,
+
+        amount,
+
+        Date.now()
+
+      );
+
+      this.ctx.storage.sql.exec(`
+
+        INSERT INTO transactions
+
+        (
+
+          user_id,
+
+          type,
+
+          method,
+
+          amount,
+
+          simulated,
+
+          created_at
+
+        )
+
+        VALUES (?, 'withdraw', ?, ?, 1, ?)
+
+      `,
+
+        userId,
+
+        method,
+
+        amount,
+
+        Date.now()
+
+      );
+
+      return {
+
+        ok: true,
+
+        simulated: true,
+
+        pending: true,
+
+        type: "withdraw",
+
+        mainBalance: balances.mainBalance,
+
+        playBalance: nextPlay
+
+      };
+
+    }
+
+    /* =====================================================
+
+       DEPOSIT
+
+       Deposit DOES NOT immediately change balance.
+
+       Admin confirmation adds it to Main Balance.
+
+       ===================================================== */
+
+    const screenshot =
+
+      body?.screenshot || null;
+
+    const screenshotMime =
+
+      String(body?.screenshotMime || "");
+
+    if (!screenshot) {
+
+      return {
+
+        ok: false,
+
+        error: "SCREENSHOT_REQUIRED"
+
+      };
+
+    }
+
+    if (
+
+      typeof screenshot !== "string" ||
+
+      screenshot.length > 450000
+
+    ) {
+
+      return {
+
+        ok: false,
+
+        error: "SCREENSHOT_TOO_LARGE"
+
+      };
+
+    }
+
+    this.ctx.storage.sql.exec(`
+
+      INSERT INTO wallet_requests
+
+      (
+
+        user_id,
+
+        type,
+
+        method,
+
+        amount,
+
+        status,
+
+        screenshot_data,
+
+        screenshot_mime,
+
+        created_at
+
+      )
+
+      VALUES (?, 'deposit', ?, ?, 'pending', ?, ?, ?)
+
+    `,
+
+      userId,
+
+      method,
+
+      amount,
+
+      screenshot,
+
+      screenshotMime,
+
+      Date.now()
+
+    );
+
+    this.ctx.storage.sql.exec(`
+
+      INSERT INTO transactions
+
+      (
+
+        user_id,
+
+        type,
+
+        method,
+
+        amount,
+
+        simulated,
+
+        created_at
+
+      )
+
+      VALUES (?, 'deposit_request', ?, ?, 1, ?)
+
+    `,
+
+      userId,
+
+      method,
+
+      amount,
+
+      Date.now()
+
+    );
+
+    return {
+
+      ok: true,
+
+      simulated: true,
+
+      pending: true,
+
+      type: "deposit",
+
+      mainBalance: balances.mainBalance,
+
+      playBalance: balances.playBalance
+
+    };
+
+  }
+
+  /* =========================================================
+
+     ADMIN AUTH
+
+     ========================================================= */
+
+  isAdmin(request) {
+
+    const expected =
+
+      String(this.env.ADMIN_KEY || "");
+
+    if (!expected) return false;
+
+    const auth =
+
+      request.headers.get("authorization") || "";
+
+    if (
+
+      auth.startsWith("Bearer ")
+
+    ) {
+
+      return auth.slice(7) === expected;
+
+    }
+
+    const supplied =
+
+      request.headers.get("x-admin-key") || "";
+
+    return supplied === expected;
+
+  }
+
+  /* =========================================================
+
+     ADMIN SUMMARY
+
+     ========================================================= */
+
+  getAdminSummary() {
+
+    const sql = this.ctx.storage.sql;
+
+    const users =
+
+      Number(
+
+        sql.exec(`
+
+          SELECT COUNT(*) AS count
+
+          FROM users
+
+        `).toArray()[0]?.count || 0
+
+      );
+
+    const pendingDeposits =
+
+      Number(
+
+        sql.exec(`
+
+          SELECT COUNT(*) AS count
+
+          FROM wallet_requests
+
+          WHERE type = 'deposit'
+
+          AND status = 'pending'
+
+        `).toArray()[0]?.count || 0
+
+      );
+
+    const pendingWithdrawals =
+
+      Number(
+
+        sql.exec(`
+
+          SELECT COUNT(*) AS count
+
+          FROM wallet_requests
+
+          WHERE type = 'withdraw'
+
+          AND status = 'pending'
+
+        `).toArray()[0]?.count || 0
+
+      );
+
+    const depositTotal =
+
+      Number(
+
+        sql.exec(`
+
+          SELECT COALESCE(SUM(amount),0) AS total
+
+          FROM wallet_requests
+
+          WHERE type = 'deposit'
+
+          AND status = 'pending'
+
+        `).toArray()[0]?.total || 0
+
+      );
+
+    const withdrawalTotal =
+
+      Number(
+
+        sql.exec(`
+
+          SELECT COALESCE(SUM(amount),0) AS total
+
+          FROM wallet_requests
+
+          WHERE type = 'withdraw'
+
+          AND status = 'pending'
+
+        `).toArray()[0]?.total || 0
+
+      );
+
+    const state =
+
+      this.getState();
+
+    return {
+
+      ok: true,
+
+      users,
+
+      pendingDeposits,
+
+      pendingWithdrawals,
+
+      pendingDepositAmount: depositTotal,
+
+      pendingWithdrawalAmount: withdrawalTotal,
+
+      game: state
+
+        ? {
+
+            gameNumber: Number(state.game_number),
+
+            status: state.status,
+
+            ballIndex: Number(state.ball_index)
+
+          }
+
+        : null
+
+    };
+
+  }
+
+  /* =========================================================
+
+     ADMIN USERS
+
+     ========================================================= */
+
+  getAdminUsers() {
+
+    const rows =
+
+      this.ctx.storage.sql.exec(`
+
+        SELECT
+
+          u.user_id,
+
+          u.first_name,
+
+          u.username,
+
+          u.created_at,
+
+          u.updated_at,
+
+          COALESCE(b.main_balance,0) AS main_balance,
+
+          COALESCE(
+
+            b.play_balance,
+
+            b.balance,
+
+            0
+
+          ) AS play_balance
+
+        FROM users u
+
+        LEFT JOIN balances b
+
+          ON b.user_id = u.user_id
+
+        ORDER BY u.updated_at DESC
+
+      `).toArray();
+
+    return rows.map(row => ({
+
+      userId: String(row.user_id),
+
+      firstName: String(row.first_name || "Player"),
+
+      username: String(row.username || ""),
+
+      mainBalance: Number(row.main_balance || 0),
+
+      playBalance: Number(row.play_balance || 0),
+
+      createdAt: Number(row.created_at || 0),
+
+      updatedAt: Number(row.updated_at || 0)
+
+    }));
+
+  }
+
+  /* =========================================================
+
+     ADMIN WALLET REQUESTS
+
+     ========================================================= */
+
+  getAdminRequests() {
+
+    const rows =
+
+      this.ctx.storage.sql.exec(`
+
+        SELECT
+
+          wr.id,
+
+          wr.user_id,
+
+          wr.type,
+
+          wr.method,
+
+          wr.amount,
+
+          wr.status,
+
+          wr.screenshot_data,
+
+          wr.screenshot_mime,
+
+          wr.created_at,
+
+          wr.reviewed_at,
+
+          wr.reviewed_by,
+
+          COALESCE(u.first_name,'Player') AS first_name,
+
+          COALESCE(u.username,'') AS username
+
+        FROM wallet_requests wr
+
+        LEFT JOIN users u
+
+          ON u.user_id = wr.user_id
+
+        ORDER BY
+
+          CASE
+
+            WHEN wr.status = 'pending'
+
+            THEN 0
+
+            ELSE 1
+
+          END,
+
+          wr.created_at DESC
+
+        LIMIT 200
+
+      `).toArray();
+
+    return rows.map(row => ({
+
+      id: Number(row.id),
+
+      userId: String(row.user_id),
+
+      firstName: String(row.first_name || "Player"),
+
+      username: String(row.username || ""),
+
+      type: String(row.type),
+
+      method: String(row.method || ""),
+
+      amount: Number(row.amount || 0),
+
+      status: String(row.status),
+
+      screenshot:
+
+        row.screenshot_data
+
+          ? String(row.screenshot_data)
+
+          : null,
+
+      screenshotMime:
+
+        row.screenshot_mime
+
+          ? String(row.screenshot_mime)
+
+          : null,
+
+      createdAt: Number(row.created_at || 0),
+
+      reviewedAt:
+
+        row.reviewed_at
+
+          ? Number(row.reviewed_at)
+
+          : null,
+
+      reviewedBy:
+
+        row.reviewed_by
+
+          ? String(row.reviewed_by)
+
+          : null
+
+    }));
+
+  }
+
+  /* =========================================================
+
+     ADMIN CONFIRM / REJECT
+
+     ========================================================= */
+
+  async adminRequestAction(
+
+    requestId,
+
+    action,
+
+    adminKey
+
+  ) {
+
+    const sql = this.ctx.storage.sql;
+
+    const row =
+
+      sql.exec(`
+
+        SELECT *
+
+        FROM wallet_requests
+
+        WHERE id = ?
+
+      `, requestId).toArray()[0];
+
+    if (!row) {
+
+      return {
+
+        ok: false,
+
+        error: "REQUEST_NOT_FOUND"
+
+      };
+
+    }
+
+    if (row.status !== "pending") {
+
+      return {
+
+        ok: false,
+
+        error: "REQUEST_ALREADY_REVIEWED",
+
+        status: row.status
+
+      };
+
+    }
+
+    const userId =
+
+      String(row.user_id);
+
+    const amount =
+
+      Number(row.amount || 0);
+
+    const type =
+
+      String(row.type);
+
+    const finalStatus =
+
+      action === "confirm"
+
+        ? "confirmed"
+
+        : "rejected";
+
+    await this.ensureBalanceRow(userId);
+
+    const balances =
+
+      this.getBalances(userId);
+
+    /* =====================================================
+
+       CONFIRM DEPOSIT
+
+       → Main Balance
+
+       ===================================================== */
+
+    if (
+
+      type === "deposit" &&
+
+      action === "confirm"
+
+    ) {
+
+      const nextMain =
+
+        balances.mainBalance + amount;
+
+      sql.exec(`
+
+        UPDATE balances
+
+        SET main_balance = ?
+
+        WHERE user_id = ?
+
+      `,
+
+        nextMain,
+
+        userId
+
+      );
+
+    }
+
+    /* =====================================================
+
+       REJECT WITHDRAW
+
+       → refund Play Balance
+
+       ===================================================== */
+
+    if (
+
+      type === "withdraw" &&
+
+      action === "reject"
+
+    ) {
+
+      const nextPlay =
+
+        balances.playBalance + amount;
+
+      sql.exec(`
+
+        UPDATE balances
+
+        SET
+
+          balance = ?,
+
+          play_balance = ?
+
+        WHERE user_id = ?
+
+      `,
+
+        nextPlay,
+
+        nextPlay,
+
+        userId
+
+      );
+
+    }
+
+    sql.exec(`
+
+      UPDATE wallet_requests
+
+      SET
+
+        status = ?,
+
+        reviewed_at = ?,
+
+        reviewed_by = ?
+
+      WHERE id = ?
+
+    `,
+
+      finalStatus,
+
+      Date.now(),
+
+      adminKey,
+
+      requestId
+
+    );
+
+    return {
+
+      ok: true,
+
+      requestId: Number(requestId),
+
+      status: finalStatus,
+
+      type,
+
+      amount,
+
+      balance: this.getBalances(userId)
+
+    };
+
+  }
+
+  /* =========================================================
+
+     ADMIN — DEMO BALANCE MANAGEMENT
+
+     ========================================================= */
+
+  async adminSetBalance(
+
+    userId,
+
+    balanceType,
+
+    amount
+
+  ) {
+
+    const cleanUser =
+
+      String(userId || "");
+
+    const value =
+
+      Number(amount);
+
+    if (!cleanUser) {
+
+      return {
+
+        ok: false,
+
+        error: "USER_REQUIRED"
+
+      };
+
+    }
+
+    if (
+
+      !Number.isFinite(value) ||
+
+      value < 0
+
+    ) {
+
+      return {
+
+        ok: false,
+
+        error: "INVALID_AMOUNT"
+
+      };
+
+    }
+
+    await this.ensureBalanceRow(
+
+      cleanUser
+
+    );
+
+    if (
+
+      balanceType !== "main" &&
+
+      balanceType !== "play"
+
+    ) {
+
+      return {
+
+        ok: false,
+
+        error: "INVALID_BALANCE_TYPE"
+
+      };
+
+    }
+
+    if (balanceType === "main") {
+
+      this.ctx.storage.sql.exec(`
+
+        UPDATE balances
+
+        SET main_balance = ?
+
+        WHERE user_id = ?
+
+      `,
+
+        value,
+
+        cleanUser
+
+      );
+
+    } else {
+
+      this.ctx.storage.sql.exec(`
+
+        UPDATE balances
+
+        SET
+
+          balance = ?,
+
+          play_balance = ?
+
+        WHERE user_id = ?
+
+      `,
+
+        value,
+
+        value,
+
+        cleanUser
+
+      );
+
+    }
+
+    return {
+
+      ok: true,
+
+      userId: cleanUser,
+
+      ...this.getBalances(cleanUser)
+
+    };
+
+  }
+
+  /* =========================================================
+
+     ADMIN — GAME CONTROL
+
+     ========================================================= */
+
+  getAppPaused() {
+
+    const row =
+
+      this.ctx.storage.sql.exec(`
+
+        SELECT paused
+
+        FROM app_control
+
+        WHERE id = 1
+
+      `).toArray()[0];
+
+    return Number(row?.paused || 0) === 1;
+
+  }
+
+  async adminGameControl(action) {
+
+    const sql =
+
+      this.ctx.storage.sql;
+
+    if (action === "pause") {
+
+      sql.exec(`
+
+        UPDATE app_control
+
+        SET paused = 1
+
+        WHERE id = 1
+
+      `);
+
+      try {
+
+        await this.ctx.storage.deleteAlarm();
+
+      } catch (_) {}
+
+      return {
+
+        ok: true,
+
+        paused: true
+
+      };
+
+    }
+
+    if (action === "resume") {
+
+      sql.exec(`
+
+        UPDATE app_control
+
+        SET paused = 0
+
+        WHERE id = 1
+
+      `);
+
+      const state =
+
+        this.getState();
+
+      if (!state) {
+
+        await this.createFreshLobby(1);
+
+      } else if (
+
+        state.status === "lobby"
+
+      ) {
+
+        const remaining =
+
+          Math.max(
+
+            1000,
+
+            Number(state.lobby_ends_at || 0)
+
+              - Date.now()
+
+          );
+
+        await this.scheduleNext(
+
+          remaining
+
+        );
+
+      } else {
+
+        await this.scheduleNext(
+
+          BALL_INTERVAL
+
+        );
+
+      }
+
+      return {
+
+        ok: true,
+
+        paused: false
+
+      };
+
+    }
+
+    if (action === "reset") {
+
+      const current =
+
+        this.getState();
+
+      const nextGame =
+
+        Number(
+
+          current?.game_number || 0
+
+        ) + 1;
+
+      sql.exec(`
+
+        DELETE FROM selected_cards
+
+      `);
+
+      await this.createFreshLobby(
+
+        nextGame
+
+      );
+
+      return {
+
+        ok: true,
+
+        paused: this.getAppPaused(),
+
+        gameNumber: nextGame
+
+      };
+
+    }
+
+    return {
+
+      ok: false,
+
+      error: "INVALID_ACTION"
+
+    };
+
+  }
+
+  /* =========================================================
+
+     CLAIM
+
+     ========================================================= */
+
+  async claim(userId) {
+
+    const state =
+
+      this.getState();
+
+    if (!state) {
+
+      return {
+
+        ok: true,
+
+        winner: false
+
+      };
+
+    }
+
+    const called =
+
+      this.getCalledBalls(state);
+
+    const cards =
+
+      this.getUserCards(userId);
+
+    for (const number of cards) {
+
+      const card =
+
+        makeCard(number);
+
+      if (
+
+        hasTwoLines(
+
+          card,
+
+          called
+
+        )
+
+      ) {
+
+        return {
+
+          ok: true,
+
+          winner: true,
+
+          card: number
+
+        };
+
+      }
+
+    }
+
+    return {
+
+      ok: true,
+
+      winner: false
+
+    };
+
+  }
+
+  /* =========================================================
+
+     DURABLE OBJECT FETCH
+
+     ========================================================= */
+
+  async fetch(request) {
+
+    const url =
+
+      new URL(request.url);
+
+    const user =
+
+      getTelegramUser(request);
+
+    /*
+
+     * Register every Telegram user who
+
+     * interacts with the Mini App.
+
+     */
+
+    await this.saveTelegramUser(
+
+      user
+
+    );
+
+    /* =====================================================
+
+       GAME
+
+       ===================================================== */
+
+    if (
+
+      url.pathname === "/do/game"
+
+    ) {
+
+      return json(
+
+        this.getGameResponse()
+
+      );
+
+    }
+
+    if (
+
+      url.pathname === "/do/cards"
+
+    ) {
+
+      return json({
+
+        ok: true,
+
+        count: CARD_COUNT,
+
+        cards:
+
+          Array.from(
+
+            {
+
+              length: CARD_COUNT
+
+            },
+
+            (_, i) => ({
+
+              number: i + 1,
+
+              available: true
+
+            })
+
+          )
+
+      });
+
+    }
+
+    if (
+
+      url.pathname === "/do/user-cards"
+
+    ) {
+
+      return json({
+
+        ok: true,
+
+        selected:
+
+          this.getUserCards(
+
+            user.id
+
+          )
+
+      });
+
+    }
+
+    if (
+
+      url.pathname === "/do/select-cards" &&
+
+      request.method === "POST"
+
+    ) {
+
+      let body = {};
+
+      try {
+
+        body =
+
+          await request.json();
+
+      } catch (_) {}
+
+      return json(
+
+        await this.selectCards(
+
+          user.id,
+
+          body.cards
+
+        )
+
+      );
+
+    }
+
+    /* =====================================================
+
+       BALANCE
+
+       ===================================================== */
+
+    if (
+
+      url.pathname === "/do/balance"
+
+    ) {
+
+      const balances =
+
+        this.getBalances(
+
+          user.id
+
+        );
+
+      return json({
+
+        ok: true,
+
+        /*
+
+         * Old "balance" field remains
+
+         * for compatibility with the
+
+         * existing Mini App.
+
+         */
+
+        balance:
+
+          balances.playBalance,
+
+        mainBalance:
+
+          balances.mainBalance,
+
+        playBalance:
+
+          balances.playBalance
+
+      });
+
+    }
+
+    /* =====================================================
+
+       WALLET
+
+       ===================================================== */
+
+    if (
+
+      url.pathname === "/do/wallet" &&
+
+      request.method === "POST"
+
+    ) {
+
+      const contentType =
+
+        request.headers.get(
+
+          "content-type"
+
+        ) || "";
+
+      /*
+
+       * Deposit screenshot uses
+
+       * multipart/form-data.
+
+       */
+
+      if (
+
+        contentType.includes(
+
+          "multipart/form-data"
+
+        )
+
+      ) {
+
+        let form;
+
+        try {
+
+          form =
+
+            await request.formData();
+
+        } catch (_) {
+
+          return json({
+
+            ok: false,
+
+            error: "INVALID_FORM"
+
+          });
+
+        }
+
+        const type =
+
+          String(
+
+            form.get("type") || "deposit"
+
+          );
+
+        const method =
+
+          String(
+
+            form.get("method") ||
+
+            "Telebirr"
+
+          );
+
+        const amount =
+
+          Number(
+
+            form.get("amount") || 0
+
+          );
+
+        let screenshot =
+
+          form.get("screenshot");
+
+        if (
+
+          type !== "deposit"
+
+        ) {
+
+          return json(
+
+            await this.walletRequest(
+
+              user.id,
+
+              {
+
+                type,
+
+                method,
+
+                amount
+
+              }
+
+            )
+
+          );
+
+        }
+
+        if (
+
+          !screenshot ||
+
+          typeof screenshot.arrayBuffer !==
+
+            "function"
+
+        ) {
+
+          return json({
+
+            ok: false,
+
+            error: "SCREENSHOT_REQUIRED"
+
+          });
+
+        }
+
+        const MAX_SCREENSHOT_BYTES =
+
+          300 * 1024;
+
+        if (
+
+          screenshot.size >
+
+          MAX_SCREENSHOT_BYTES
+
+        ) {
+
+          return json({
+
+            ok: false,
+
+            error: "SCREENSHOT_TOO_LARGE",
+
+            maxBytes:
+
+              MAX_SCREENSHOT_BYTES
+
+          });
+
+        }
+
+        const buffer =
+
+          await screenshot.arrayBuffer();
+
+        const bytes =
+
+          new Uint8Array(buffer);
+
+        let binary = "";
+
+        const CHUNK =
+
+          0x8000;
+
+        for (
+
+          let i = 0;
+
+          i < bytes.length;
+
+          i += CHUNK
+
+        ) {
+
+          binary += String.fromCharCode(
+
+            ...bytes.subarray(
+
+              i,
+
+              i + CHUNK
+
+            )
+
+          );
+
+        }
+
+        const base64 =
+
+          btoa(binary);
+
+        const mime =
+
+          screenshot.type ||
+
+          "image/jpeg";
+
+        const dataUrl =
+
+          `data:${mime};base64,${base64}`;
+
+        return json(
+
+          await this.walletRequest(
+
+            user.id,
+
+            {
+
+              type: "deposit",
+
+              method,
+
+              amount,
+
+              screenshot: dataUrl,
+
+              screenshotMime: mime
+
+            }
+
+          )
+
+        );
+
+      }
+
+      /*
+
+       * Normal JSON request:
+
+       * mainly withdrawal.
+
+       */
+
+      let body = {};
+
+      try {
+
+        body =
+
+          await request.json();
+
+      } catch (_) {}
+
+      return json(
+
+        await this.walletRequest(
+
+          user.id,
+
+          body
+
+        )
+
+      );
+
+    }
+
+    /* =====================================================
+
+       CLAIM
+
+       ===================================================== */
+
+    if (
+
+      url.pathname === "/do/claim"
+
+    ) {
+
+      return json(
+
+        await this.claim(
+
+          user.id
+
+        )
+
+      );
+
+    }
+
+    /* =====================================================
+
+       ADMIN AUTH
+
+       ===================================================== */
+
+    if (
+
+      url.pathname.startsWith(
+
+        "/do/admin/"
+
+      )
+
+    ) {
+
+      if (
+
+        !this.isAdmin(request)
+
+      ) {
+
+        return json(
+
+          {
+
+            ok: false,
+
+            error: "UNAUTHORIZED"
+
+          },
+
+          401
+
+        );
+
+      }
+
+      const adminKey =
+
+        request.headers.get(
+
+          "x-admin-key"
+
+        ) || "admin";
+
+      /* SUMMARY */
+
+      if (
+
+        url.pathname ===
+
+        "/do/admin/summary"
+
+      ) {
+
+        return json(
+
+          this.getAdminSummary()
+
+        );
+
+      }
+
+      /* USERS */
+
+      if (
+
+        url.pathname ===
+
+        "/do/admin/users"
+
+      ) {
+
+        return json({
+
+          ok: true,
+
+          users:
+
+            this.getAdminUsers()
+
+        });
+
+      }
+
+      /* REQUESTS */
+
+      if (
+
+        url.pathname ===
+
+        "/do/admin/requests"
+
+      ) {
+
+        return json({
+
+          ok: true,
+
+          requests:
+
+            this.getAdminRequests()
+
+        });
+
+      }
+
+      /* CONFIRM / REJECT */
+
+      if (
+
+        url.pathname ===
+
+          "/do/admin/request-action" &&
+
+        request.method === "POST"
+
+      ) {
+
+        let body = {};
+
+        try {
+
+          body =
+
+            await request.json();
+
+        } catch (_) {}
+
+        const requestId =
+
+          Number(
+
+            body.requestId
+
+          );
+
+        const action =
+
+          body.action === "confirm"
+
+            ? "confirm"
+
+            : body.action === "reject"
+
+              ? "reject"
+
+              : "";
+
+        if (
+
+          !Number.isInteger(
+
+            requestId
+
+          ) ||
+
+          !action
+
+        ) {
+
+          return json({
+
+            ok: false,
+
+            error: "INVALID_ACTION"
+
+          });
+
+        }
+
+        return json(
+
+          await this.adminRequestAction(
+
+            requestId,
+
+            action,
+
+            adminKey
+
+          )
+
+        );
+
+      }
+
+      /* SET DEMO BALANCE */
+
+      if (
+
+        url.pathname ===
+
+          "/do/admin/set-balance" &&
+
+        request.method === "POST"
+
+      ) {
+
+        let body = {};
+
+        try {
+
+          body =
+
+            await request.json();
+
+        } catch (_) {}
+
+        return json(
+
+          await this.adminSetBalance(
+
+            String(
+
+              body.userId || ""
+
+            ),
+
+            String(
+
+              body.balanceType || ""
+
+            ),
+
+            Number(
+
+              body.amount
+
+            )
+
+          )
+
+        );
+
+      }
+
+      /* GAME CONTROL */
+
+      if (
+
+        url.pathname ===
+
+          "/do/admin/control" &&
+
+        request.method === "POST"
+
+      ) {
+
+        let body = {};
+
+        try {
+
+          body =
+
+            await request.json();
+
+        } catch (_) {}
+
+        return json(
+
+          await this.adminGameControl(
+
+            String(
+
+              body.action || ""
+
+            )
+
+          )
+
+        );
+
+      }
+
+      return json(
+
+        {
+
+          ok: false,
+
+          error: "ADMIN_NOT_FOUND"
+
+        },
+
+        404
+
+      );
+
+    }
+
+    return json(
+
+      {
+
+        ok: false,
+
+        error: "NOT_FOUND"
+
+      },
+
+      404
+
+    );
+
+  }
+
+}  
+
+   /* =========================================================
 
    WALLET REQUEST
 
