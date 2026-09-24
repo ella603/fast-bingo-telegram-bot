@@ -4276,69 +4276,35 @@ if (!hasPlayBalance) {
 
    ========================================================= */
 
-async walletRequest(userId, body) {
+GameScheduler.prototype.walletRequest =
 
-  const amount = Number(body?.amount || 0);
+  async function (userId, body) {
 
-  const type =
+    const amount =
 
-    body?.type === "withdraw"
+      Number(body?.amount || 0);
 
-      ? "withdraw"
+    const type =
 
-      : "deposit";
+      body?.type === "withdraw"
 
-  const method = String(
+        ? "withdraw"
 
-    body?.method || "Telebirr"
+        : "deposit";
 
-  );
+    const method =
 
-  if (
+      String(
 
-    !Number.isFinite(amount) ||
+        body?.method || "Telebirr"
 
-    amount < 50
-
-  ) {
-
-    return {
-
-      ok: false,
-
-      error: "MINIMUM_AMOUNT",
-
-      minimum: 50
-
-    };
-
-  }
-
-  const balances =
-
-    this.getBalances(userId);
-
-  if (type === "withdraw") {
-
-    if (balances.playBalance <= 100) {
-
-      return {
-
-        ok: false,
-
-        error: "WITHDRAW_MIN_BALANCE",
-
-        minimumBalance: 100
-
-      };
-
-    }
+      );
 
     if (
 
-      amount >
+      !Number.isFinite(amount) ||
 
-      balances.playBalance
+      amount < 50
 
     ) {
 
@@ -4346,39 +4312,195 @@ async walletRequest(userId, body) {
 
         ok: false,
 
-        error: "INSUFFICIENT_PLAY_BALANCE"
+        error: "MINIMUM_AMOUNT",
+
+        minimum: 50
 
       };
 
     }
 
-    const nextPlay =
+    const balances =
 
-      balances.playBalance - amount;
+      this.getBalances(userId);
 
-    this.ctx.storage.sql.exec(
+    if (type === "withdraw") {
 
-      `
+      if (
 
-      UPDATE balances
+        balances.playBalance <= 100
 
-      SET
+      ) {
 
-        play_balance = ?,
+        return {
 
-        balance = ?
+          ok: false,
 
-      WHERE user_id = ?
+          error: "WITHDRAW_MIN_BALANCE",
 
-      `,
+          minimumBalance: 100
 
-      nextPlay,
+        };
 
-      nextPlay,
+      }
 
-      userId
+      if (
 
-    );
+        amount >
+
+        balances.playBalance
+
+      ) {
+
+        return {
+
+          ok: false,
+
+          error: "INSUFFICIENT_PLAY_BALANCE"
+
+        };
+
+      }
+
+      const nextPlay =
+
+        balances.playBalance - amount;
+
+      this.ctx.storage.sql.exec(
+
+        `
+
+        UPDATE balances
+
+        SET
+
+          play_balance = ?,
+
+          balance = ?
+
+        WHERE user_id = ?
+
+        `,
+
+        nextPlay,
+
+        nextPlay,
+
+        userId
+
+      );
+
+      this.ctx.storage.sql.exec(
+
+        `
+
+        INSERT INTO wallet_requests
+
+        (
+
+          user_id,
+
+          type,
+
+          method,
+
+          amount,
+
+          status,
+
+          created_at
+
+        )
+
+        VALUES (?, ?, ?, ?, 'pending', ?)
+
+        `,
+
+        userId,
+
+        "withdraw",
+
+        method,
+
+        amount,
+
+        Date.now()
+
+      );
+
+      return {
+
+        ok: true,
+
+        pending: true,
+
+        type: "withdraw",
+
+        amount,
+
+        method,
+
+        mainBalance:
+
+          balances.mainBalance,
+
+        playBalance:
+
+          nextPlay
+
+      };
+
+    }
+
+    const screenshot =
+
+      String(
+
+        body?.screenshot_data || ""
+
+      );
+
+    const screenshotMime =
+
+      String(
+
+        body?.screenshot_mime ||
+
+        "image/jpeg"
+
+      );
+
+    if (!screenshot) {
+
+      return {
+
+        ok: false,
+
+        error: "SCREENSHOT_REQUIRED"
+
+      };
+
+    }
+
+    if (
+
+      screenshot.length >
+
+      600 * 1024
+
+    ) {
+
+      return {
+
+        ok: false,
+
+        error: "SCREENSHOT_TOO_LARGE",
+
+        maximum: "300KB"
+
+      };
+
+    }
 
     this.ctx.storage.sql.exec(
 
@@ -4398,21 +4520,29 @@ async walletRequest(userId, body) {
 
         status,
 
+        screenshot_data,
+
+        screenshot_mime,
+
         created_at
 
       )
 
-      VALUES (?, ?, ?, ?, 'pending', ?)
+      VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)
 
       `,
 
       userId,
 
-      "withdraw",
+      "deposit",
 
       method,
 
       amount,
+
+      screenshot,
+
+      screenshotMime,
 
       Date.now()
 
@@ -4424,341 +4554,11 @@ async walletRequest(userId, body) {
 
       pending: true,
 
-      type: "withdraw",
+      type: "deposit",
 
       amount,
 
       method,
-
-      mainBalance:
-
-        balances.mainBalance,
-
-      playBalance: nextPlay
-
-    };
-
-  }
-
-  const screenshot =
-
-    body?.screenshot_data || "";
-
-  const screenshotMime =
-
-    body?.screenshot_mime ||
-
-    "image/jpeg";
-
-  if (!screenshot) {
-
-    return {
-
-      ok: false,
-
-      error: "SCREENSHOT_REQUIRED"
-
-    };
-
-  }
-
-  if (
-
-    screenshot.length >
-
-    300 * 1024 * 2
-
-  ) {
-
-    return {
-
-      ok: false,
-
-      error: "SCREENSHOT_TOO_LARGE",
-
-      maximum: "300KB"
-
-    };
-
-  }
-
-  this.ctx.storage.sql.exec(
-
-    `
-
-    INSERT INTO wallet_requests
-
-    (
-
-      user_id,
-
-      type,
-
-      method,
-
-      amount,
-
-      status,
-
-      screenshot_data,
-
-      screenshot_mime,
-
-      created_at
-
-    )
-
-    VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)
-
-    `,
-
-    userId,
-
-    "deposit",
-
-    method,
-
-    amount,
-
-    screenshot,
-
-    screenshotMime,
-
-    Date.now()
-
-  );
-
-  return {
-
-    ok: true,
-
-    pending: true,
-
-    type: "deposit",
-
-    amount,
-
-    method,
-
-    mainBalance:
-
-      balances.mainBalance,
-
-    playBalance:
-
-      balances.playBalance
-
-  };
-
-}
-
-/* =========================================================
-
-   CLAIM
-
-   ========================================================= */
-
-async claim(userId) {
-
-  const state = this.getState();
-
-  if (
-
-    !state ||
-
-    state.status !== "live"
-
-  ) {
-
-    return {
-
-      ok: false,
-
-      error: "GAME_NOT_LIVE"
-
-    };
-
-  }
-
-  const cards =
-
-    this.getUserCards(userId);
-
-  if (!cards.length) {
-
-    return {
-
-      ok: false,
-
-      error: "NO_CARD"
-
-    };
-
-  }
-
-  const called =
-
-    this.getCalledBalls(state);
-
-  const winner =
-
-    cards.find(card =>
-
-      hasTwoLines(card, called)
-
-    );
-
-  if (!winner) {
-
-    return {
-
-      ok: false,
-
-      error: "NOT_WINNING"
-
-    };
-
-  }
-
-  return {
-
-    ok: true,
-
-    winner: true,
-
-    card: winner
-
-  };
-
-}
-
-/* =========================================================
-
-   DURABLE OBJECT FETCH
-
-   ========================================================= */
-
-async fetch(request) {
-
-  const url =
-
-    new URL(request.url);
-
-  const user =
-
-    getTelegramUser(request);
-
-  if (
-
-    url.pathname === "/do/game"
-
-  ) {
-
-    return json(
-
-      this.getGameResponse()
-
-    );
-
-  }
-
-  if (
-
-    url.pathname === "/do/cards"
-
-  ) {
-
-    return json({
-
-      ok: true,
-
-      cards: Array.from(
-
-        { length: CARD_COUNT },
-
-        (_, i) =>
-
-          makeCard(i + 1)
-
-      )
-
-    });
-
-  }
-
-  if (
-
-    url.pathname ===
-
-    "/do/user-cards"
-
-  ) {
-
-    return json({
-
-      ok: true,
-
-      cards:
-
-        this.getUserCards(user.id)
-
-    });
-
-  }
-
-  if (
-
-    url.pathname ===
-
-      "/do/select-cards" &&
-
-    request.method === "POST"
-
-  ) {
-
-    let body = {};
-
-    try {
-
-      body =
-
-        await request.json();
-
-    } catch (_) {}
-
-    return json(
-
-      await this.selectCards(
-
-        user.id,
-
-        Array.isArray(body.cards)
-
-          ? body.cards
-
-          : []
-
-      )
-
-    );
-
-  }
-
-  if (
-
-    url.pathname ===
-
-    "/do/balance"
-
-  ) {
-
-    const balances =
-
-      this.getBalances(user.id);
-
-    return json({
-
-      ok: true,
 
       mainBalance:
 
@@ -4766,227 +4566,509 @@ async fetch(request) {
 
       playBalance:
 
-        balances.playBalance,
-
-      balance:
-
         balances.playBalance
 
-    });
+    };
 
-  }
+  };
 
-  if (
+/* =========================================================
 
-    url.pathname ===
+   CLAIM
 
-      "/do/wallet" &&
+   ========================================================= */
 
-    request.method === "POST"
+GameScheduler.prototype.claim =
 
-  ) {
+  async function (userId) {
 
-    let body = {};
+    const state =
 
-    const contentType =
+      this.getState();
 
-      request.headers.get(
+    if (
 
-        "content-type"
+      !state ||
 
-      ) || "";
+      state.status !== "live"
 
-    try {
+    ) {
 
-      if (
+      return {
 
-        contentType.includes(
+        ok: false,
 
-          "multipart/form-data"
+        error: "GAME_NOT_LIVE"
+
+      };
+
+    }
+
+    const cards =
+
+      this.getUserCards(userId);
+
+    if (!cards.length) {
+
+      return {
+
+        ok: false,
+
+        error: "NO_CARD"
+
+      };
+
+    }
+
+    const called =
+
+      this.getCalledBalls(state);
+
+    const winner =
+
+      cards.find(card =>
+
+        hasTwoLines(
+
+          card,
+
+          called
 
         )
 
-      ) {
+      );
 
-        const form =
+    if (!winner) {
 
-          await request.formData();
+      return {
 
-        const screenshot =
+        ok: false,
 
-          form.get("screenshot");
+        error: "NOT_WINNING"
 
-        let screenshotData = "";
+      };
 
-        let screenshotMime =
+    }
 
-          "image/jpeg";
+    return {
 
-        if (
+      ok: true,
 
-          screenshot &&
+      winner: true,
 
-          typeof screenshot !==
+      card: winner
 
-            "string"
+    };
 
-        ) {
+  };
 
-          const bytes =
+/* =========================================================
 
-            new Uint8Array(
+   DURABLE OBJECT FETCH
 
-              await screenshot.arrayBuffer()
+   ========================================================= */
 
-            );
+GameScheduler.prototype.fetch =
 
-          let binary = "";
+  async function (request) {
 
-          for (
+    const url =
 
-            let i = 0;
+      new URL(request.url);
 
-            i < bytes.length;
+    const user =
 
-            i += 0x8000
+      getTelegramUser(request);
 
-          ) {
+    if (
 
-            binary += String.fromCharCode(
+      url.pathname ===
 
-              ...bytes.subarray(
+      "/do/game"
 
-                i,
+    ) {
 
-                i + 0x8000
+      return json(
 
-              )
+        this.getGameResponse()
 
-            );
+      );
 
-          }
+    }
 
-          screenshotData =
+    if (
 
-            `data:${screenshot.type || "image/jpeg"};base64,` +
+      url.pathname ===
 
-            btoa(binary);
+      "/do/cards"
 
-          screenshotMime =
+    ) {
 
-            screenshot.type ||
+      return json({
 
-            "image/jpeg";
+        ok: true,
 
-        }
+        cards: Array.from(
 
-        body = {
+          {
 
-          type:
+            length: CARD_COUNT
 
-            String(
+          },
 
-              form.get("type") ||
+          (_, i) =>
 
-              "deposit"
+            makeCard(i + 1)
 
-            ),
+        )
 
-          method:
+      });
 
-            String(
+    }
 
-              form.get("method") ||
+    if (
 
-              "Telebirr"
+      url.pathname ===
 
-            ),
+      "/do/user-cards"
 
-          amount:
+    ) {
 
-            Number(
+      return json({
 
-              form.get("amount") || 0
+        ok: true,
 
-            ),
+        cards:
 
-          screenshot_data:
+          this.getUserCards(
 
-            screenshotData,
+            user.id
 
-          screenshot_mime:
+          )
 
-            screenshotMime
+      });
 
-        };
+    }
 
-      } else {
+    if (
+
+      url.pathname ===
+
+        "/do/select-cards" &&
+
+      request.method === "POST"
+
+    ) {
+
+      let body = {};
+
+      try {
 
         body =
 
           await request.json();
 
-      }
+      } catch (_) {}
 
-    } catch (_) {
+      return json(
 
-      body = {};
+        await this.selectCards(
+
+          user.id,
+
+          Array.isArray(body.cards)
+
+            ? body.cards
+
+            : []
+
+        )
+
+      );
 
     }
 
-    await this.saveTelegramUser(
+    if (
 
-      user
+      url.pathname ===
 
-    );
+      "/do/balance"
+
+    ) {
+
+      const balances =
+
+        this.getBalances(
+
+          user.id
+
+        );
+
+      return json({
+
+        ok: true,
+
+        mainBalance:
+
+          balances.mainBalance,
+
+        playBalance:
+
+          balances.playBalance,
+
+        balance:
+
+          balances.playBalance
+
+      });
+
+    }
+
+    if (
+
+      url.pathname ===
+
+        "/do/wallet" &&
+
+      request.method === "POST"
+
+    ) {
+
+      let body = {};
+
+      const contentType =
+
+        request.headers.get(
+
+          "content-type"
+
+        ) || "";
+
+      try {
+
+        if (
+
+          contentType.includes(
+
+            "multipart/form-data"
+
+          )
+
+        ) {
+
+          const form =
+
+            await request.formData();
+
+          const screenshot =
+
+            form.get(
+
+              "screenshot"
+
+            );
+
+          let screenshotData = "";
+
+          let screenshotMime =
+
+            "image/jpeg";
+
+          if (
+
+            screenshot &&
+
+            typeof screenshot !==
+
+              "string"
+
+          ) {
+
+            const bytes =
+
+              new Uint8Array(
+
+                await screenshot.arrayBuffer()
+
+              );
+
+            if (
+
+              bytes.length >
+
+              300 * 1024
+
+            ) {
+
+              return json({
+
+                ok: false,
+
+                error:
+
+                  "SCREENSHOT_TOO_LARGE",
+
+                maximum:
+
+                  "300KB"
+
+              });
+
+            }
+
+            let binary = "";
+
+            for (
+
+              let i = 0;
+
+              i < bytes.length;
+
+              i += 0x8000
+
+            ) {
+
+              binary +=
+
+                String.fromCharCode(
+
+                  ...bytes.subarray(
+
+                    i,
+
+                    i + 0x8000
+
+                  )
+
+                );
+
+            }
+
+            screenshotData =
+
+              `data:${screenshot.type || "image/jpeg"};base64,` +
+
+              btoa(binary);
+
+            screenshotMime =
+
+              screenshot.type ||
+
+              "image/jpeg";
+
+          }
+
+          body = {
+
+            type:
+
+              String(
+
+                form.get("type") ||
+
+                "deposit"
+
+              ),
+
+            method:
+
+              String(
+
+                form.get("method") ||
+
+                "Telebirr"
+
+              ),
+
+            amount:
+
+              Number(
+
+                form.get("amount") ||
+
+                0
+
+              ),
+
+            screenshot_data:
+
+              screenshotData,
+
+            screenshot_mime:
+
+              screenshotMime
+
+          };
+
+        } else {
+
+          body =
+
+            await request.json();
+
+        }
+
+      } catch (_) {
+
+        body = {};
+
+      }
+
+      await this.saveTelegramUser(
+
+        user
+
+      );
+
+      return json(
+
+        await this.walletRequest(
+
+          user.id,
+
+          body
+
+        )
+
+      );
+
+    }
+
+    if (
+
+      url.pathname ===
+
+      "/do/claim"
+
+    ) {
+
+      return json(
+
+        await this.claim(
+
+          user.id
+
+        )
+
+      );
+
+    }
 
     return json(
 
-      await this.walletRequest(
+      {
 
-        user.id,
+        ok: false,
 
-        body
+        error: "NOT_FOUND"
 
-      )
+      },
 
-    );
-
-  }
-
-  if (
-
-    url.pathname ===
-
-    "/do/claim"
-
-  ) {
-
-    return json(
-
-      await this.claim(user.id)
+      404
 
     );
 
-  }
-
-  return json(
-
-    {
-
-      ok: false,
-
-      error: "NOT_FOUND"
-
-    },
-
-    404
-
-  );
-
-}
-
-}
+  };
 
 /* =========================================================
 
