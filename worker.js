@@ -4269,40 +4269,6 @@ if (!hasPlayBalance) {
 
       }
 
-      return json(
-
-        {
-
-          ok: false,
-
-          error: "ADMIN_NOT_FOUND"
-
-        },
-
-        404
-
-      );
-
-    }
-
-    return json(
-
-      {
-
-        ok: false,
-
-        error: "NOT_FOUND"
-
-      },
-
-      404
-
-    );
-
-  }
-
-}  
-
    /* =========================================================
 
    WALLET REQUEST
