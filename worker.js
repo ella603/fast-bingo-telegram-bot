@@ -1889,131 +1889,169 @@ class GameScheduler extends DurableObject {
 
   }
 
-  async walletRequest(
+/* =========================================================
 
-    userId,
+   FAST BINGO — PAYMENT DISPLAY SETTINGS
 
-    body
+   CHANGE ONLY THE VALUES BELOW.
 
-  ) {
+   These are display/demo settings only.
 
-    const amount =
+   ========================================================= */
 
-      Number(
+const PAYMENT_DISPLAY = {
 
-        body?.amount || 0
+  telebirr: {
 
-      );
+    name: "Hanza",
 
-    const type =
+    number: "0999960421"
 
-      body?.type === "withdraw"
+  },
 
-        ? "withdraw"
+  ebirr: {
 
-        : "deposit";
+    name: "Belay",
 
-    const method =
+    number: "0999960421"
 
-      String(
+  },
 
-        body?.method || "Demo"
+  mpesa: {
 
-      );
+    name: "Gemechu",
 
-    if (
+    number: "0786192665"
 
-      !Number.isFinite(amount) ||
+  }
 
-      amount <= 0
+};
 
-    ) {
+/* =========================================================
 
-      return {
+   WALLET REQUEST
 
-        ok: false,
+   DEMO / PLAY-MONEY ONLY
 
-        error: "INVALID_AMOUNT"
+   ========================================================= */
 
-      };
+async walletRequest(userId, body) {
 
-    }
+  const amount =
 
-    const current =
+    Number(
 
-      this.getBalance(userId);
-
-    if (
-
-      type === "withdraw" &&
-
-      amount > current
-
-    ) {
-
-      return {
-
-        ok: false,
-
-        error: "INSUFFICIENT_BALANCE"
-
-      };
-
-    }
-
-    const next =
-
-      type === "deposit"
-
-        ? current + amount
-
-        : current - amount;
-
-    this.ctx.storage.sql.exec(
-
-      `
-
-      UPDATE balances
-
-      SET balance = ?
-
-      WHERE user_id = ?
-
-      `,
-
-      next,
-
-      userId
+      body?.amount || 0
 
     );
 
-    this.ctx.storage.sql.exec(
+  const type =
 
-      `
+    body?.type === "withdraw"
 
-      INSERT INTO transactions
+      ? "withdraw"
 
-      (
+      : "deposit";
 
-        user_id,
+  const method =
 
-        type,
+    String(
 
-        method,
+      body?.method || "Telebirr"
 
-        amount,
+    );
 
-        simulated,
+  /*
 
-        created_at
+   * Demo minimum amount.
 
-      )
+   * No real money is transferred.
 
-      VALUES (?, ?, ?, ?, 1, ?)
+   */
 
-      `,
+  if (
 
-      userId,
+    !Number.isFinite(amount) ||
+
+    amount < 50
+
+  ) {
+
+    return {
+
+      ok: false,
+
+      error: "MINIMUM_AMOUNT",
+
+      minimum: 50
+
+    };
+
+  }
+
+  const current =
+
+    this.getBalance(userId);
+
+  if (
+
+    type === "withdraw" &&
+
+    amount > current
+
+  ) {
+
+    return {
+
+      ok: false,
+
+      error: "INSUFFICIENT_BALANCE"
+
+    };
+
+  }
+
+  /*
+
+   * DEMO BALANCE ONLY
+
+   */
+
+  const next =
+
+    type === "deposit"
+
+      ? current + amount
+
+      : current - amount;
+
+  this.ctx.storage.sql.exec(
+
+    `
+
+    UPDATE balances
+
+    SET balance = ?
+
+    WHERE user_id = ?
+
+    `,
+
+    next,
+
+    userId
+
+  );
+
+  this.ctx.storage.sql.exec(
+
+    `
+
+    INSERT INTO transactions
+
+    (
+
+      user_id,
 
       type,
 
@@ -2021,79 +2059,55 @@ class GameScheduler extends DurableObject {
 
       amount,
 
-      Date.now()
+      simulated,
 
-    );
+      created_at
 
-    return {
+    )
 
-      ok: true,
+    VALUES (?, ?, ?, ?, 1, ?)
 
-      simulated: true,
+    `,
 
-      balance: next
+    userId,
 
-    };
+    type,
 
-  }
+    method,
 
-  async claim(userId) {
+    amount,
 
-    const state =
+    Date.now()
 
-      this.getState();
+  );
 
-    if (!state) {
+  return {
 
-      return {
+    ok: true,
 
-        ok: true,
+    simulated: true,
 
-        winner: false
+    balance: next,
 
-      };
+    method: method
 
-    }
+  };
 
-    const called =
+}
 
-      this.getCalledBalls(state);
+/* =========================================================
 
-    const cards =
+   CLAIM
 
-      this.getUserCards(userId);
+   ========================================================= */
 
-    for (const number of cards) {
+async claim(userId) {
 
-      const card =
+  const state =
 
-        makeCard(number);
+    this.getState();
 
-      if (
-
-        hasTwoLines(
-
-          card,
-
-          called
-
-        )
-
-      ) {
-
-        return {
-
-          ok: true,
-
-          winner: true,
-
-          card: number
-
-        };
-
-      }
-
-    }
+  if (!state) {
 
     return {
 
@@ -2105,49 +2119,111 @@ class GameScheduler extends DurableObject {
 
   }
 
-  async fetch(request) {
+  const called =
 
-    const url =
+    this.getCalledBalls(state);
 
-      new URL(request.url);
+  const cards =
 
-    const user =
+    this.getUserCards(userId);
 
-      getTelegramUser(request);
+  for (const number of cards) {
 
-    if (
+    const card =
 
-      url.pathname ===
-
-      "/do/game"
-
-    ) {
-
-      return json(
-
-        this.getGameResponse()
-
-      );
-
-    }
+      makeCard(number);
 
     if (
 
-      url.pathname ===
+      hasTwoLines(
 
-      "/do/cards"
+        card,
+
+        called
+
+      )
 
     ) {
 
-      return json({
+      return {
 
         ok: true,
 
-        count: CARD_COUNT,
+        winner: true,
 
-        cards: Array.from(
+        card: number
 
-          { length: CARD_COUNT },
+      };
+
+    }
+
+  }
+
+  return {
+
+    ok: true,
+
+    winner: false
+
+  };
+
+}
+
+/* =========================================================
+
+   DURABLE OBJECT FETCH
+
+   ========================================================= */
+
+async fetch(request) {
+
+  const url =
+
+    new URL(request.url);
+
+  const user =
+
+    getTelegramUser(request);
+
+  if (
+
+    url.pathname ===
+
+    "/do/game"
+
+  ) {
+
+    return json(
+
+      this.getGameResponse()
+
+    );
+
+  }
+
+  if (
+
+    url.pathname ===
+
+    "/do/cards"
+
+  ) {
+
+    return json({
+
+      ok: true,
+
+      count: CARD_COUNT,
+
+      cards:
+
+        Array.from(
+
+          {
+
+            length: CARD_COUNT
+
+          },
 
           (_, i) => ({
 
@@ -2159,159 +2235,169 @@ class GameScheduler extends DurableObject {
 
         )
 
-      });
+    });
 
-    }
+  }
 
-    if (
+  if (
 
-      url.pathname ===
+    url.pathname ===
 
-      "/do/user-cards"
+    "/do/user-cards"
 
-    ) {
+  ) {
 
-      return json({
+    return json({
 
-        ok: true,
+      ok: true,
 
-        selected:
+      selected:
 
-          this.getUserCards(
-
-            user.id
-
-          )
-
-      });
-
-    }
-
-    if (
-
-      url.pathname ===
-
-        "/do/select-cards" &&
-
-      request.method === "POST"
-
-    ) {
-
-      let body = {};
-
-      try {
-
-        body =
-
-          await request.json();
-
-      } catch (_) {}
-
-      return json(
-
-        await this.selectCards(
-
-          user.id,
-
-          body.cards
-
-        )
-
-      );
-
-    }
-
-    if (
-
-      url.pathname ===
-
-      "/do/balance"
-
-    ) {
-
-      return json({
-
-        ok: true,
-
-        balance:
-
-          this.getBalance(user.id)
-
-      });
-
-    }
-
-    if (
-
-      url.pathname ===
-
-        "/do/wallet" &&
-
-      request.method === "POST"
-
-    ) {
-
-      let body = {};
-
-      try {
-
-        body =
-
-          await request.json();
-
-      } catch (_) {}
-
-      return json(
-
-        await this.walletRequest(
-
-          user.id,
-
-          body
-
-        )
-
-      );
-
-    }
-
-    if (
-
-      url.pathname ===
-
-      "/do/claim"
-
-    ) {
-
-      return json(
-
-        await this.claim(
+        this.getUserCards(
 
           user.id
 
         )
 
-      );
+    });
 
-    }
+  }
+
+  if (
+
+    url.pathname ===
+
+      "/do/select-cards" &&
+
+    request.method === "POST"
+
+  ) {
+
+    let body = {};
+
+    try {
+
+      body =
+
+        await request.json();
+
+    } catch (_) {}
 
     return json(
 
-      {
+      await this.selectCards(
 
-        ok: false,
+        user.id,
 
-        error: "NOT_FOUND"
+        body.cards
 
-      },
-
-      404
+      )
 
     );
 
   }
 
+  if (
+
+    url.pathname ===
+
+    "/do/balance"
+
+  ) {
+
+    return json({
+
+      ok: true,
+
+      balance:
+
+        this.getBalance(
+
+          user.id
+
+        )
+
+    });
+
+  }
+
+  if (
+
+    url.pathname ===
+
+      "/do/wallet" &&
+
+    request.method === "POST"
+
+  ) {
+
+    let body = {};
+
+    try {
+
+      body =
+
+        await request.json();
+
+    } catch (_) {}
+
+    return json(
+
+      await this.walletRequest(
+
+        user.id,
+
+        body
+
+      )
+
+    );
+
+  }
+
+  if (
+
+    url.pathname ===
+
+    "/do/claim"
+
+  ) {
+
+    return json(
+
+      await this.claim(
+
+        user.id
+
+      )
+
+    );
+
+  }
+
+  return json(
+
+    {
+
+      ok: false,
+
+      error: "NOT_FOUND"
+
+    },
+
+    404
+
+  );
+
 }
+
+}
+
+/* =========================================================
+
+   MINI APP HTML
+
+   ========================================================= */
 
 function pageHtml() {
 
@@ -3403,6 +3489,74 @@ button{
 
 }
 
+.payment-methods{
+
+  display:grid;
+
+  grid-template-columns:repeat(3,1fr);
+
+  gap:8px;
+
+  margin-top:12px;
+
+}
+
+.payment-card{
+
+  border:1px solid var(--line);
+
+  border-radius:12px;
+
+  background:#0d1219;
+
+  padding:10px;
+
+  text-align:left;
+
+}
+
+.payment-card.active{
+
+  border-color:var(--red2);
+
+  background:#17141a;
+
+}
+
+.payment-name{
+
+  font-size:11px;
+
+  font-weight:950;
+
+}
+
+.payment-owner{
+
+  color:#cbd2dd;
+
+  font-size:9px;
+
+  margin-top:5px;
+
+  white-space:nowrap;
+
+  overflow:hidden;
+
+  text-overflow:ellipsis;
+
+}
+
+.payment-number{
+
+  color:var(--muted);
+
+  font-size:9px;
+
+  margin-top:3px;
+
+}
+
 .field{
 
   margin-top:10px;
@@ -3443,21 +3597,7 @@ button{
 
 .note{
 
-  margin-top:10px;
-
-  color:#9ca6b5;
-
-  background:#0c1118;
-
-  border:1px solid #252d39;
-
-  border-radius:10px;
-
-  padding:10px;
-
-  font-size:9px;
-
-  line-height:14px;
+  display:none;
 
 }
 
@@ -3692,6 +3832,12 @@ button{
   }
 
   .preview-grid{
+
+    grid-template-columns:1fr;
+
+  }
+
+  .payment-methods{
 
     grid-template-columns:1fr;
 
@@ -4215,15 +4361,135 @@ button{
 
     </div>
 
-    <div
+    <!-- PAYMENT METHODS -->
 
-      class="panel-sub"
+    <div class="payment-methods">
 
-      id="walletSub"
+      <button
 
-    >
+        type="button"
 
-      ይህ የሙከራ ሂሳብ ብቻ ነው።
+        class="payment-card active"
+
+        data-method="Telebirr"
+
+      >
+
+        <div class="payment-name">
+
+          Telebirr
+
+        </div>
+
+        <div
+
+          class="payment-owner"
+
+          id="telebirrOwner"
+
+        >
+
+          Hanza
+
+        </div>
+
+        <div
+
+          class="payment-number"
+
+          id="telebirrNumber"
+
+        >
+
+          0999960421
+
+        </div>
+
+      </button>
+
+      <button
+
+        type="button"
+
+        class="payment-card"
+
+        data-method="eBirr"
+
+      >
+
+        <div class="payment-name">
+
+          E-Birr
+
+        </div>
+
+        <div
+
+          class="payment-owner"
+
+          id="ebirrOwner"
+
+        >
+
+          Belay
+
+        </div>
+
+        <div
+
+          class="payment-number"
+
+          id="ebirrNumber"
+
+        >
+
+          0999960421
+
+        </div>
+
+      </button>
+
+      <button
+
+        type="button"
+
+        class="payment-card"
+
+        data-method="M-PESA"
+
+      >
+
+        <div class="payment-name">
+
+          M-PESA
+
+        </div>
+
+        <div
+
+          class="payment-owner"
+
+          id="mpesaOwner"
+
+        >
+
+          Gemechu
+
+        </div>
+
+        <div
+
+          class="payment-number"
+
+          id="mpesaNumber"
+
+        >
+
+          0786192665
+
+        </div>
+
+      </button>
 
     </div>
 
@@ -4289,44 +4555,6 @@ button{
 
     <div class="field">
 
-      <label id="methodLabel">
-
-        ዘዴ
-
-      </label>
-
-      <select id="walletMethod">
-
-        <option value="Demo">
-
-          Demo
-
-        </option>
-
-        <option value="Telebirr">
-
-          Telebirr (Demo)
-
-        </option>
-
-        <option value="eBirr">
-
-          eBirr (Demo)
-
-        </option>
-
-        <option value="M-PESA">
-
-          M-PESA (Demo)
-
-        </option>
-
-      </select>
-
-    </div>
-
-    <div class="field">
-
       <label id="amountLabel">
 
         መጠን
@@ -4339,11 +4567,11 @@ button{
 
         type="number"
 
-        min="1"
+        min="50"
 
         max="100000"
 
-        placeholder="100"
+        placeholder="50"
 
       >
 
@@ -4362,20 +4590,6 @@ button{
       ገቢ አድርግ
 
     </button>
-
-    <div
-
-      class="note"
-
-      id="walletNote"
-
-    >
-
-      ⚠️ ይህ የሙከራ ሂሳብ ብቻ ነው።
-
-      ትክክለኛ ገንዘብ አይላክም ወይም አይቀበልም።
-
-    </div>
 
   </div>
 
@@ -4455,7 +4669,11 @@ button{
 
       <div class="nav-icon">⌂</div>
 
-      <span id="navHome">መነሻ</span>
+      <span id="navHome">
+
+        መነሻ
+
+      </span>
 
     </button>
 
@@ -4469,7 +4687,11 @@ button{
 
       <div class="nav-icon">♛</div>
 
-      <span id="navRank">ደረጃ</span>
+      <span id="navRank">
+
+        ደረጃ
+
+      </span>
 
     </button>
 
@@ -4483,7 +4705,11 @@ button{
 
       <div class="nav-icon">◉</div>
 
-      <span id="navProfile">ፕሮፋይል</span>
+      <span id="navProfile">
+
+        ፕሮፋይል
+
+      </span>
 
     </button>
 
@@ -4497,7 +4723,11 @@ button{
 
       <div class="nav-icon">▣</div>
 
-      <span id="navWallet">ቦርሳ</span>
+      <span id="navWallet">
+
+        ቦርሳ
+
+      </span>
 
     </button>
 
@@ -4561,13 +4791,21 @@ button{
 
   var userHeader =
 
-    JSON.stringify(telegramUser);
+    JSON.stringify(
+
+      telegramUser
+
+    );
 
   var selected = [];
 
   var currentGame = null;
 
   var walletType = "deposit";
+
+  var selectedPaymentMethod =
+
+    "Telebirr";
 
   var language = "am";
 
@@ -4615,8 +4853,6 @@ button{
 
       profileText:"የTelegram መለያዎ መረጃ እዚህ ይታያል።",
 
-      walletSub:"ይህ የሙከራ ሂሳብ ብቻ ነው።",
-
       method:"ዘዴ",
 
       amount:"መጠን",
@@ -4633,8 +4869,6 @@ button{
 
       languageSub:"የመተግበሪያውን ቋንቋ ይምረጡ።",
 
-      walletNote:"⚠️ ይህ የሙከራ ሂሳብ ብቻ ነው። ትክክለኛ ገንዘብ አይላክም ወይም አይቀበልም።",
-
       saved:"ካርዶችዎ ተቀምጠዋል።",
 
       lobbyOnly:"ካርድ መምረጥ የሚቻለው Lobby ጊዜ ብቻ ነው።",
@@ -4644,6 +4878,8 @@ button{
       gameProgress:"ጨዋታው ጀምሯል። ቀጣዩን ዙር ይጠብቁ።",
 
       invalidAmount:"ትክክለኛ መጠን ያስገቡ።",
+
+      minimum:"ዝቅተኛው መጠን 50 ብር ነው።",
 
       insufficient:"በቂ ሂሳብ የለዎትም።",
 
@@ -4697,8 +4933,6 @@ button{
 
       profileText:"Your Telegram profile information appears here.",
 
-      walletSub:"This is a simulated play-money balance only.",
-
       method:"Method",
 
       amount:"Amount",
@@ -4715,8 +4949,6 @@ button{
 
       languageSub:"Choose your application language.",
 
-      walletNote:"⚠️ This is simulated play-money only. No real money is sent or received.",
-
       saved:"Your cards have been saved.",
 
       lobbyOnly:"Cards can only be selected during the lobby.",
@@ -4726,6 +4958,8 @@ button{
       gameProgress:"Game has started. Wait for the next round.",
 
       invalidAmount:"Enter a valid amount.",
+
+      minimum:"Minimum amount is 50 ETB.",
 
       insufficient:"Insufficient balance.",
 
@@ -4775,7 +5009,9 @@ button{
 
     }
 
-    options.headers = headers;
+    options.headers =
+
+      headers;
 
     return fetch(
 
@@ -4819,7 +5055,11 @@ button{
 
       message;
 
-    toast.classList.add("show");
+    toast.classList.add(
+
+      "show"
+
+    );
 
     clearTimeout(
 
@@ -4904,6 +5144,48 @@ button{
             button.dataset.section
 
           );
+
+        }
+
+      );
+
+    });
+
+  document
+
+    .querySelectorAll(".payment-card")
+
+    .forEach(function(card){
+
+      card.addEventListener(
+
+        "click",
+
+        function(){
+
+          document
+
+            .querySelectorAll(".payment-card")
+
+            .forEach(function(item){
+
+              item.classList.remove(
+
+                "active"
+
+              );
+
+            });
+
+          card.classList.add(
+
+            "active"
+
+          );
+
+          selectedPaymentMethod =
+
+            card.dataset.method;
 
         }
 
@@ -5139,7 +5421,7 @@ button{
 
           value +
 
-          '</div>';
+          "</div>";
 
       }
 
@@ -5639,11 +5921,7 @@ button{
 
     ).style.display =
 
-      selected.length
-
-        ? "block"
-
-        : "block";
+      "block";
 
     var recent =
 
@@ -5829,25 +6107,23 @@ button{
 
       );
 
-    var method =
-
-      document.getElementById(
-
-        "walletMethod"
-
-      ).value;
-
     if(
 
       !Number.isFinite(amount) ||
 
-      amount <= 0
+      amount < 50
 
     ){
 
       showToast(
 
-        t("invalidAmount")
+        Number.isFinite(amount) &&
+
+        amount > 0
+
+          ? t("minimum")
+
+          : t("invalidAmount")
 
       );
 
@@ -5865,11 +6141,17 @@ button{
 
         body:JSON.stringify({
 
-          method:method,
+          method:
 
-          type:walletType,
+            selectedPaymentMethod,
 
-          amount:amount
+          type:
+
+            walletType,
+
+          amount:
+
+            amount
 
         })
 
@@ -5897,6 +6179,20 @@ button{
 
         data.error ===
 
+        "MINIMUM_AMOUNT"
+
+      ){
+
+        showToast(
+
+          t("minimum")
+
+        );
+
+      }else if(
+
+        data.error ===
+
         "INSUFFICIENT_BALANCE"
 
       ){
@@ -5909,7 +6205,11 @@ button{
 
       }else{
 
-        showToast("Error");
+        showToast(
+
+          "Error"
+
+        );
 
       }
 
@@ -6115,14 +6415,6 @@ button{
 
     document.getElementById(
 
-      "walletSub"
-
-    ).textContent =
-
-      x.walletSub;
-
-    document.getElementById(
-
       "methodLabel"
 
     ).textContent =
@@ -6180,14 +6472,6 @@ button{
     ).textContent =
 
       x.languageSub;
-
-    document.getElementById(
-
-      "walletNote"
-
-    ).textContent =
-
-      x.walletNote;
 
     document.getElementById(
 
@@ -6423,6 +6707,12 @@ button{
 
 }
 
+/* =========================================================
+
+   PROXY TO GAME SCHEDULER
+
+   ========================================================= */
+
 async function proxyToGame(
 
   request,
@@ -6495,9 +6785,13 @@ async function proxyToGame(
 
       {
 
-        method:request.method,
+        method:
 
-        headers:headers,
+          request.method,
+
+        headers:
+
+          headers,
 
         body:
 
@@ -6520,6 +6814,12 @@ async function proxyToGame(
   );
 
 }
+
+/* =========================================================
+
+   MAIN WORKER
+
+   ========================================================= */
 
 export default {
 
@@ -6677,4 +6977,4 @@ export default {
 
 };
 
-export { GameScheduler };
+export { GameScheduler };  
