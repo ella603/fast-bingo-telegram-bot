@@ -6949,9 +6949,9 @@ function api(path, options){
 
     options.headers || {};
 
-  headers["x-telegram-user"] =
+  headers["x-admin-key"] =
 
-    userHeader;
+    x-admin-key;
 
   if(
 
