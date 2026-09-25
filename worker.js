@@ -6451,29 +6451,73 @@ button{
 
     </div>
 
-    <div class="field">
+<div class="field">
 
-      <label id="amountLabel">
+  <label id="amountLabel">መጠን</label>
 
-        መጠን
+  <input
 
-      </label>
+    id="walletAmount"
 
-      <input
+    type="number"
 
-        id="walletAmount"
+    min="50"
 
-        type="number"
+    max="100000"
 
-        min="50"
+    placeholder="50"
 
-        max="100000"
+  >
 
-        placeholder="50"
+</div>
 
-      >
+<div
 
-    </div>
+  class="field"
+
+  id="walletScreenshotField"
+
+>
+
+  <label>
+
+    የክፍያ Screenshot
+
+  </label>
+
+  <input
+
+    id="walletScreenshot"
+
+    type="file"
+
+    accept="image/jpeg,image/png,image/webp"
+
+  >
+
+  <div
+
+    style="
+
+      color:#8993a4;
+
+      font-size:8px;
+
+      margin-top:5px;
+
+      line-height:13px;
+
+    "
+
+  >
+
+    Deposit ሲያደርጉ የክፍያ Screenshot ያስገቡ።
+
+    Maximum 300 KB.
+
+  </div>
+
+</div>
 
     <button
 
@@ -6881,63 +6925,65 @@ button{
 
   }
 
-  function api(path, options){
+function api(path, options){
 
-    options = options || {};
+  options = options || {};
 
-    var headers =
+  var headers =
 
-      options.headers || {};
+    options.headers || {};
 
-    headers["x-telegram-user"] =
+  headers["x-telegram-user"] =
 
-      userHeader;
+    userHeader;
 
-    if(
+  if(
 
-      options.body &&
+    options.body &&
 
-      !headers["content-type"]
+    !(options.body instanceof FormData) &&
 
-    ){
+    !headers["content-type"]
 
-      headers["content-type"] =
+  ){
 
-        "application/json";
+    headers["content-type"] =
 
-    }
-
-    options.headers =
-
-      headers;
-
-    return fetch(
-
-      path +
-
-      (
-
-        path.indexOf("?") >= 0
-
-          ? "&"
-
-          : "?"
-
-      ) +
-
-      "_=" +
-
-      Date.now(),
-
-      options
-
-    ).then(function(response){
-
-      return response.json();
-
-    });
+      "application/json";
 
   }
+
+  options.headers =
+
+    headers;
+
+  return fetch(
+
+    path +
+
+    (
+
+      path.indexOf("?") >= 0
+
+        ? "&"
+
+        : "?"
+
+    ) +
+
+    "_=" +
+
+    Date.now(),
+
+    options
+
+  ).then(function(response){
+
+    return response.json();
+
+  });
+
+}
 
   function showToast(message){
 
@@ -7949,79 +7995,145 @@ button{
 
   }
 
-  function setWalletType(type){
+function setWalletType(type){
 
-    walletType=type;
+  walletType = type;
 
-    document.getElementById(
+  document.getElementById(
 
-      "depositBtn"
+    "depositBtn"
 
-    ).classList.toggle(
+  ).classList.toggle(
 
-      "active",
+    "active",
 
-      type === "deposit"
+    type === "deposit"
+
+  );
+
+  document.getElementById(
+
+    "withdrawBtn"
+
+  ).classList.toggle(
+
+    "active",
+
+    type === "withdraw"
+
+  );
+
+  document.getElementById(
+
+    "walletSubmit"
+
+  ).textContent =
+
+    type === "deposit"
+
+      ? t("depositAction")
+
+      : t("withdrawAction");
+
+  document.getElementById(
+
+    "screenshotField"
+
+  ).style.display =
+
+    type === "deposit"
+
+      ? "block"
+
+      : "none";
+
+}
+
+function walletRequest(){
+
+  var amount =
+
+    Number(
+
+      document.getElementById(
+
+        "walletAmount"
+
+      ).value
 
     );
 
-    document.getElementById(
+  if(
 
-      "withdrawBtn"
+    !Number.isFinite(amount) ||
 
-    ).classList.toggle(
+    amount < 50
 
-      "active",
+  ){
 
-      type === "withdraw"
+    showToast(
+
+      Number.isFinite(amount) &&
+
+      amount > 0
+
+        ? t("minimum")
+
+        : t("invalidAmount")
 
     );
 
-    document.getElementById(
-
-      "walletSubmit"
-
-    ).textContent =
-
-      type === "deposit"
-
-        ? t("depositAction")
-
-        : t("withdrawAction");
+    return;
 
   }
 
-  function walletRequest(){
+  var formData =
 
-    var amount =
+    new FormData();
 
-      Number(
+  formData.append(
 
-        document.getElementById(
+    "method",
 
-          "walletAmount"
+    selectedPaymentMethod
 
-        ).value
+  );
 
-      );
+  formData.append(
 
-    if(
+    "type",
 
-      !Number.isFinite(amount) ||
+    walletType
 
-      amount < 50
+  );
 
-    ){
+  formData.append(
+
+    "amount",
+
+    String(amount)
+
+  );
+
+  if(walletType === "deposit"){
+
+    var screenshot =
+
+      document.getElementById(
+
+        "walletScreenshot"
+
+      ).files[0];
+
+    if(!screenshot){
 
       showToast(
 
-        Number.isFinite(amount) &&
+        language === "am"
 
-        amount > 0
+          ? "የክፍያ Screenshot ያስገቡ።"
 
-          ? t("minimum")
-
-          : t("invalidAmount")
+          : "Please upload your payment screenshot."
 
       );
 
@@ -8029,99 +8141,163 @@ button{
 
     }
 
-    api(
-
-      "/api/wallet",
-
-      {
-
-        method:"POST",
-
-        body:JSON.stringify({
-
-          method:
-
-            selectedPaymentMethod,
-
-          type:
-
-            walletType,
-
-          amount:
-
-            amount
-
-        })
-
-      }
-
-    ).then(function(data){
-
-      if(data.ok){
-
-        document.getElementById(
-
-          "walletAmount"
-
-        ).value="";
-
-        loadBalance();
-
-        showToast(
-
-          t("balanceUpdated")
-
-        );
-
-      }else if(
-
-        data.error ===
-
-        "MINIMUM_AMOUNT"
-
-      ){
-
-        showToast(
-
-          t("minimum")
-
-        );
-
-      }else if(
-
-        data.error ===
-
-        "INSUFFICIENT_BALANCE"
-
-      ){
-
-        showToast(
-
-          t("insufficient")
-
-        );
-
-      }else{
-
-        showToast(
-
-          "Error"
-
-        );
-
-      }
-
-    }).catch(function(){
+    if(screenshot.size > 300 * 1024){
 
       showToast(
 
-        "Connection error"
+        language === "am"
+
+          ? "Screenshot ከ300 KB መብለጥ የለበትም።"
+
+          : "Screenshot must be 300 KB or smaller."
 
       );
 
-    });
+      return;
+
+    }
+
+    formData.append(
+
+      "screenshot",
+
+      screenshot
+
+    );
 
   }
+
+  api(
+
+    "/api/wallet",
+
+    {
+
+      method:"POST",
+
+      body:formData
+
+    }
+
+  ).then(function(data){
+
+    if(data.ok){
+
+      document.getElementById(
+
+        "walletAmount"
+
+      ).value = "";
+
+      var screenshotInput =
+
+        document.getElementById(
+
+          "walletScreenshot"
+
+        );
+
+      if(screenshotInput){
+
+        screenshotInput.value = "";
+
+      }
+
+      loadBalance();
+
+      showToast(
+
+        walletType === "deposit"
+
+          ? (
+
+              language === "am"
+
+                ? "Deposit ተልኳል። እባክዎ የAdmin ማረጋገጫ ይጠብቁ።"
+
+                : "Deposit submitted. Please wait for admin confirmation."
+
+            )
+
+          : (
+
+              language === "am"
+
+                ? "Withdrawal ጥያቄ ተልኳል።"
+
+                : "Withdrawal request submitted."
+
+            )
+
+      );
+
+    }else if(
+
+      data.error ===
+
+      "MINIMUM_AMOUNT"
+
+    ){
+
+      showToast(
+
+        t("minimum")
+
+      );
+
+    }else if(
+
+      data.error ===
+
+      "INSUFFICIENT_BALANCE"
+
+    ){
+
+      showToast(
+
+        t("insufficient")
+
+      );
+
+    }else if(
+
+      data.error ===
+
+      "SCREENSHOT_REQUIRED"
+
+    ){
+
+      showToast(
+
+        language === "am"
+
+          ? "የክፍያ Screenshot ያስገቡ።"
+
+          : "Payment screenshot is required."
+
+      );
+
+    }else{
+
+      showToast(
+
+        "Error"
+
+      );
+
+    }
+
+  }).catch(function(){
+
+    showToast(
+
+      "Connection error"
+
+    );
+
+  });
+
+}
 
   function setLanguage(next){
 
@@ -8488,6 +8664,8 @@ button{
     function(){
 
       setLanguage("am");
+
+      setWalletType("deposit");
 
     }
 
