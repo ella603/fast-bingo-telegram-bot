@@ -2597,11 +2597,27 @@ if (!hasPlayBalance) {
 
     const auth =
 
-      request.headers.get("authorization") || "";
+  request.headers.get("authorization") || "";
 
-    if (
+const adminHeader =
 
-      auth.startsWith("Bearer ")
+  request.headers.get("x-admin-key") || "";
+
+if (
+
+  adminHeader &&
+
+  adminHeader === this.env.ADMIN_KEY
+
+){
+
+  return true;
+
+}
+
+if (
+
+  auth.startsWith("Bearer ")
 
     ) {
 
