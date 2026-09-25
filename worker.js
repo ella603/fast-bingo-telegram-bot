@@ -9523,9 +9523,9 @@ function api(path, options){
 
     options.headers || {};
 
-  headers["Authorization"] =
+  headers["x-admin-key"] =
 
-    "Bearer " + adminKey;
+    adminKey;
 
   options.headers =
 
