@@ -2581,58 +2581,68 @@ if (!hasPlayBalance) {
 
   }
 
-  /* =========================================================
+/* =========================================================
 
-     ADMIN AUTH
+   ADMIN AUTH
 
-     ========================================================= */
+   ========================================================= */
 
-  isAdmin(request) {
+isAdmin(request) {
 
-    const expected =
+  const expected =
 
-      String(this.env.ADMIN_KEY || "");
+    String(this.env.ADMIN_KEY || "");
 
-    if (!expected) return false;
+  if (!expected) {
 
-    const auth =
-
-  request.headers.get("authorization") || "";
-
-const adminHeader =
-
-  request.headers.get("x-admin-key") || "";
-
-if (
-
-  adminHeader &&
-
-  adminHeader === this.env.ADMIN_KEY
-
-){
-
-  return true;
-
-}
-
-if (
-
-  auth.startsWith("Bearer ")
-
-    ) {
-
-      return auth.slice(7) === expected;
-
-    }
-
-    const supplied =
-
-      request.headers.get("x-admin-key") || "";
-
-    return supplied === expected;
+    return false;
 
   }
 
+  const adminHeader =
+
+    request.headers.get(
+
+      "x-admin-key"
+
+    ) || "";
+
+  if (
+
+    adminHeader === expected
+
+  ) {
+
+    return true;
+
+  }
+
+  const auth =
+
+    request.headers.get(
+
+      "authorization"
+
+    ) || "";
+
+  if (
+
+    auth.startsWith("Bearer ")
+
+  ) {
+
+    return (
+
+      auth.slice(7) === expected
+
+    );
+
+  }
+
+  return false;
+
+}
+   
   /* =========================================================
 
      ADMIN SUMMARY
