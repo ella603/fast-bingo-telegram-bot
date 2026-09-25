@@ -8893,6 +8893,1374 @@ async function proxyToGame(
 
 /* =========================================================
 
+   ADMIN DASHBOARD
+
+   ========================================================= */
+
+function adminHtml(){
+
+  return String.raw`<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+
+      content="width=device-width,initial-scale=1.0">
+
+<meta name="theme-color"
+
+      content="#07090d">
+
+<title>Fast Bingo Admin</title>
+
+<style>
+
+:root{
+
+  --bg:#07090d;
+
+  --surface:#10141c;
+
+  --surface2:#151b25;
+
+  --line:#293243;
+
+  --text:#fff;
+
+  --muted:#8993a4;
+
+  --red:#e50914;
+
+  --green:#26d07c;
+
+  --gold:#ffc857;
+
+}
+
+*{
+
+  box-sizing:border-box;
+
+}
+
+body{
+
+  margin:0;
+
+  background:var(--bg);
+
+  color:var(--text);
+
+  font-family:-apple-system,BlinkMacSystemFont,
+
+  "Segoe UI",Roboto,Arial,sans-serif;
+
+}
+
+.app{
+
+  max-width:900px;
+
+  margin:auto;
+
+  padding:18px 14px 50px;
+
+}
+
+.header{
+
+  display:flex;
+
+  justify-content:space-between;
+
+  align-items:center;
+
+  gap:12px;
+
+  margin-bottom:15px;
+
+}
+
+.title{
+
+  font-size:22px;
+
+  font-weight:950;
+
+}
+
+.subtitle{
+
+  color:var(--muted);
+
+  font-size:10px;
+
+  margin-top:3px;
+
+}
+
+.panel{
+
+  background:var(--surface);
+
+  border:1px solid var(--line);
+
+  border-radius:15px;
+
+  padding:14px;
+
+  margin-bottom:12px;
+
+}
+
+.panel-title{
+
+  font-size:14px;
+
+  font-weight:900;
+
+  margin-bottom:10px;
+
+}
+
+input{
+
+  width:100%;
+
+  padding:12px;
+
+  border-radius:10px;
+
+  border:1px solid var(--line);
+
+  background:#0c1118;
+
+  color:#fff;
+
+  outline:none;
+
+}
+
+button{
+
+  border:0;
+
+  border-radius:10px;
+
+  padding:10px 13px;
+
+  font-weight:900;
+
+  cursor:pointer;
+
+}
+
+.primary{
+
+  background:var(--red);
+
+  color:#fff;
+
+}
+
+.green{
+
+  background:var(--green);
+
+  color:#06130c;
+
+}
+
+.dark{
+
+  background:var(--surface2);
+
+  border:1px solid var(--line);
+
+  color:#fff;
+
+}
+
+.danger{
+
+  background:#4a1116;
+
+  color:#fff;
+
+  border:1px solid #7b2028;
+
+}
+
+.login-row{
+
+  display:grid;
+
+  grid-template-columns:1fr auto;
+
+  gap:8px;
+
+}
+
+.grid{
+
+  display:grid;
+
+  grid-template-columns:repeat(4,1fr);
+
+  gap:8px;
+
+}
+
+.stat{
+
+  background:#0d1118;
+
+  border:1px solid var(--line);
+
+  border-radius:11px;
+
+  padding:12px;
+
+}
+
+.stat-label{
+
+  color:var(--muted);
+
+  font-size:9px;
+
+}
+
+.stat-value{
+
+  font-size:18px;
+
+  font-weight:950;
+
+  margin-top:4px;
+
+}
+
+.request{
+
+  background:#0d1118;
+
+  border:1px solid var(--line);
+
+  border-radius:12px;
+
+  padding:12px;
+
+  margin-top:8px;
+
+}
+
+.request-top{
+
+  display:flex;
+
+  justify-content:space-between;
+
+  gap:8px;
+
+}
+
+.badge{
+
+  display:inline-block;
+
+  padding:4px 7px;
+
+  border-radius:7px;
+
+  background:#242c38;
+
+  color:#fff;
+
+  font-size:9px;
+
+  font-weight:900;
+
+}
+
+.deposit{
+
+  color:var(--green);
+
+}
+
+.withdraw{
+
+  color:var(--gold);
+
+}
+
+.request-info{
+
+  color:#c5ccd7;
+
+  font-size:10px;
+
+  line-height:17px;
+
+  margin-top:7px;
+
+}
+
+.request-actions{
+
+  display:flex;
+
+  gap:7px;
+
+  margin-top:9px;
+
+}
+
+.request-actions button{
+
+  flex:1;
+
+}
+
+.screenshot{
+
+  display:block;
+
+  width:100%;
+
+  max-height:360px;
+
+  object-fit:contain;
+
+  background:#05070a;
+
+  border-radius:10px;
+
+  margin-top:10px;
+
+}
+
+.hidden{
+
+  display:none;
+
+}
+
+.toolbar{
+
+  display:flex;
+
+  gap:7px;
+
+  flex-wrap:wrap;
+
+}
+
+.status{
+
+  color:var(--muted);
+
+  font-size:10px;
+
+  margin-top:8px;
+
+}
+
+@media(max-width:600px){
+
+  .grid{
+
+    grid-template-columns:1fr 1fr;
+
+  }
+
+  .login-row{
+
+    grid-template-columns:1fr;
+
+  }
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="app">
+
+  <div class="header">
+
+    <div>
+
+      <div class="title">
+
+        Fast Bingo Admin
+
+      </div>
+
+      <div class="subtitle">
+
+        Private administration dashboard
+
+      </div>
+
+    </div>
+
+    <button
+
+      class="dark"
+
+      onclick="logout()">
+
+      Logout
+
+    </button>
+
+  </div>
+
+  <div
+
+    class="panel"
+
+    id="loginPanel">
+
+    <div class="panel-title">
+
+      Admin Login
+
+    </div>
+
+    <div class="login-row">
+
+      <input
+
+        id="adminKey"
+
+        type="password"
+
+        placeholder="ADMIN_KEY">
+
+      <button
+
+        class="primary"
+
+        onclick="login()">
+
+        Login
+
+      </button>
+
+    </div>
+
+    <div
+
+      class="status"
+
+      id="loginStatus">
+
+    </div>
+
+  </div>
+
+  <div
+
+    id="dashboard"
+
+    class="hidden">
+
+    <div class="panel">
+
+      <div class="panel-title">
+
+        Overview
+
+      </div>
+
+      <div
+
+        class="grid"
+
+        id="stats">
+
+      </div>
+
+    </div>
+
+    <div class="panel">
+
+      <div class="panel-title">
+
+        Game Control
+
+      </div>
+
+      <div class="toolbar">
+
+        <button
+
+          class="green"
+
+          onclick="gameControl('resume')">
+
+          Resume
+
+        </button>
+
+        <button
+
+          class="dark"
+
+          onclick="gameControl('pause')">
+
+          Pause
+
+        </button>
+
+        <button
+
+          class="danger"
+
+          onclick="gameControl('reset')">
+
+          Reset
+
+        </button>
+
+      </div>
+
+      <div
+
+        class="status"
+
+        id="gameStatus">
+
+      </div>
+
+    </div>
+
+    <div class="panel">
+
+      <div class="panel-title">
+
+        Pending Requests
+
+      </div>
+
+      <div id="requests">
+
+      </div>
+
+    </div>
+
+    <div class="panel">
+
+      <div class="panel-title">
+
+        Users
+
+      </div>
+
+      <div id="users">
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+
+var adminKey =
+
+  localStorage.getItem(
+
+    "fastBingoAdminKey"
+
+  ) || "";
+
+function api(path, options){
+
+  options =
+
+    options || {};
+
+  var headers =
+
+    options.headers || {};
+
+  headers["Authorization"] =
+
+    "Bearer " + adminKey;
+
+  options.headers =
+
+    headers;
+
+  return fetch(
+
+    path,
+
+    options
+
+  ).then(function(response){
+
+    return response.json();
+
+  });
+
+}
+
+function login(){
+
+  var key =
+
+    document.getElementById(
+
+      "adminKey"
+
+    ).value.trim();
+
+  if(!key){
+
+    document.getElementById(
+
+      "loginStatus"
+
+    ).textContent =
+
+      "Enter ADMIN_KEY.";
+
+    return;
+
+  }
+
+  adminKey = key;
+
+  api(
+
+    "/do/admin/summary"
+
+  ).then(function(data){
+
+    if(data.ok){
+
+      localStorage.setItem(
+
+        "fastBingoAdminKey",
+
+        adminKey
+
+      );
+
+      showDashboard();
+
+    }else{
+
+      adminKey = "";
+
+      localStorage.removeItem(
+
+        "fastBingoAdminKey"
+
+      );
+
+      document.getElementById(
+
+        "loginStatus"
+
+      ).textContent =
+
+        "Invalid admin key.";
+
+    }
+
+  }).catch(function(){
+
+    document.getElementById(
+
+      "loginStatus"
+
+    ).textContent =
+
+      "Connection error.";
+
+  });
+
+}
+
+function showDashboard(){
+
+  document.getElementById(
+
+    "loginPanel"
+
+  ).classList.add(
+
+    "hidden"
+
+  );
+
+  document.getElementById(
+
+    "dashboard"
+
+  ).classList.remove(
+
+    "hidden"
+
+  );
+
+  loadAll();
+
+}
+
+function logout(){
+
+  adminKey = "";
+
+  localStorage.removeItem(
+
+    "fastBingoAdminKey"
+
+  );
+
+  location.reload();
+
+}
+
+function loadAll(){
+
+  loadSummary();
+
+  loadRequests();
+
+  loadUsers();
+
+}
+
+function loadSummary(){
+
+  api(
+
+    "/do/admin/summary"
+
+  ).then(function(data){
+
+    if(!data.ok){
+
+      logout();
+
+      return;
+
+    }
+
+    var html = "";
+
+    html += stat(
+
+      "Users",
+
+      data.users
+
+    );
+
+    html += stat(
+
+      "Pending Deposits",
+
+      data.pendingDeposits
+
+    );
+
+    html += stat(
+
+      "Pending Withdrawals",
+
+      data.pendingWithdrawals
+
+    );
+
+    html += stat(
+
+      "Game",
+
+      data.gameNumber
+
+        ? "#" + data.gameNumber
+
+        : "-"
+
+    );
+
+    document.getElementById(
+
+      "stats"
+
+    ).innerHTML =
+
+      html;
+
+    document.getElementById(
+
+      "gameStatus"
+
+    ).textContent =
+
+      "Status: " +
+
+      (
+
+        data.gameStatus ||
+
+        "-"
+
+      );
+
+  });
+
+}
+
+function stat(label,value){
+
+  return (
+
+    '<div class="stat">' +
+
+      '<div class="stat-label">' +
+
+        label +
+
+      '</div>' +
+
+      '<div class="stat-value">' +
+
+        value +
+
+      '</div>' +
+
+    '</div>'
+
+  );
+
+}
+
+function loadRequests(){
+
+  api(
+
+    "/do/admin/requests"
+
+  ).then(function(data){
+
+    if(!data.ok){
+
+      return;
+
+    }
+
+    var list =
+
+      data.requests ||
+
+      [];
+
+    if(!list.length){
+
+      document.getElementById(
+
+        "requests"
+
+      ).innerHTML =
+
+        '<div class="status">' +
+
+        'No pending requests.' +
+
+        '</div>';
+
+      return;
+
+    }
+
+    var html = "";
+
+    list.forEach(function(item){
+
+      if(
+
+        item.status !==
+
+        "pending"
+
+      ){
+
+        return;
+
+      }
+
+      html +=
+
+        '<div class="request">' +
+
+          '<div class="request-top">' +
+
+            '<span class="badge">' +
+
+              (
+
+                item.type ===
+
+                "deposit"
+
+                  ? "DEPOSIT"
+
+                  : "WITHDRAWAL"
+
+              ) +
+
+            '</span>' +
+
+            '<strong>' +
+
+              Number(
+
+                item.amount || 0
+
+              ).toFixed(2) +
+
+              ' ETB' +
+
+            '</strong>' +
+
+          '</div>' +
+
+          '<div class="request-info">' +
+
+            'User: ' +
+
+            escapeHtml(
+
+              item.user_id || "-"
+
+            ) +
+
+            '<br>' +
+
+            'Method: ' +
+
+            escapeHtml(
+
+              item.method || "-"
+
+            ) +
+
+            '<br>' +
+
+            'Status: ' +
+
+            escapeHtml(
+
+              item.status || "-"
+
+            ) +
+
+          '</div>';
+
+      if(
+
+        item.type ===
+
+        "deposit" &&
+
+        item.screenshot
+
+      ){
+
+        html +=
+
+          '<img class="screenshot" ' +
+
+          'src="' +
+
+          item.screenshot +
+
+          '" alt="Payment screenshot">';
+
+      }
+
+      html +=
+
+        '<div class="request-actions">' +
+
+          '<button class="green" ' +
+
+          'onclick="requestAction(' +
+
+          item.id +
+
+          ',\\'confirm\\')">' +
+
+          'Confirm' +
+
+          '</button>' +
+
+          '<button class="danger" ' +
+
+          'onclick="requestAction(' +
+
+          item.id +
+
+          ',\\'reject\\')">' +
+
+          'Reject' +
+
+          '</button>' +
+
+        '</div>' +
+
+      '</div>';
+
+    });
+
+    document.getElementById(
+
+      "requests"
+
+    ).innerHTML =
+
+      html;
+
+  });
+
+}
+
+function requestAction(
+
+  id,
+
+  action
+
+){
+
+  if(
+
+    !confirm(
+
+      "Are you sure?"
+
+    )
+
+  ){
+
+    return;
+
+  }
+
+  api(
+
+    "/do/admin/request-action",
+
+    {
+
+      method:"POST",
+
+      headers:{
+
+        "content-type":
+
+          "application/json"
+
+      },
+
+      body:JSON.stringify({
+
+        id:id,
+
+        action:action
+
+      })
+
+    }
+
+  ).then(function(data){
+
+    if(data.ok){
+
+      loadAll();
+
+    }else{
+
+      alert(
+
+        data.error ||
+
+        "Action failed."
+
+      );
+
+    }
+
+  });
+
+}
+
+function loadUsers(){
+
+  api(
+
+    "/do/admin/users"
+
+  ).then(function(data){
+
+    if(!data.ok){
+
+      return;
+
+    }
+
+    var list =
+
+      data.users ||
+
+      [];
+
+    if(!list.length){
+
+      document.getElementById(
+
+        "users"
+
+      ).innerHTML =
+
+        '<div class="status">' +
+
+        'No users.' +
+
+        '</div>';
+
+      return;
+
+    }
+
+    var html = "";
+
+    list.forEach(function(user){
+
+      html +=
+
+        '<div class="request">' +
+
+          '<div class="request-info">' +
+
+            '<strong>' +
+
+            escapeHtml(
+
+              user.first_name ||
+
+              user.username ||
+
+              user.user_id ||
+
+              "-"
+
+            ) +
+
+            '</strong>' +
+
+            '<br>User ID: ' +
+
+            escapeHtml(
+
+              user.user_id ||
+
+              "-"
+
+            ) +
+
+            '<br>Main Balance: ' +
+
+            Number(
+
+              user.main_balance || 0
+
+            ).toFixed(2) +
+
+            ' ETB' +
+
+            '<br>Play Balance: ' +
+
+            Number(
+
+              user.play_balance || 0
+
+            ).toFixed(2) +
+
+            ' ETB' +
+
+          '</div>' +
+
+        '</div>';
+
+    });
+
+    document.getElementById(
+
+      "users"
+
+    ).innerHTML =
+
+      html;
+
+  });
+
+}
+
+function gameControl(
+
+  action
+
+){
+
+  if(
+
+    !confirm(
+
+      "Run game action: " +
+
+      action +
+
+      "?"
+
+    )
+
+  ){
+
+    return;
+
+  }
+
+  api(
+
+    "/do/admin/control",
+
+    {
+
+      method:"POST",
+
+      headers:{
+
+        "content-type":
+
+          "application/json"
+
+      },
+
+      body:JSON.stringify({
+
+        action:action
+
+      })
+
+    }
+
+  ).then(function(data){
+
+    if(data.ok){
+
+      loadAll();
+
+    }else{
+
+      alert(
+
+        data.error ||
+
+        "Game control failed."
+
+      );
+
+    }
+
+  });
+
+}
+
+function escapeHtml(value){
+
+  return String(
+
+    value
+
+  )
+
+    .replace(
+
+      /&/g,
+
+      "&amp;"
+
+    )
+
+    .replace(
+
+      /</g,
+
+      "&lt;"
+
+    )
+
+    .replace(
+
+      />/g,
+
+      "&gt;"
+
+    )
+
+    .replace(
+
+      /"/g,
+
+      "&quot;"
+
+    )
+
+    .replace(
+
+      /'/g,
+
+      "&#039;"
+
+    );
+
+}
+
+if(adminKey){
+
+  showDashboard();
+
+}
+
+</script>
+
+</body>
+
+</html>`;
+
+}
+
+/* =========================================================
+
    MAIN WORKER
 
    ========================================================= */
@@ -8910,6 +10278,34 @@ export default {
     const url =
 
       new URL(request.url);
+
+    /* =====================================================
+
+       ADMIN DASHBOARD
+
+       ===================================================== */
+
+    if(
+
+      url.pathname ===
+
+      "/admin"
+
+    ){
+
+      return html(
+
+        adminHtml()
+
+      );
+
+    }
+
+    /* =====================================================
+
+       HEALTH
+
+       ===================================================== */
 
     if(
 
@@ -8932,6 +10328,12 @@ export default {
       });
 
     }
+
+    /* =====================================================
+
+       PLAYER API
+
+       ===================================================== */
 
     const apiRoutes = [
 
@@ -8972,6 +10374,12 @@ export default {
       );
 
     }
+
+    /* =====================================================
+
+       PLAYER DIRECT DO ROUTES
+
+       ===================================================== */
 
     const doRoutes = [
 
@@ -9021,6 +10429,64 @@ export default {
 
     }
 
+    /* =====================================================
+
+       ADMIN API
+
+       ===================================================== */
+
+    const adminRoutes = [
+
+      "/do/admin/summary",
+
+      "/do/admin/users",
+
+      "/do/admin/requests",
+
+      "/do/admin/request-action",
+
+      "/do/admin/set-balance",
+
+      "/do/admin/control"
+
+    ];
+
+    if(
+
+      adminRoutes.includes(
+
+        url.pathname
+
+      )
+
+    ){
+
+      const id =
+
+        env.GAME_SCHEDULER.idFromName(
+
+          "main-game"
+
+        );
+
+      const stub =
+
+        env.GAME_SCHEDULER.get(id);
+
+      return stub.fetch(
+
+        request
+
+      );
+
+    }
+
+    /* =====================================================
+
+       FAVICON
+
+       ===================================================== */
+
     if(
 
       url.pathname ===
@@ -9043,6 +10509,12 @@ export default {
 
     }
 
+    /* =====================================================
+
+       MINI APP
+
+       ===================================================== */
+
     return html(
 
       pageHtml()
@@ -9053,4 +10525,4 @@ export default {
 
 };
 
-export { GameScheduler };  
+export { GameScheduler };
