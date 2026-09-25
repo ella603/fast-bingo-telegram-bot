@@ -529,6 +529,34 @@ sql.exec(`
 
 `);
 
+/* =========================================================
+
+   BALANCES TABLE
+
+   ========================================================= */
+
+sql.exec(`
+
+  CREATE TABLE IF NOT EXISTS balances (
+
+    user_id TEXT PRIMARY KEY,
+
+    balance REAL NOT NULL,
+
+    main_balance REAL NOT NULL DEFAULT 0,
+
+    play_balance REAL
+
+  )
+
+`);
+
+/* =========================================================
+
+   BALANCE COLUMN MIGRATION
+
+   ========================================================= */
+
 const balanceColumns =
 
   sql.exec(`
@@ -608,18 +636,6 @@ if (!hasPlayBalance) {
           card_number
 
         )
-
-      )
-
-    `);
-
-    sql.exec(`
-
-      CREATE TABLE IF NOT EXISTS balances (
-
-        user_id TEXT PRIMARY KEY,
-
-        balance REAL NOT NULL
 
       )
 
