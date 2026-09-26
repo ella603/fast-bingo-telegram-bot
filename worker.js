@@ -6285,8 +6285,6 @@ button{
 
     </div>
 
-    <!-- PAYMENT METHODS -->
-
     <div class="payment-methods">
 
       <button
@@ -6477,73 +6475,77 @@ button{
 
     </div>
 
-<div class="field">
+    <div class="field">
 
-  <label id="amountLabel">መጠን</label>
+      <label id="amountLabel">
 
-  <input
+        መጠን
 
-    id="walletAmount"
+      </label>
 
-    type="number"
+      <input
 
-    min="50"
+        id="walletAmount"
 
-    max="100000"
+        type="number"
 
-    placeholder="50"
+        min="50"
 
-  >
+        max="100000"
 
-</div>
+        placeholder="50"
 
-<div
+      >
 
-  class="field"
+    </div>
 
-  id="walletScreenshotField"
+    <div
 
->
+      class="field"
 
-  <label>
+      id="walletScreenshotField"
 
-    የክፍያ Screenshot
+    >
 
-  </label>
+      <label>
 
-  <input
+        የክፍያ Screenshot
 
-    id="walletScreenshot"
+      </label>
 
-    type="file"
+      <input
 
-    accept="image/jpeg,image/png,image/webp"
+        id="walletScreenshot"
 
-  >
+        type="file"
 
-  <div
+        accept="image/jpeg,image/png,image/webp"
 
-    style="
+      >
 
-      color:#8993a4;
+      <div
 
-      font-size:8px;
+        style="
 
-      margin-top:5px;
+          color:#8993a4;
 
-      line-height:13px;
+          font-size:8px;
 
-    "
+          margin-top:5px;
 
-  >
+          line-height:13px;
 
-    Deposit ሲያደርጉ የክፍያ Screenshot ያስገቡ።
+        "
 
-    Maximum 300 KB.
+      >
 
-  </div>
+        Deposit ሲያደርጉ የክፍያ Screenshot ያስገቡ።
 
-</div>
+        Maximum 300 KB.
+
+      </div>
+
+    </div>
 
     <button
 
@@ -6711,6 +6713,10 @@ button{
 
 ></div>
 
+<!-- Telegram WebApp SDK MUST load before the app script -->
+
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
 <script>
 
 (function(){
@@ -6776,6 +6782,16 @@ button{
     "Telebirr";
 
   var language = "am";
+
+  var mainBalance = 0;
+
+  var playBalance = 0;
+
+  var lobbyDeadline = 0;
+
+  var cardCache = {};
+
+  var cardSignatures = {};
 
   var translations = {
 
@@ -6849,7 +6865,7 @@ button{
 
       minimum:"ዝቅተኛው መጠን 50 ብር ነው።",
 
-      insufficient:"በቂ ሂሳብ የለዎትም።",
+      insufficient:"❌ ለመጫወት በቂ ሂሳብ የለዎትም። ተቀማጭ ገቢ ያድርጉ እና ጨዋታውን ይቀጥሉ።",
 
       balanceUpdated:"ሂሳቡ ተዘምኗል።",
 
@@ -6929,7 +6945,7 @@ button{
 
       minimum:"Minimum amount is 50 ETB.",
 
-      insufficient:"Insufficient balance.",
+      insufficient:"❌ Insufficient balance. Please deposit funds and continue the game.",
 
       balanceUpdated:"Balance updated.",
 
@@ -6951,65 +6967,115 @@ button{
 
   }
 
-function api(path, options){
+  /* =======================================================
 
-  options = options || {};
+     API
 
-  var headers =
+     ======================================================= */
 
-    options.headers || {};
+  function api(path, options){
 
-  headers["x-admin-key"] =
+    options = options || {};
 
-    x-admin-key;
+    var headers =
 
-  if(
+      options.headers
 
-    options.body &&
+        ? new Headers(options.headers)
 
-    !(options.body instanceof FormData) &&
+        : new Headers();
 
-    !headers["content-type"]
+    /*
 
-  ){
+      IMPORTANT:
 
-    headers["content-type"] =
+      Send Telegram user to Durable Object.
 
-      "application/json";
+      Do NOT send ADMIN_KEY from Mini App.
 
-  }
+    */
 
-  options.headers =
+    headers.set(
 
-    headers;
+      "x-telegram-user",
 
-  return fetch(
+      userHeader
 
-    path +
+    );
 
-    (
+    if(
+
+      options.body &&
+
+      !(options.body instanceof FormData) &&
+
+      !headers.has("content-type")
+
+    ){
+
+      headers.set(
+
+        "content-type",
+
+        "application/json"
+
+      );
+
+    }
+
+    options.headers = headers;
+
+    var separator =
 
       path.indexOf("?") >= 0
 
         ? "&"
 
-        : "?"
+        : "?";
 
-    ) +
+    return fetch(
 
-    "_=" +
+      path +
 
-    Date.now(),
+      separator +
 
-    options
+      "_=" +
 
-  ).then(function(response){
+      Date.now(),
 
-    return response.json();
+      options
 
-  });
+    ).then(function(response){
 
-}
+      return response.text();
+
+    }).then(function(text){
+
+      try{
+
+        return JSON.parse(text);
+
+      }catch(error){
+
+        return {
+
+          ok:false,
+
+          error:"SERVER_RESPONSE"
+
+        };
+
+      }
+
+    });
+
+  }
+
+  /* =======================================================
+
+     TOAST
+
+     ======================================================= */
 
   function showToast(message){
 
@@ -7047,9 +7113,15 @@ function api(path, options){
 
         );
 
-      },2200);
+      },2600);
 
   }
+
+  /* =======================================================
+
+     NAVIGATION
+
+     ======================================================= */
 
   function showSection(name){
 
@@ -7121,6 +7193,12 @@ function api(path, options){
 
     });
 
+  /* =======================================================
+
+     PAYMENT METHOD
+
+     ======================================================= */
+
   document
 
     .querySelectorAll(".payment-card")
@@ -7163,11 +7241,21 @@ function api(path, options){
 
     });
 
+  /* =======================================================
+
+     SEEDED RANDOM
+
+     ======================================================= */
+
   function seededShuffle(arr, seed){
 
-    var a = arr.slice();
+    var a =
 
-    var s = seed >>> 0;
+      arr.slice();
+
+    var s =
+
+      seed >>> 0;
 
     for(
 
@@ -7181,9 +7269,13 @@ function api(path, options){
 
       s =
 
-        (s * 1664525 +
+        (
 
-        1013904223) >>> 0;
+          s * 1664525 +
+
+          1013904223
+
+        ) >>> 0;
 
       var j =
 
@@ -7203,7 +7295,19 @@ function api(path, options){
 
   }
 
+  /* =======================================================
+
+     CREATE UNIQUE BINGO CARDS
+
+     ======================================================= */
+
   function makeClientCard(number){
+
+    if(cardCache[number]){
+
+      return cardCache[number];
+
+    }
 
     var ranges = [
 
@@ -7219,95 +7323,159 @@ function api(path, options){
 
     ];
 
-    var columns = [];
+    var attempt = 0;
 
-    for(
+    while(true){
 
-      var c=0;
-
-      c<5;
-
-      c++
-
-    ){
-
-      var values=[];
+      var columns = [];
 
       for(
 
-        var n=ranges[c][0];
+        var c=0;
 
-        n<=ranges[c][1];
+        c<5;
 
-        n++
+        c++
 
       ){
 
-        values.push(n);
+        var values=[];
+
+        for(
+
+          var n=ranges[c][0];
+
+          n<=ranges[c][1];
+
+          n++
+
+        ){
+
+          values.push(n);
+
+        }
+
+        columns.push(
+
+          seededShuffle(
+
+            values,
+
+            100000 +
+
+            number * 7919 +
+
+            attempt * 104729 +
+
+            c * 97
+
+          ).slice(0,5)
+
+        );
 
       }
 
-      columns.push(
-
-        seededShuffle(
-
-          values,
-
-          100000 +
-
-          number * 7919 +
-
-          c * 97
-
-        ).slice(0,5)
-
-      );
-
-    }
-
-    var grid=[];
-
-    for(
-
-      var r=0;
-
-      r<5;
-
-      r++
-
-    ){
-
-      grid[r]=[];
+      var grid=[];
 
       for(
 
-        var cc=0;
+        var r=0;
 
-        cc<5;
+        r<5;
 
-        cc++
+        r++
 
       ){
 
-        grid[r][cc] =
+        grid[r]=[];
 
-          columns[cc][r];
+        for(
+
+          var cc=0;
+
+          cc<5;
+
+          cc++
+
+        ){
+
+          grid[r][cc] =
+
+            columns[cc][r];
+
+        }
 
       }
 
+      grid[2][2]="FREE";
+
+      var signature =
+
+        grid
+
+          .map(function(row){
+
+            return row.join(",");
+
+          })
+
+          .join("|");
+
+      if(
+
+        !cardSignatures[signature]
+
+      ){
+
+        cardSignatures[signature] =
+
+          number;
+
+        var card = {
+
+          number:number,
+
+          grid:grid
+
+        };
+
+        cardCache[number] =
+
+          card;
+
+        return card;
+
+      }
+
+      attempt++;
+
     }
-
-    grid[2][2]="FREE";
-
-    return {
-
-      number:number,
-
-      grid:grid
-
-    };
 
   }
+
+  function prepareAllCards(){
+
+    for(
+
+      var i=1;
+
+      i<=400;
+
+      i++
+
+    ){
+
+      makeClientCard(i);
+
+    }
+
+  }
+
+  /* =======================================================
+
+     RENDER BINGO CARD
+
+     ======================================================= */
 
   function renderBingoCard(card){
 
@@ -7361,6 +7529,8 @@ function api(path, options){
 
           currentGame.calledBalls &&
 
+          value !== "FREE" &&
+
           currentGame.calledBalls.indexOf(
 
             value
@@ -7373,11 +7543,15 @@ function api(path, options){
 
         if(value === "FREE"){
 
-          classes += " free";
+          classes +=
+
+            " free";
 
         }else if(called){
 
-          classes += " called";
+          classes +=
+
+            " called";
 
         }
 
@@ -7404,6 +7578,12 @@ function api(path, options){
     return html;
 
   }
+
+  /* =======================================================
+
+     RENDER 400 CARD SELECT BUTTONS
+
+     ======================================================= */
 
   function renderCards(){
 
@@ -7433,7 +7613,11 @@ function api(path, options){
 
       html +=
 
-        '<button class="card-select' +
+        '<button ' +
+
+        'type="button" ' +
+
+        'class="card-select' +
 
         (
 
@@ -7445,7 +7629,9 @@ function api(path, options){
 
         ) +
 
-        '" data-card="' +
+        '" ' +
+
+        'data-card="' +
 
         i +
 
@@ -7457,7 +7643,9 @@ function api(path, options){
 
     }
 
-    grid.innerHTML=html;
+    grid.innerHTML =
+
+      html;
 
     grid
 
@@ -7489,6 +7677,12 @@ function api(path, options){
 
   }
 
+  /* =======================================================
+
+     RENDER SELECTED CARDS
+
+     ======================================================= */
+
   function renderPreviews(){
 
     var grid =
@@ -7503,7 +7697,15 @@ function api(path, options){
 
       grid.innerHTML =
 
-        '<div style="grid-column:1/-1;color:#667184;font-size:10px;padding:8px 0">' +
+        '<div style="' +
+
+        'grid-column:1/-1;' +
+
+        'color:#667184;' +
+
+        'font-size:10px;' +
+
+        'padding:8px 0">' +
 
         (
 
@@ -7539,7 +7741,9 @@ function api(path, options){
 
     );
 
-    grid.innerHTML=html;
+    grid.innerHTML =
+
+      html;
 
   }
 
@@ -7556,6 +7760,54 @@ function api(path, options){
       "/4";
 
   }
+
+  /* =======================================================
+
+     BALANCE CHECK
+
+     ======================================================= */
+
+  function hasEnoughBalance(){
+
+    /*
+
+      One card costs 10 ETB.
+
+      The game can use the player's play balance.
+
+      Main balance is also displayed and checked so
+
+      the user is warned when neither balance is sufficient.
+
+    */
+
+    if(
+
+      playBalance >= 10 ||
+
+      mainBalance >= 10
+
+    ){
+
+      return true;
+
+    }
+
+    showToast(
+
+      t("insufficient")
+
+    );
+
+    return false;
+
+  }
+
+  /* =======================================================
+
+     CARD SELECTION
+
+     ======================================================= */
 
   function toggleCard(number){
 
@@ -7579,7 +7831,11 @@ function api(path, options){
 
     var index =
 
-      selected.indexOf(number);
+      selected.indexOf(
+
+        number
+
+      );
 
     if(index >= 0){
 
@@ -7605,7 +7861,25 @@ function api(path, options){
 
       }
 
-      selected.push(number);
+      /*
+
+        Check balance before selecting
+
+        a new paid card.
+
+      */
+
+      if(!hasEnoughBalance()){
+
+        return;
+
+      }
+
+      selected.push(
+
+        number
+
+      );
 
       selected.sort(
 
@@ -7628,6 +7902,12 @@ function api(path, options){
     saveCardsSilently();
 
   }
+
+  /* =======================================================
+
+     SAVE SELECTED CARDS
+
+     ======================================================= */
 
   function saveCardsSilently(){
 
@@ -7663,11 +7943,35 @@ function api(path, options){
 
           selected =
 
-            data.selected.map(Number);
+            data.selected.map(
+
+              Number
+
+            );
 
         }
 
         updateSelectionCount();
+
+        renderCards();
+
+        renderPreviews();
+
+        loadBalance();
+
+      }else if(
+
+        data.error ===
+
+        "INSUFFICIENT_BALANCE"
+
+      ){
+
+        showToast(
+
+          t("insufficient")
+
+        );
 
       }
 
@@ -7691,7 +7995,11 @@ function api(path, options){
 
         )
 
-          ? data.selected.map(Number)
+          ? data.selected.map(
+
+              Number
+
+            )
 
           : [];
 
@@ -7702,6 +8010,156 @@ function api(path, options){
       renderPreviews();
 
     });
+
+  }
+
+  /* =======================================================
+
+     GAME UI
+
+     ======================================================= */
+
+  function updateLobbyDeadline(){
+
+    if(
+
+      !currentGame ||
+
+      currentGame.status !== "lobby"
+
+    ){
+
+      lobbyDeadline =
+
+        0;
+
+      return;
+
+    }
+
+    var remaining =
+
+      Number(
+
+        currentGame.lobbyRemaining || 0
+
+      );
+
+    /*
+
+      Convert server remaining seconds into
+
+      a local deadline so the number does not
+
+      remain frozen at 45s between requests.
+
+    */
+
+    lobbyDeadline =
+
+      Date.now() +
+
+      Math.max(
+
+        0,
+
+        remaining
+
+      ) * 1000;
+
+  }
+
+  function updateCountdownOnly(){
+
+    if(
+
+      !currentGame
+
+    ){
+
+      return;
+
+    }
+
+    if(
+
+      currentGame.status === "live"
+
+    ){
+
+      document.getElementById(
+
+        "countdown"
+
+      ).innerHTML =
+
+        '<strong>' +
+
+        Number(
+
+          currentGame.calledCount || 0
+
+        ) +
+
+        '</strong> / 75';
+
+      return;
+
+    }
+
+    var remaining =
+
+      Math.max(
+
+        0,
+
+        Math.ceil(
+
+          (
+
+            lobbyDeadline -
+
+            Date.now()
+
+          ) / 1000
+
+        )
+
+      );
+
+    document.getElementById(
+
+      "countdown"
+
+    ).innerHTML =
+
+      '<strong>' +
+
+      remaining +
+
+      's</strong>';
+
+    /*
+
+      Once local countdown reaches zero,
+
+      immediately refresh from Durable Object.
+
+      The actual game start is controlled by
+
+      the Durable Object alarm, not card selection.
+
+    */
+
+    if(
+
+      remaining <= 0
+
+    ){
+
+      refreshGame();
+
+    }
 
   }
 
@@ -7805,41 +8263,13 @@ function api(path, options){
 
       " ETB";
 
-    var countdown =
+    if(!live){
 
-      document.getElementById(
-
-        "countdown"
-
-      );
-
-    if(live){
-
-      countdown.innerHTML =
-
-        '<strong>' +
-
-        currentGame.calledCount +
-
-        '</strong> / 75';
-
-    }else{
-
-      countdown.innerHTML =
-
-        '<strong>' +
-
-        Math.max(
-
-          0,
-
-          currentGame.lobbyRemaining
-
-        ) +
-
-        's</strong>';
+      updateLobbyDeadline();
 
     }
+
+    updateCountdownOnly();
 
     var ball =
 
@@ -7869,7 +8299,11 @@ function api(path, options){
 
     ).textContent =
 
-      currentGame.calledCount +
+      Number(
+
+        currentGame.calledCount || 0
+
+      ) +
 
       " / 75";
 
@@ -7951,6 +8385,12 @@ function api(path, options){
 
   }
 
+  /* =======================================================
+
+     GAME REFRESH
+
+     ======================================================= */
+
   function refreshGame(){
 
     return api(
@@ -7959,9 +8399,57 @@ function api(path, options){
 
     ).then(function(data){
 
-      currentGame = data;
+      if(
 
-      updateGameUI();
+        data &&
+
+        data.status
+
+      ){
+
+        var previousGame =
+
+          currentGame
+
+            ? currentGame.gameNumber
+
+            : null;
+
+        currentGame =
+
+          data;
+
+        /*
+
+          New game = clear only local selected
+
+          cards if backend no longer has them.
+
+          Existing backend-selected cards are
+
+          loaded again below.
+
+        */
+
+        if(
+
+          previousGame !== null &&
+
+          previousGame !==
+
+            data.gameNumber
+
+        ){
+
+          loadMyCards();
+
+        }
+
+        updateGameUI();
+
+      }
+
+      return data;
 
     }).catch(function(){
 
@@ -7971,6 +8459,12 @@ function api(path, options){
 
   }
 
+  /* =======================================================
+
+     BALANCE
+
+     ======================================================= */
+
   function loadBalance(){
 
     return api(
@@ -7979,17 +8473,37 @@ function api(path, options){
 
     ).then(function(data){
 
-      var balance =
+      mainBalance =
 
         Number(
 
-          data.balance || 0
+          data.mainBalance !== undefined
+
+            ? data.mainBalance
+
+            : 0
+
+        );
+
+      playBalance =
+
+        Number(
+
+          data.playBalance !== undefined
+
+            ? data.playBalance
+
+            : (
+
+                data.balance || 0
+
+              )
 
         );
 
       var formatted =
 
-        balance.toFixed(2) +
+        playBalance.toFixed(2) +
 
         " ETB";
 
@@ -8007,7 +8521,7 @@ function api(path, options){
 
       ).textContent =
 
-        balance.toFixed(2);
+        mainBalance.toFixed(2);
 
       document.getElementById(
 
@@ -8021,145 +8535,105 @@ function api(path, options){
 
   }
 
-function setWalletType(type){
+  /* =======================================================
 
-  walletType = type;
+     WALLET TYPE
 
-  document.getElementById(
+     ======================================================= */
 
-    "depositBtn"
+  function setWalletType(type){
 
-  ).classList.toggle(
+    walletType =
 
-    "active",
+      type;
 
-    type === "deposit"
+    document.getElementById(
 
-  );
+      "depositBtn"
 
-  document.getElementById(
+    ).classList.toggle(
 
-    "withdrawBtn"
+      "active",
 
-  ).classList.toggle(
-
-    "active",
-
-    type === "withdraw"
-
-  );
-
-  document.getElementById(
-
-    "walletSubmit"
-
-  ).textContent =
-
-    type === "deposit"
-
-      ? t("depositAction")
-
-      : t("withdrawAction");
-
-  document.getElementById(
-
-    "screenshotField"
-
-  ).style.display =
-
-    type === "deposit"
-
-      ? "block"
-
-      : "none";
-
-}
-
-function walletRequest(){
-
-  var amount =
-
-    Number(
-
-      document.getElementById(
-
-        "walletAmount"
-
-      ).value
+      type === "deposit"
 
     );
 
-  if(
+    document.getElementById(
 
-    !Number.isFinite(amount) ||
+      "withdrawBtn"
 
-    amount < 50
+    ).classList.toggle(
 
-  ){
+      "active",
 
-    showToast(
-
-      Number.isFinite(amount) &&
-
-      amount > 0
-
-        ? t("minimum")
-
-        : t("invalidAmount")
+      type === "withdraw"
 
     );
 
-    return;
+    document.getElementById(
+
+      "walletSubmit"
+
+    ).textContent =
+
+      type === "deposit"
+
+        ? t("depositAction")
+
+        : t("withdrawAction");
+
+    document.getElementById(
+
+      "walletScreenshotField"
+
+    ).style.display =
+
+      type === "deposit"
+
+        ? "block"
+
+        : "none";
 
   }
 
-  var formData =
+  /* =======================================================
 
-    new FormData();
+     WALLET REQUEST
 
-  formData.append(
+     ======================================================= */
 
-    "method",
+  function walletRequest(){
 
-    selectedPaymentMethod
+    var amount =
 
-  );
+      Number(
 
-  formData.append(
+        document.getElementById(
 
-    "type",
+          "walletAmount"
 
-    walletType
+        ).value
 
-  );
+      );
 
-  formData.append(
+    if(
 
-    "amount",
+      !Number.isFinite(amount) ||
 
-    String(amount)
+      amount < 50
 
-  );
-
-  if(walletType === "deposit"){
-
-    var screenshot =
-
-      document.getElementById(
-
-        "walletScreenshot"
-
-      ).files[0];
-
-    if(!screenshot){
+    ){
 
       showToast(
 
-        language === "am"
+        Number.isFinite(amount) &&
 
-          ? "የክፍያ Screenshot ያስገቡ።"
+        amount > 0
 
-          : "Please upload your payment screenshot."
+          ? t("minimum")
+
+          : t("invalidAmount")
 
       );
 
@@ -8167,167 +8641,245 @@ function walletRequest(){
 
     }
 
-    if(screenshot.size > 300 * 1024){
+    var formData =
 
-      showToast(
-
-        language === "am"
-
-          ? "Screenshot ከ300 KB መብለጥ የለበትም።"
-
-          : "Screenshot must be 300 KB or smaller."
-
-      );
-
-      return;
-
-    }
+      new FormData();
 
     formData.append(
 
-      "screenshot",
+      "method",
 
-      screenshot
+      selectedPaymentMethod
 
     );
 
-  }
+    formData.append(
 
-  api(
+      "type",
 
-    "/api/wallet",
+      walletType
 
-    {
+    );
 
-      method:"POST",
+    formData.append(
 
-      body:formData
+      "amount",
 
-    }
+      String(amount)
 
-  ).then(function(data){
+    );
 
-    if(data.ok){
+    if(
 
-      document.getElementById(
+      walletType ===
 
-        "walletAmount"
+      "deposit"
 
-      ).value = "";
+    ){
 
-      var screenshotInput =
+      var screenshot =
 
         document.getElementById(
 
           "walletScreenshot"
 
+        ).files[0];
+
+      if(!screenshot){
+
+        showToast(
+
+          language === "am"
+
+            ? "የክፍያ Screenshot ያስገቡ።"
+
+            : "Please upload your payment screenshot."
+
         );
 
-      if(screenshotInput){
-
-        screenshotInput.value = "";
+        return;
 
       }
 
-      loadBalance();
+      if(
 
-      showToast(
+        screenshot.size >
 
-        walletType === "deposit"
+        300 * 1024
 
-          ? (
+      ){
 
-              language === "am"
+        showToast(
 
-                ? "Deposit ተልኳል። እባክዎ የAdmin ማረጋገጫ ይጠብቁ።"
+          language === "am"
 
-                : "Deposit submitted. Please wait for admin confirmation."
+            ? "Screenshot ከ300 KB መብለጥ የለበትም።"
 
-            )
+            : "Screenshot must be 300 KB or smaller."
 
-          : (
+        );
 
-              language === "am"
+        return;
 
-                ? "Withdrawal ጥያቄ ተልኳል።"
+      }
 
-                : "Withdrawal request submitted."
+      formData.append(
 
-            )
+        "screenshot",
 
-      );
-
-    }else if(
-
-      data.error ===
-
-      "MINIMUM_AMOUNT"
-
-    ){
-
-      showToast(
-
-        t("minimum")
-
-      );
-
-    }else if(
-
-      data.error ===
-
-      "INSUFFICIENT_BALANCE"
-
-    ){
-
-      showToast(
-
-        t("insufficient")
-
-      );
-
-    }else if(
-
-      data.error ===
-
-      "SCREENSHOT_REQUIRED"
-
-    ){
-
-      showToast(
-
-        language === "am"
-
-          ? "የክፍያ Screenshot ያስገቡ።"
-
-          : "Payment screenshot is required."
-
-      );
-
-    }else{
-
-      showToast(
-
-        "Error"
+        screenshot
 
       );
 
     }
 
-  }).catch(function(){
+    api(
 
-    showToast(
+      "/api/wallet",
 
-      "Connection error"
+      {
 
-    );
+        method:"POST",
 
-  });
+        body:formData
 
-}
+      }
+
+    ).then(function(data){
+
+      if(data.ok){
+
+        document.getElementById(
+
+          "walletAmount"
+
+        ).value = "";
+
+        var screenshotInput =
+
+          document.getElementById(
+
+            "walletScreenshot"
+
+          );
+
+        if(screenshotInput){
+
+          screenshotInput.value =
+
+            "";
+
+        }
+
+        loadBalance();
+
+        showToast(
+
+          walletType ===
+
+          "deposit"
+
+            ? (
+
+                language === "am"
+
+                  ? "Deposit ተልኳል። እባክዎ የAdmin ማረጋገጫ ይጠብቁ።"
+
+                  : "Deposit submitted. Please wait for admin confirmation."
+
+              )
+
+            : (
+
+                language === "am"
+
+                  ? "Withdrawal ጥያቄ ተልኳል።"
+
+                  : "Withdrawal request submitted."
+
+              )
+
+        );
+
+      }else if(
+
+        data.error ===
+
+        "MINIMUM_AMOUNT"
+
+      ){
+
+        showToast(
+
+          t("minimum")
+
+        );
+
+      }else if(
+
+        data.error ===
+
+        "INSUFFICIENT_BALANCE"
+
+      ){
+
+        showToast(
+
+          t("insufficient")
+
+        );
+
+      }else if(
+
+        data.error ===
+
+        "SCREENSHOT_REQUIRED"
+
+      ){
+
+        showToast(
+
+          language === "am"
+
+            ? "የክፍያ Screenshot ያስገቡ።"
+
+            : "Payment screenshot is required."
+
+        );
+
+      }else{
+
+        showToast(
+
+          "Error"
+
+        );
+
+      }
+
+    }).catch(function(){
+
+      showToast(
+
+        "Connection error"
+
+      );
+
+    });
+
+  }
+
+  /* =======================================================
+
+     LANGUAGE
+
+     ======================================================= */
 
   function setLanguage(next){
 
-    language=next;
+    language =
+
+      next;
 
     document.documentElement.lang =
 
@@ -8515,14 +9067,6 @@ function walletRequest(){
 
     document.getElementById(
 
-      "methodLabel"
-
-    ).textContent =
-
-      x.method;
-
-    document.getElementById(
-
       "amountLabel"
 
     ).textContent =
@@ -8627,6 +9171,12 @@ function walletRequest(){
 
   }
 
+  /* =======================================================
+
+     EVENTS
+
+     ======================================================= */
+
   document.getElementById(
 
     "depositBtn"
@@ -8691,7 +9241,11 @@ function walletRequest(){
 
       setLanguage("am");
 
-      setWalletType("deposit");
+      setWalletType(
+
+        "deposit"
+
+      );
 
     }
 
@@ -8757,13 +9311,59 @@ function walletRequest(){
 
     "Guest";
 
+  /* =======================================================
+
+     LOCAL COUNTDOWN LOOP
+
+     ======================================================= */
+
+  setInterval(
+
+    function(){
+
+      if(
+
+        currentGame &&
+
+        currentGame.status === "lobby"
+
+      ){
+
+        updateCountdownOnly();
+
+      }
+
+    },
+
+    250
+
+  );
+
+  /* =======================================================
+
+     BOOT
+
+     ======================================================= */
+
   function boot(){
 
-    setLanguage("am");
+    setLanguage(
+
+      "am"
+
+    );
+
+    prepareAllCards();
 
     renderCards();
 
     renderPreviews();
+
+    setWalletType(
+
+      "deposit"
+
+    );
 
     Promise.all([
 
@@ -8774,6 +9374,14 @@ function walletRequest(){
       refreshGame()
 
     ]).then(function(){
+
+      /*
+
+        Refresh frequently so the Mini App sees
+
+        the automatic lobby -> live transition.
+
+      */
 
       setInterval(
 
@@ -8801,11 +9409,129 @@ function walletRequest(){
 
 </script>
 
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-
 </body>
 
 </html>`;
+
+}
+
+/* =========================================================
+
+   PROXY TO GAME SCHEDULER
+
+   ========================================================= */
+
+async function proxyToGame(
+
+  request,
+
+  env,
+
+  path
+
+) {
+
+  const id =
+
+    env.GAME_SCHEDULER.idFromName(
+
+      "main-game"
+
+    );
+
+  const stub =
+
+    env.GAME_SCHEDULER.get(id);
+
+  const url =
+
+    new URL(request.url);
+
+  url.pathname =
+
+    path.replace(
+
+      /^\/api/,
+
+      "/do"
+
+    );
+
+  const headers =
+
+    new Headers(
+
+      request.headers
+
+    );
+
+  /*
+
+    Preserve Telegram user identity.
+
+    This is required so the Durable Object
+
+    does not treat every Mini App request
+
+    as Guest.
+
+  */
+
+  const telegramUser =
+
+    request.headers.get(
+
+      "x-telegram-user"
+
+    );
+
+  if(telegramUser){
+
+    headers.set(
+
+      "x-telegram-user",
+
+      telegramUser
+
+    );
+
+  }
+
+  const proxied =
+
+    new Request(
+
+      url.toString(),
+
+      {
+
+        method:
+
+          request.method,
+
+        headers:
+
+          headers,
+
+        body:
+
+          request.method === "GET" ||
+
+          request.method === "HEAD"
+
+            ? undefined
+
+            : request.body
+
+      }
+
+    );
+
+  return stub.fetch(
+
+    proxied
+
+  );
 
 }
 
