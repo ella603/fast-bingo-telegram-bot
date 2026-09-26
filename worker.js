@@ -443,6 +443,136 @@ class GameScheduler extends DurableObject {
 
     `);
 
+    /* STATE TABLE MIGRATION */
+
+    const stateColumns =
+
+      sql.exec(`
+
+        PRAGMA table_info(state)
+
+      `).toArray();
+
+    const hasGameNumber =
+
+      stateColumns.some(
+
+        c => c.name === "game_number"
+
+      );
+
+    const hasStatus =
+
+      stateColumns.some(
+
+        c => c.name === "status"
+
+      );
+
+    const hasLobbyEndsAt =
+
+      stateColumns.some(
+
+        c => c.name === "lobby_ends_at"
+
+      );
+
+    const hasStartedAt =
+
+      stateColumns.some(
+
+        c => c.name === "started_at"
+
+      );
+
+    const hasBallIndex =
+
+      stateColumns.some(
+
+        c => c.name === "ball_index"
+
+      );
+
+    const hasBallOrder =
+
+      stateColumns.some(
+
+        c => c.name === "ball_order"
+
+      );
+
+    if (!hasGameNumber) {
+
+      sql.exec(`
+
+        ALTER TABLE state
+
+        ADD COLUMN game_number INTEGER
+
+      `);
+
+    }
+
+    if (!hasStatus) {
+
+      sql.exec(`
+
+        ALTER TABLE state
+
+        ADD COLUMN status TEXT
+
+      `);
+
+    }
+
+    if (!hasLobbyEndsAt) {
+
+      sql.exec(`
+
+        ALTER TABLE state
+
+        ADD COLUMN lobby_ends_at INTEGER
+
+      `);
+
+    }
+
+    if (!hasStartedAt) {
+
+      sql.exec(`
+
+        ALTER TABLE state
+
+        ADD COLUMN started_at INTEGER
+
+      `);
+
+    }
+
+    if (!hasBallIndex) {
+
+      sql.exec(`
+
+        ALTER TABLE state
+
+        ADD COLUMN ball_index INTEGER
+
+      `);
+
+    }
+
+    if (!hasBallOrder) {
+
+      sql.exec(`
+
+        ALTER TABLE state
+
+        ADD COLUMN ball_order TEXT
+
+      `);
+
+    }
+     
 sql.exec(`
 
   CREATE TABLE IF NOT EXISTS users (
