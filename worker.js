@@ -9589,25 +9589,19 @@ function login(){
 
       showDashboard();
 
-    }else{
+}else{
 
-      adminKey = "";
+  document.getElementById(
 
-      localStorage.removeItem(
+    "loginStatus"
 
-        "fastBingoAdminKey"
+  ).textContent =
 
-      );
+    "Login failed: " +
 
-      document.getElementById(
+    (data.error || "Unknown error");
 
-        "loginStatus"
-
-      ).textContent =
-
-        "Invalid admin key.";
-
-    }
+}
 
   }).catch(function(){
 
