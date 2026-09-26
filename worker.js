@@ -1531,13 +1531,15 @@ if (!hasPlayBalance) {
 
         "Fast Bingo alarm error:",
 
-        error,
+        error?.message || String(error),
+
+        error?.stack || "",
 
         "retry:",
 
         alarmInfo?.retryCount || 0
 
-      );
+   );
 
       /*
 
