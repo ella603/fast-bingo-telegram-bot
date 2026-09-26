@@ -9569,6 +9569,8 @@ function api(path, options){
 
 function login(){
 
+  alert("LOGIN FUNCTION IS WORKING");
+
   var key =
 
     document.getElementById(
