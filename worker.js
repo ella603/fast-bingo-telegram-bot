@@ -9379,7 +9379,7 @@ button{
 
         type="button"
 
-        onclick="alert('BUTTON WORKS'); login();">
+        onclick="alert('BUTTON WORKS'); alert(typeof login);"
 
         Login
 
