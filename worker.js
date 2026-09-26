@@ -9539,7 +9539,29 @@ function api(path, options){
 
   ).then(function(response){
 
-    return response.json();
+    return response.text();
+
+  }).then(function(text){
+
+    try{
+
+      return JSON.parse(text);
+
+    }catch(error){
+
+      return {
+
+        ok:false,
+
+        error:
+
+          "SERVER_RESPONSE: " +
+
+          text
+
+      };
+
+    }
 
   });
 
