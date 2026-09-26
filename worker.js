@@ -9085,6 +9085,14 @@ button{
 
 }
 
+button:disabled{
+
+  opacity:.6;
+
+  cursor:not-allowed;
+
+}
+
 .primary{
 
   background:var(--red);
@@ -9297,6 +9305,18 @@ button{
 
 }
 
+.error{
+
+  color:#ff7b84;
+
+}
+
+.success{
+
+  color:var(--green);
+
+}
+
 @media(max-width:600px){
 
   .grid{
@@ -9343,6 +9363,8 @@ button{
 
       class="dark"
 
+      type="button"
+
       onclick="logout()">
 
       Logout
@@ -9350,6 +9372,12 @@ button{
     </button>
 
   </div>
+
+  <!-- =====================================================
+
+       LOGIN
+
+       ===================================================== -->
 
   <div
 
@@ -9371,7 +9399,9 @@ button{
 
         type="password"
 
-        placeholder="ADMIN_KEY">
+        placeholder="ADMIN_KEY"
+
+        autocomplete="current-password">
 
       <button
 
@@ -9379,7 +9409,9 @@ button{
 
         type="button"
 
-        onclick="alert('BUTTON WORKS'); login();"
+        id="loginButton"
+
+        onclick="login()">
 
         Login
 
@@ -9397,11 +9429,23 @@ button{
 
   </div>
 
+  <!-- =====================================================
+
+       DASHBOARD
+
+       ===================================================== -->
+
   <div
 
     id="dashboard"
 
     class="hidden">
+
+    <!-- ===================================================
+
+         OVERVIEW
+
+         =================================================== -->
 
     <div class="panel">
 
@@ -9421,6 +9465,12 @@ button{
 
     </div>
 
+    <!-- ===================================================
+
+         GAME CONTROL
+
+         =================================================== -->
+
     <div class="panel">
 
       <div class="panel-title">
@@ -9435,6 +9485,8 @@ button{
 
           class="green"
 
+          type="button"
+
           onclick="gameControl('resume')">
 
           Resume
@@ -9445,6 +9497,8 @@ button{
 
           class="dark"
 
+          type="button"
+
           onclick="gameControl('pause')">
 
           Pause
@@ -9454,6 +9508,8 @@ button{
         <button
 
           class="danger"
+
+          type="button"
 
           onclick="gameControl('reset')">
 
@@ -9473,6 +9529,12 @@ button{
 
     </div>
 
+    <!-- ===================================================
+
+         PENDING REQUESTS
+
+         =================================================== -->
+
     <div class="panel">
 
       <div class="panel-title">
@@ -9486,6 +9548,12 @@ button{
       </div>
 
     </div>
+
+    <!-- ===================================================
+
+         USERS
+
+         =================================================== -->
 
     <div class="panel">
 
@@ -9507,6 +9575,12 @@ button{
 
 <script>
 
+/* =========================================================
+
+   ADMIN KEY
+
+   ========================================================= */
+
 var adminKey =
 
   localStorage.getItem(
@@ -9514,6 +9588,12 @@ var adminKey =
     "fastBingoAdminKey"
 
   ) || "";
+
+/* =========================================================
+
+   API HELPER
+
+   ========================================================= */
 
 function api(path, options){
 
@@ -9539,11 +9619,15 @@ function api(path, options){
 
     options
 
-  ).then(function(response){
+  )
+
+  .then(function(response){
 
     return response.text();
 
-  }).then(function(text){
+  })
+
+  .then(function(text){
 
     try{
 
@@ -9569,25 +9653,49 @@ function api(path, options){
 
 }
 
+/* =========================================================
+
+   LOGIN
+
+   ========================================================= */
+
 function login(){
 
-  alert("LOGIN FUNCTION IS WORKING");
-
-  var key =
+  var input =
 
     document.getElementById(
 
       "adminKey"
 
-    ).value.trim();
+    );
 
-  if(!key){
+  var status =
 
     document.getElementById(
 
       "loginStatus"
 
-    ).textContent =
+    );
+
+  var button =
+
+    document.getElementById(
+
+      "loginButton"
+
+    );
+
+  var key =
+
+    input.value.trim();
+
+  if(!key){
+
+    status.className =
+
+      "status error";
+
+    status.textContent =
 
       "Enter ADMIN_KEY.";
 
@@ -9595,15 +9703,31 @@ function login(){
 
   }
 
-  adminKey = key;
+  adminKey =
+
+    key;
+
+  button.disabled =
+
+    true;
+
+  status.className =
+
+    "status";
+
+  status.textContent =
+
+    "Checking ADMIN_KEY...";
 
   api(
 
     "/do/admin/summary"
 
-  ).then(function(data){
+  )
 
-    if(data.ok){
+  .then(function(data){
+
+    if(data && data.ok){
 
       localStorage.setItem(
 
@@ -9613,35 +9737,73 @@ function login(){
 
       );
 
+      status.className =
+
+        "status success";
+
+      status.textContent =
+
+        "Login successful.";
+
       showDashboard();
 
-}else{
+      return;
 
-  document.getElementById(
+    }
 
-    "loginStatus"
+    adminKey = "";
 
-  ).textContent =
+    button.disabled =
 
-    "Login failed: " +
+      false;
 
-    (data.error || "Unknown error");
+    status.className =
 
-}
+      "status error";
 
-  }).catch(function(){
+    status.textContent =
 
-    document.getElementById(
+      "Login failed: " +
 
-      "loginStatus"
+      (
 
-    ).textContent =
+        data &&
+
+        data.error
+
+          ? data.error
+
+          : "Invalid ADMIN_KEY."
+
+      );
+
+  })
+
+  .catch(function(){
+
+    adminKey = "";
+
+    button.disabled =
+
+      false;
+
+    status.className =
+
+      "status error";
+
+    status.textContent =
 
       "Connection error.";
 
   });
 
 }
+
+/* =========================================================
+
+   SHOW DASHBOARD
+
+   ========================================================= */
 
 function showDashboard(){
 
@@ -9669,9 +9831,17 @@ function showDashboard(){
 
 }
 
+/* =========================================================
+
+   LOGOUT
+
+   ========================================================= */
+
 function logout(){
 
-  adminKey = "";
+  adminKey =
+
+    "";
 
   localStorage.removeItem(
 
@@ -9683,6 +9853,12 @@ function logout(){
 
 }
 
+/* =========================================================
+
+   LOAD ALL
+
+   ========================================================= */
+
 function loadAll(){
 
   loadSummary();
@@ -9693,15 +9869,23 @@ function loadAll(){
 
 }
 
+/* =========================================================
+
+   SUMMARY
+
+   ========================================================= */
+
 function loadSummary(){
 
   api(
 
     "/do/admin/summary"
 
-  ).then(function(data){
+  )
 
-    if(!data.ok){
+  .then(function(data){
+
+    if(!data || !data.ok){
 
       logout();
 
@@ -9709,13 +9893,19 @@ function loadSummary(){
 
     }
 
-    var html = "";
+    var game =
+
+      data.game || {};
+
+    var html =
+
+      "";
 
     html += stat(
 
       "Users",
 
-      data.users
+      data.users || 0
 
     );
 
@@ -9723,7 +9913,7 @@ function loadSummary(){
 
       "Pending Deposits",
 
-      data.pendingDeposits
+      data.pendingDeposits || 0
 
     );
 
@@ -9731,7 +9921,7 @@ function loadSummary(){
 
       "Pending Withdrawals",
 
-      data.pendingWithdrawals
+      data.pendingWithdrawals || 0
 
     );
 
@@ -9739,9 +9929,9 @@ function loadSummary(){
 
       "Game",
 
-      data.gameNumber
+      game.gameNumber
 
-        ? "#" + data.gameNumber
+        ? "#" + game.gameNumber
 
         : "-"
 
@@ -9765,17 +9955,41 @@ function loadSummary(){
 
       (
 
-        data.gameStatus ||
+        game.status ||
 
         "-"
 
       );
 
+  })
+
+  .catch(function(){
+
+    document.getElementById(
+
+      "gameStatus"
+
+    ).textContent =
+
+      "Status: Connection error.";
+
   });
 
 }
 
-function stat(label,value){
+/* =========================================================
+
+   STAT CARD
+
+   ========================================================= */
+
+function stat(
+
+  label,
+
+  value
+
+){
 
   return (
 
@@ -9783,13 +9997,13 @@ function stat(label,value){
 
       '<div class="stat-label">' +
 
-        label +
+        escapeHtml(label) +
 
       '</div>' +
 
       '<div class="stat-value">' +
 
-        value +
+        escapeHtml(value) +
 
       '</div>' +
 
@@ -9799,15 +10013,23 @@ function stat(label,value){
 
 }
 
+/* =========================================================
+
+   PENDING REQUESTS
+
+   ========================================================= */
+
 function loadRequests(){
 
   api(
 
     "/do/admin/requests"
 
-  ).then(function(data){
+  )
 
-    if(!data.ok){
+  .then(function(data){
+
+    if(!data || !data.ok){
 
       return;
 
@@ -9819,7 +10041,25 @@ function loadRequests(){
 
       [];
 
-    if(!list.length){
+    var pending =
+
+      list.filter(
+
+        function(item){
+
+          return (
+
+            item.status ===
+
+            "pending"
+
+          );
+
+        }
+
+      );
+
+    if(!pending.length){
 
       document.getElementById(
 
@@ -9837,145 +10077,177 @@ function loadRequests(){
 
     }
 
-    var html = "";
+    var html =
 
-    list.forEach(function(item){
+      "";
 
-      if(
+    pending.forEach(
 
-        item.status !==
+      function(item){
 
-        "pending"
+        var typeLabel =
 
-      ){
+          item.type === "deposit"
 
-        return;
+            ? "DEPOSIT"
 
-      }
+            : "WITHDRAWAL";
 
-      html +=
+        var userId =
 
-        '<div class="request">' +
+          item.userId ||
 
-          '<div class="request-top">' +
-
-            '<span class="badge">' +
-
-              (
-
-                item.type ===
-
-                "deposit"
-
-                  ? "DEPOSIT"
-
-                  : "WITHDRAWAL"
-
-              ) +
-
-            '</span>' +
-
-            '<strong>' +
-
-              Number(
-
-                item.amount || 0
-
-              ).toFixed(2) +
-
-              ' ETB' +
-
-            '</strong>' +
-
-          '</div>' +
-
-          '<div class="request-info">' +
-
-            'User: ' +
-
-            escapeHtml(
-
-              item.user_id || "-"
-
-            ) +
-
-            '<br>' +
-
-            'Method: ' +
-
-            escapeHtml(
-
-              item.method || "-"
-
-            ) +
-
-            '<br>' +
-
-            'Status: ' +
-
-            escapeHtml(
-
-              item.status || "-"
-
-            ) +
-
-          '</div>';
-
-      if(
-
-        item.type ===
-
-        "deposit" &&
-
-        item.screenshot
-
-      ){
+          "-";
 
         html +=
 
-          '<img class="screenshot" ' +
+          '<div class="request">' +
 
-          'src="' +
+            '<div class="request-top">' +
 
-          item.screenshot +
+              '<span class="badge">' +
 
-          '" alt="Payment screenshot">';
+                typeLabel +
+
+              '</span>' +
+
+              '<strong>' +
+
+                Number(
+
+                  item.amount || 0
+
+                ).toFixed(2) +
+
+                ' ETB' +
+
+              '</strong>' +
+
+            '</div>' +
+
+            '<div class="request-info">' +
+
+              'User: ' +
+
+              escapeHtml(
+
+                userId
+
+              ) +
+
+              '<br>' +
+
+              'Name: ' +
+
+              escapeHtml(
+
+                item.firstName ||
+
+                item.username ||
+
+                "-"
+
+              ) +
+
+              '<br>' +
+
+              'Method: ' +
+
+              escapeHtml(
+
+                item.method ||
+
+                "-"
+
+              ) +
+
+              '<br>' +
+
+              'Status: ' +
+
+              escapeHtml(
+
+                item.status ||
+
+                "-"
+
+              ) +
+
+            '</div>';
+
+        if(
+
+          item.type === "deposit" &&
+
+          item.screenshot
+
+        ){
+
+          html +=
+
+            '<img class="screenshot" ' +
+
+            'src="' +
+
+            escapeHtml(
+
+              item.screenshot
+
+            ) +
+
+            '" ' +
+
+            'alt="Payment screenshot">';
+
+        }
+
+        html +=
+
+          '<div class="request-actions">' +
+
+            '<button ' +
+
+              'class="green" ' +
+
+              'type="button" ' +
+
+              'onclick="requestAction(' +
+
+                Number(item.id) +
+
+                ',&quot;confirm&quot;)' +
+
+            '>' +
+
+              'Confirm' +
+
+            '</button>' +
+
+            '<button ' +
+
+              'class="danger" ' +
+
+              'type="button" ' +
+
+              'onclick="requestAction(' +
+
+                Number(item.id) +
+
+                ',&quot;reject&quot;)' +
+
+            '>' +
+
+              'Reject' +
+
+            '</button>' +
+
+          '</div>' +
+
+        '</div>';
 
       }
 
-      html +=
-
-        '<div class="request-actions">' +
-
-          '<button class="green" ' +
-
-          'onclick="requestAction(' +
-
-          item.id +
-
-          ',\\'confirm\\')">' +
-
-          'Confirm' +
-
-          '</button>' +
-
-          '<button class="danger" ' +
-
-          'onclick="requestAction(' +
-
-          item.id +
-
-          ',\\'reject\\')">' +
-
-          'Reject' +
-
-          '</button>' +
-
-        '</div>' +
-
-      '</div>';
-
-    });
+    );
 
     document.getElementById(
 
@@ -9985,9 +10257,31 @@ function loadRequests(){
 
       html;
 
+  })
+
+  .catch(function(){
+
+    document.getElementById(
+
+      "requests"
+
+    ).innerHTML =
+
+      '<div class="status error">' +
+
+      'Failed to load requests.' +
+
+      '</div>';
+
   });
 
 }
+
+/* =========================================================
+
+   REQUEST ACTION
+
+   ========================================================= */
 
 function requestAction(
 
@@ -10027,19 +10321,23 @@ function requestAction(
 
       },
 
-      body:JSON.stringify({
+      body:
 
-        id:id,
+        JSON.stringify({
 
-        action:action
+          requestId:id,
 
-      })
+          action:action
+
+        })
 
     }
 
-  ).then(function(data){
+  )
 
-    if(data.ok){
+  .then(function(data){
+
+    if(data && data.ok){
 
       loadAll();
 
@@ -10047,17 +10345,37 @@ function requestAction(
 
       alert(
 
-        data.error ||
+        data &&
 
-        "Action failed."
+        data.error
+
+          ? data.error
+
+          : "Action failed."
 
       );
 
     }
 
+  })
+
+  .catch(function(){
+
+    alert(
+
+      "Connection error."
+
+    );
+
   });
 
 }
+
+/* =========================================================
+
+   USERS
+
+   ========================================================= */
 
 function loadUsers(){
 
@@ -10065,9 +10383,11 @@ function loadUsers(){
 
     "/do/admin/users"
 
-  ).then(function(data){
+  )
 
-    if(!data.ok){
+  .then(function(data){
+
+    if(!data || !data.ok){
 
       return;
 
@@ -10097,67 +10417,99 @@ function loadUsers(){
 
     }
 
-    var html = "";
+    var html =
 
-    list.forEach(function(user){
+      "";
 
-      html +=
+    list.forEach(
 
-        '<div class="request">' +
+      function(user){
 
-          '<div class="request-info">' +
+        var displayName =
 
-            '<strong>' +
+          user.firstName ||
 
-            escapeHtml(
+          user.username ||
 
-              user.first_name ||
+          user.userId ||
 
-              user.username ||
+          "-";
 
-              user.user_id ||
+        html +=
 
-              "-"
+          '<div class="request">' +
 
-            ) +
+            '<div class="request-info">' +
 
-            '</strong>' +
+              '<strong>' +
 
-            '<br>User ID: ' +
+                escapeHtml(
 
-            escapeHtml(
+                  displayName
 
-              user.user_id ||
+                ) +
 
-              "-"
+              '</strong>' +
 
-            ) +
+              '<br>' +
 
-            '<br>Main Balance: ' +
+              'User ID: ' +
 
-            Number(
+              escapeHtml(
 
-              user.main_balance || 0
+                user.userId ||
 
-            ).toFixed(2) +
+                "-"
 
-            ' ETB' +
+              ) +
 
-            '<br>Play Balance: ' +
+              '<br>' +
 
-            Number(
+              'Username: ' +
 
-              user.play_balance || 0
+              escapeHtml(
 
-            ).toFixed(2) +
+                user.username
 
-            ' ETB' +
+                  ? "@" +
 
-          '</div>' +
+                    user.username
 
-        '</div>';
+                  : "-"
 
-    });
+              ) +
+
+              '<br>' +
+
+              'Main Balance: ' +
+
+              Number(
+
+                user.mainBalance || 0
+
+              ).toFixed(2) +
+
+              ' ETB' +
+
+              '<br>' +
+
+              'Play Balance: ' +
+
+              Number(
+
+                user.playBalance || 0
+
+              ).toFixed(2) +
+
+              ' ETB' +
+
+            '</div>' +
+
+          '</div>';
+
+      }
+
+    );
 
     document.getElementById(
 
@@ -10167,9 +10519,31 @@ function loadUsers(){
 
       html;
 
+  })
+
+  .catch(function(){
+
+    document.getElementById(
+
+      "users"
+
+    ).innerHTML =
+
+      '<div class="status error">' +
+
+      'Failed to load users.' +
+
+      '</div>';
+
   });
 
 }
+
+/* =========================================================
+
+   GAME CONTROL
+
+   ========================================================= */
 
 function gameControl(
 
@@ -10211,17 +10585,21 @@ function gameControl(
 
       },
 
-      body:JSON.stringify({
+      body:
 
-        action:action
+        JSON.stringify({
 
-      })
+          action:action
+
+        })
 
     }
 
-  ).then(function(data){
+  )
 
-    if(data.ok){
+  .then(function(data){
+
+    if(data && data.ok){
 
       loadAll();
 
@@ -10229,71 +10607,183 @@ function gameControl(
 
       alert(
 
-        data.error ||
+        data &&
 
-        "Game control failed."
+        data.error
+
+          ? data.error
+
+          : "Game control failed."
 
       );
 
     }
 
+  })
+
+  .catch(function(){
+
+    alert(
+
+      "Connection error."
+
+    );
+
   });
 
 }
 
-function escapeHtml(value){
+/* =========================================================
+
+   HTML ESCAPE
+
+   ========================================================= */
+
+function escapeHtml(
+
+  value
+
+){
 
   return String(
 
-    value
+    value == null
+
+      ? ""
+
+      : value
 
   )
 
-    .replace(
+  .replace(
 
-      /&/g,
+    /&/g,
 
-      "&amp;"
+    "&amp;"
 
-    )
+  )
 
-    .replace(
+  .replace(
 
-      /</g,
+    /</g,
 
-      "&lt;"
+    "&lt;"
 
-    )
+  )
 
-    .replace(
+  .replace(
 
-      />/g,
+    />/g,
 
-      "&gt;"
+    "&gt;"
 
-    )
+  )
 
-    .replace(
+  .replace(
 
-      /"/g,
+    /"/g,
 
-      "&quot;"
+    "&quot;"
 
-    )
+  )
 
-    .replace(
+  .replace(
 
-      /'/g,
+    /'/g,
 
-      "&#039;"
+    "&#039;"
 
-    );
+  );
 
 }
 
+/* =========================================================
+
+   ENTER KEY LOGIN
+
+   ========================================================= */
+
+document
+
+  .getElementById(
+
+    "adminKey"
+
+  )
+
+  .addEventListener(
+
+    "keydown",
+
+    function(event){
+
+      if(
+
+        event.key ===
+
+        "Enter"
+
+      ){
+
+        login();
+
+      }
+
+    }
+
+  );
+
+/* =========================================================
+
+   RESTORE SAVED LOGIN
+
+   ========================================================= */
+
 if(adminKey){
 
-  showDashboard();
+  api(
+
+    "/do/admin/summary"
+
+  )
+
+  .then(function(data){
+
+    if(
+
+      data &&
+
+      data.ok
+
+    ){
+
+      showDashboard();
+
+    }else{
+
+      adminKey = "";
+
+      localStorage.removeItem(
+
+        "fastBingoAdminKey"
+
+      );
+
+    }
+
+  })
+
+  .catch(function(){
+
+    adminKey = "";
+
+    localStorage.removeItem(
+
+      "fastBingoAdminKey"
+
+    );
+
+  });
 
 }
 
@@ -10465,7 +10955,11 @@ export default {
 
       const stub =
 
-        env.GAME_SCHEDULER.get(id);
+        env.GAME_SCHEDULER.get(
+
+          id
+
+        );
 
       return stub.fetch(
 
@@ -10517,7 +11011,11 @@ export default {
 
       const stub =
 
-        env.GAME_SCHEDULER.get(id);
+        env.GAME_SCHEDULER.get(
+
+          id
+
+        );
 
       return stub.fetch(
 
@@ -10571,4 +11069,8 @@ export default {
 
 };
 
-export { GameScheduler };
+export {
+
+  GameScheduler
+
+};
