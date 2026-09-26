@@ -9377,7 +9377,9 @@ button{
 
         class="primary"
 
-        onclick="login()">
+        type="button"
+
+        onclick="alert('BUTTON WORKS'); login();">
 
         Login
 
