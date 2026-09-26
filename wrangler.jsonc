@@ -22,16 +22,6 @@
 
   },
 
-  "triggers": {
-
-    "crons": [
-
-      "* * * * *"
-
-    ]
-
-  },
-
   "exports": {
 
     "GameScheduler": {
