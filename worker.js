@@ -4085,61 +4085,61 @@ isAdmin(request) {
 
           `data:${mime};base64,${base64}`;
 
-       try {
+        try {
 
-         return json(
+          return json(
 
-           await this.walletRequest(
+            await this.walletRequest(
 
-             user.id,
+              user.id,
 
-             {
+              {
 
-               type: "deposit",
+                type: "deposit",
 
-               method,
+                method,
 
-               amount,
+                amount,
 
-               screenshot: dataUrl,
+                screenshot: dataUrl,
 
-               screenshotMime: mime
+                screenshotMime: mime
 
-             }
+              }
 
-          )
+           )
 
-       ); 
+        ); 
 
-     } catch (error) {
+      } catch (error) {
 
-       console.error(
+        console.error(
 
-         "DEPOSIT_ERROR:",
+          "DEPOSIT_ERROR:",
 
-         error
+          error
  
-       );
+        );
 
-       return json({
+        return json({
 
-         ok: false,
+          ok: false,
 
-         error: "DEPOSIT_SERVER_ERROR",
+          error: "DEPOSIT_SERVER_ERROR",
 
-         message: String(
+          message: String(
 
-           error?.message ||  
+            error?.message ||  
 
-           error ||
+            error ||
 
-           "Unknown error"
+            "Unknown error"
 
-         ) 
+          ) 
 
-       }, 500);
+        }, 500);
 
-     }
+      }
 
       /*
 
