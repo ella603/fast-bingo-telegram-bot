@@ -3885,11 +3885,7 @@ isAdmin(request) {
 
       const contentType =
 
-        request.headers.get(
-
-          "content-type"
-
-        ) || "";
+        request.headers.get("content-type") || "";
 
       /*
 
@@ -3901,11 +3897,7 @@ isAdmin(request) {
 
       if (
 
-        contentType.includes(
-
-          "multipart/form-data"
-
-        )
+        contentType.includes("multipart/form-data")
 
       ) {
 
@@ -3941,9 +3933,7 @@ isAdmin(request) {
 
           String(
 
-            form.get("method") ||
-
-            "Telebirr"
+            form.get("method") || "Telebirr"
 
           );
 
@@ -4057,17 +4047,19 @@ isAdmin(request) {
 
         ) {
 
-          binary += String.fromCharCode(
+          binary +=
 
-            ...bytes.subarray(
+            String.fromCharCode(
 
-              i,
+              ...bytes.subarray(
 
-              i + CHUNK
+                i,
 
-            )
+                i + CHUNK
 
-          );
+              )
+
+            );
 
         }
 
@@ -4107,37 +4099,39 @@ isAdmin(request) {
 
               }
 
-           )
+            )
 
-        ); 
+          );
 
-      } catch (error) {
+        } catch (error) {
 
-        console.error(
+          console.error(
 
-          "DEPOSIT_ERROR:",
+            "DEPOSIT_ERROR:",
 
-          error
- 
-        );
+            error
 
-        return json({
+          );
 
-          ok: false,
+          return json({
 
-          error: "DEPOSIT_SERVER_ERROR",
+            ok: false,
 
-          message: String(
+            error: "DEPOSIT_SERVER_ERROR",
 
-            error?.message ||  
+            message: String(
 
-            error ||
+              error?.message ||
 
-            "Unknown error"
+              error ||
 
-          ) 
+              "Unknown error"
 
-        }, 500);
+            )
+
+          }, 500);
+
+        }
 
       }
 
@@ -4171,7 +4165,7 @@ isAdmin(request) {
 
       );
 
-      }
+    }
 
     /* =====================================================
 
