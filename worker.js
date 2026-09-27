@@ -665,29 +665,7 @@ sql.exec(`
 
    ========================================================= */
 
-sql.exec(`
-
-  CREATE TABLE IF NOT EXISTS balances (
-
-    user_id TEXT PRIMARY KEY,
-
-    balance REAL NOT NULL,
-
-    main_balance REAL NOT NULL DEFAULT 0,
-
-    play_balance REAL
-
-  )
-
-`);
-
-/* =========================================================
-
-   BALANCE COLUMN MIGRATION
-
-   ========================================================= */
-
-const balanceColumns =
+const balanceTableInfo =
 
   sql.exec(`
 
@@ -695,103 +673,211 @@ const balanceColumns =
 
   `).toArray();
 
-const hasMainBalance =
-
-  balanceColumns.some(
-
-    c => c.name === "main_balance"
-
-  );
-
-const hasPlayBalance =
-
-  balanceColumns.some(
-
-    c => c.name === "play_balance"
-
-  );
-
-if (!hasMainBalance) {
+if (balanceTableInfo.length === 0) {
 
   sql.exec(`
 
-    ALTER TABLE balances
+    CREATE TABLE IF NOT EXISTS balances (
 
-    ADD COLUMN main_balance REAL NOT NULL DEFAULT 0
+      user_id TEXT PRIMARY KEY,
 
-  `);
+      balance REAL NOT NULL,
 
-}
+      main_balance REAL NOT NULL DEFAULT 0,
 
-if (!hasPlayBalance) {
+      play_balance REAL
 
-  sql.exec(`
-
-    ALTER TABLE balances
-
-    ADD COLUMN play_balance REAL
+    )
 
   `);
 
-  sql.exec(`
+} else {
 
-    UPDATE balances
+  const hasUserId =
 
-    SET play_balance = balance
+    balanceTableInfo.some(
 
-    WHERE play_balance IS NULL
+      c => c.name === "user_id"
 
-  `);
+    );
 
-}
-     
+  const hasBalance =
+
+    balanceTableInfo.some(
+
+      c => c.name === "balance"
+
+    );
+
+  const hasMainBalance =
+
+    balanceTableInfo.some(
+
+      c => c.name === "main_balance"
+
+    );
+
+  const hasPlayBalance =
+
+    balanceTableInfo.some(
+
+      c => c.name === "play_balance"
+
+    );
+
+  /*
+
+   * Existing database is missing user_id.
+
+   *
+
+   * Rebuild the table while preserving
+
+   * existing balance values where possible.
+
+   */
+
+  if (!hasUserId) {
+
     sql.exec(`
 
-      CREATE TABLE IF NOT EXISTS selected_cards (
+      ALTER TABLE balances
 
-        game_number INTEGER NOT NULL,
-
-        user_id TEXT NOT NULL,
-
-        card_number INTEGER NOT NULL,
-
-        selected_at INTEGER NOT NULL,
-
-        PRIMARY KEY (
-
-          game_number,
-
-          user_id,
-
-          card_number
-
-        )
-
-      )
+      RENAME TO balances_old
 
     `);
 
     sql.exec(`
 
-      CREATE TABLE IF NOT EXISTS transactions (
+      CREATE TABLE balances (
 
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT PRIMARY KEY,
 
-        user_id TEXT NOT NULL,
+        balance REAL NOT NULL,
 
-        type TEXT NOT NULL,
+        main_balance REAL NOT NULL DEFAULT 0,
 
-        method TEXT,
-
-        amount REAL NOT NULL,
-
-        simulated INTEGER NOT NULL,
-
-        created_at INTEGER NOT NULL
+        play_balance REAL
 
       )
 
     `);
+
+    /*
+
+     * Old table has no user_id, so old rows
+
+     * cannot safely be mapped to Telegram users.
+
+     *
+
+     * Keep the old table temporarily instead
+
+     * of deleting data automatically.
+
+     */
+
+  } else {
+
+    if (!hasMainBalance) {
+
+      sql.exec(`
+
+        ALTER TABLE balances
+
+        ADD COLUMN main_balance
+
+        REAL NOT NULL DEFAULT 0
+
+      `);
+
+    }
+
+    if (!hasPlayBalance) {
+
+      sql.exec(`
+
+        ALTER TABLE balances
+
+        ADD COLUMN play_balance REAL
+
+      `);
+
+      sql.exec(`
+
+        UPDATE balances
+
+        SET play_balance = balance
+
+        WHERE play_balance IS NULL
+
+      `);
+
+    }
+
+  }
+
+}
+
+/* =========================================================
+
+   SELECTED CARDS
+
+   ========================================================= */
+
+sql.exec(`
+
+  CREATE TABLE IF NOT EXISTS selected_cards (
+
+    game_number INTEGER NOT NULL,
+
+    user_id TEXT NOT NULL,
+
+    card_number INTEGER NOT NULL,
+
+    selected_at INTEGER NOT NULL,
+
+    PRIMARY KEY (
+
+      game_number,
+
+      user_id,
+
+      card_number
+
+    )
+
+  )
+
+`);
+
+/* =========================================================
+
+   TRANSACTIONS
+
+   ========================================================= */
+
+sql.exec(`
+
+  CREATE TABLE IF NOT EXISTS transactions (
+
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    user_id TEXT NOT NULL,
+
+    type TEXT NOT NULL,
+
+    method TEXT,
+
+    amount REAL NOT NULL,
+
+    simulated INTEGER NOT NULL,
+
+    created_at INTEGER NOT NULL
+
+  )
+
+`);
 
     let existing = sql
 
