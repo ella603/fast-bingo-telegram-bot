@@ -4085,31 +4085,61 @@ isAdmin(request) {
 
           `data:${mime};base64,${base64}`;
 
-        return json(
+       try {
 
-          await this.walletRequest(
+         return json(
 
-            user.id,
+           await this.walletRequest(
 
-            {
+             user.id,
 
-              type: "deposit",
+             {
 
-              method,
+               type: "deposit",
 
-              amount,
+               method,
 
-              screenshot: dataUrl,
+               amount,
 
-              screenshotMime: mime
+               screenshot: dataUrl,
 
-            }
+               screenshotMime: mime
+
+             }
 
           )
 
-        );
+       ); 
 
-      }
+     } catch (error) {
+
+       console.error(
+
+         "DEPOSIT_ERROR:",
+
+         error
+ 
+       );
+
+       return json({
+
+         ok: false,
+
+         error: "DEPOSIT_SERVER_ERROR",
+
+         message: String(
+
+           error?.message ||  
+
+           error ||
+
+           "Unknown error"
+
+         ) 
+
+       }, 500);
+
+     }
 
       /*
 
