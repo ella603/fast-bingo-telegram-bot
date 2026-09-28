@@ -8143,7 +8143,9 @@ function createLoginScreen(){
 
     "fastBingoLogin";
 
-  overlay.innerHTML = `
+  overlay.innerHTML =
+
+    ${String.fromCharCode(96)}
 
     <div class="login-box">
 
@@ -8239,7 +8241,7 @@ function createLoginScreen(){
 
     </div>
 
-  `;
+    ${String.fromCharCode(96)};
 
   document.body.appendChild(
 
