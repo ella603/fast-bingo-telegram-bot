@@ -8143,7 +8143,7 @@ function createLoginScreen(){
 
     "fastBingoLogin";
 
-  overlay.innerHTML = `
+  overlay.innerHTML = \`
 
     <div class="login-box">
 
