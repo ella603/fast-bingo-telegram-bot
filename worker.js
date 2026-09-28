@@ -383,6 +383,134 @@ function getTelegramUser(request) {
 
 }
 
+/* =========================================================
+
+   LOGIN / REGISTRATION AUTH
+
+   ========================================================= */
+
+const LOGIN_CODE_MIN = 100000;
+
+const LOGIN_CODE_MAX = 999999;
+
+const LOGIN_CODE_TTL = 5 * 60 * 1000;
+
+const FIRST_REGISTRATION_BONUS = 20;
+
+async function hashLoginCode(code) {
+
+  const data =
+
+    new TextEncoder().encode(
+
+      String(code)
+
+    );
+
+  const digest =
+
+    await crypto.subtle.digest(
+
+      "SHA-256",
+
+      data
+
+    );
+
+  return Array.from(
+
+    new Uint8Array(digest)
+
+  )
+
+    .map(
+
+      b =>
+
+        b.toString(16).padStart(2, "0")
+
+    )
+
+    .join("");
+
+}
+
+async function sendLoginCode(
+
+  userId,
+
+  code,
+
+  env
+
+) {
+
+  const apiKey =
+
+    String(
+
+      env.LOGIN_API_KEY || ""
+
+    );
+
+  if (!apiKey) {
+
+    throw new Error(
+
+      "LOGIN_API_KEY is not configured"
+
+    );
+
+  }
+
+  const response =
+
+    await fetch(
+
+      "https://fast-bingo-telegram-bot.dagnaeli21.workers.dev/send-login-password",
+
+      {
+
+        method: "POST",
+
+        headers: {
+
+          "content-type":
+
+            "application/json",
+
+          "x-login-api-key":
+
+            apiKey
+
+        },
+
+        body: JSON.stringify({
+
+          userId: String(userId),
+
+          password: String(code)
+
+        })
+
+      }
+
+    );
+
+  if (!response.ok) {
+
+    throw new Error(
+
+      "Telegram login message failed"
+
+    );
+
+  }
+
+  return response.json();
+
+}
+
 class GameScheduler extends DurableObject {
 
   constructor(ctx, env) {
@@ -2274,126 +2402,6 @@ sql.exec(`
     );
 
   }
-
-/* =========================================================
-
-   LOGIN / REGISTRATION AUTH
-
-   ========================================================= */
-
-const LOGIN_CODE_MIN = 100000;
-
-const LOGIN_CODE_MAX = 999999;
-
-const LOGIN_CODE_TTL = 5 * 60 * 1000;
-
-const FIRST_REGISTRATION_BONUS = 20;
-
-async function hashLoginCode(code) {
-
-  const data =
-
-    new TextEncoder().encode(
-
-      String(code)
-
-    );
-
-  const digest =
-
-    await crypto.subtle.digest(
-
-      "SHA-256",
-
-      data
-
-    );
-
-  return Array.from(
-
-    new Uint8Array(digest)
-
-  )
-
-    .map(
-
-      b =>
-
-        b.toString(16).padStart(2, "0")
-
-    )
-
-    .join("");
-
-}
-
-async function sendLoginCode(userId, code) {
-
-  const apiKey =
-
-    String(
-
-      this.env.LOGIN_API_KEY || ""
-
-    );
-
-  if (!apiKey) {
-
-    throw new Error(
-
-      "LOGIN_API_KEY is not configured"
-
-    );
-
-  }
-
-  const response =
-
-    await fetch(
-
-      "https://fast-bingo-telegram-bot.dagnaeli21.workers.dev/send-login-password",
-
-      {
-
-        method: "POST",
-
-        headers: {
-
-          "content-type":
-
-            "application/json",
-
-          "x-login-api-key":
-
-            apiKey
-
-        },
-
-        body: JSON.stringify({
-
-          userId: String(userId),
-
-          password: String(code)
-
-        })
-
-      }
-
-    );
-
-  if (!response.ok) {
-
-    throw new Error(
-
-      "Telegram login message failed"
-
-    );
-
-  }
-
-  return response.json();
-
-}
    
   /* =========================================================
 
@@ -4331,6 +4339,8 @@ async requestLoginCode(user) {
 
       code
 
+      this.env
+       
     );
 
   } catch (error) {
