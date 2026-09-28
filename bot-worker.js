@@ -44,7 +44,11 @@ export default {
 
           "Unauthorized",
 
-          { status: 401 }
+          {
+
+            status: 401
+
+          }
 
         );
 
@@ -56,7 +60,11 @@ export default {
 
           "BOT_TOKEN secret is missing.",
 
-          { status: 500 }
+          {
+
+            status: 500
+
+          }
 
         );
 
@@ -206,13 +214,21 @@ export default {
 
         ) {
 
+          console.error(
+
+            "Unauthorized login API request."
+
+          );
+
           return jsonResponse(
 
             {
 
               ok: false,
 
-              error: "UNAUTHORIZED"
+              error:
+
+                "UNAUTHORIZED"
 
             },
 
@@ -244,7 +260,9 @@ export default {
 
               ok: false,
 
-              error: "INVALID_JSON"
+              error:
+
+                "INVALID_JSON"
 
             },
 
@@ -284,7 +302,9 @@ export default {
 
               ok: false,
 
-              error: "USER_ID_REQUIRED"
+              error:
+
+                "USER_ID_REQUIRED"
 
             },
 
@@ -324,7 +344,9 @@ export default {
 
         /* -------------------------------------------------
 
-           Telegram chat ID = Telegram user ID
+           Telegram chat ID
+
+           Telegram user ID = chat ID
 
            ------------------------------------------------- */
 
@@ -344,19 +366,41 @@ export default {
 
           "⚠️ ይህን ኮድ ለሌላ ሰው አትስጥ።";
 
-        await sendMessage(
+        /* -------------------------------------------------
 
-          chatId,
+           Send Telegram message
 
-          message,
+           ------------------------------------------------- */
 
-          env
+        const telegramResult =
+
+          await sendMessage(
+
+            chatId,
+
+            message,
+
+            env
+
+          );
+
+        console.log(
+
+          "LOGIN_CODE_SENT:",
+
+          JSON.stringify(
+
+            telegramResult
+
+          )
 
         );
 
         return jsonResponse({
 
-          ok: true
+          ok: true,
+
+          telegram: true
 
         });
 
@@ -366,7 +410,9 @@ export default {
 
           "SEND_LOGIN_PASSWORD_ERROR:",
 
-          error
+          error?.message ||
+
+            String(error)
 
         );
 
@@ -378,7 +424,13 @@ export default {
 
             error:
 
-              "TELEGRAM_SEND_FAILED"
+              "TELEGRAM_SEND_FAILED",
+
+            message:
+
+              error?.message ||
+
+              String(error)
 
           },
 
@@ -468,7 +520,11 @@ export default {
 
       "Not Found",
 
-      { status: 404 }
+      {
+
+        status: 404
+
+      }
 
     );
 
@@ -972,61 +1028,157 @@ async function sendMessage(
 
   if (!env.BOT_TOKEN) {
 
-    console.error(
+    throw new Error(
 
       "BOT_TOKEN secret is missing."
 
     );
 
-    return;
-
   }
 
-  const response =
+  const controller =
 
-    await fetch(
+    new AbortController();
 
-      `https://api.telegram.org/bot${env.BOT_TOKEN}/sendMessage`,
+  const timeout =
 
-      {
+    setTimeout(
 
-        method:
+      () => {
 
-          "POST",
+        controller.abort();
 
-        headers: {
+      },
 
-          "Content-Type":
-
-            "application/json"
-
-        },
-
-        body:
-
-          JSON.stringify({
-
-            chat_id:
-
-              chatId,
-
-            text,
-
-            ...extra
-
-          })
-
-      }
+      10000
 
     );
 
-  if (!response.ok) {
+  try {
 
-    console.error(
+    const response =
 
-      "Telegram sendMessage failed:",
+      await fetch(
 
-      await response.text()
+        `https://api.telegram.org/bot${env.BOT_TOKEN}/sendMessage`,
+
+        {
+
+          method:
+
+            "POST",
+
+          headers: {
+
+            "Content-Type":
+
+              "application/json"
+
+          },
+
+          body:
+
+            JSON.stringify({
+
+              chat_id:
+
+                chatId,
+
+              text,
+
+              ...extra
+
+            }),
+
+          signal:
+
+            controller.signal
+
+        }
+
+      );
+
+    const responseText =
+
+      await response.text();
+
+    let result = null;
+
+    try {
+
+      result =
+
+        JSON.parse(
+
+          responseText
+
+        );
+
+    } catch (_) {
+
+      result = {
+
+        ok: false,
+
+        description:
+
+          responseText
+
+      };
+
+    }
+
+    if (!response.ok || !result.ok) {
+
+      console.error(
+
+        "Telegram sendMessage failed:",
+
+        JSON.stringify(
+
+          result
+
+        )
+
+      );
+
+      throw new Error(
+
+        result.description ||
+
+        `Telegram API HTTP ${response.status}`
+
+      );
+
+    }
+
+    return result;
+
+  } catch (error) {
+
+    if (
+
+      error?.name ===
+
+      "AbortError"
+
+    ) {
+
+      throw new Error(
+
+        "Telegram API request timed out."
+
+      );
+
+    }
+
+    throw error;
+
+  } finally {
+
+    clearTimeout(
+
+      timeout
 
     );
 
