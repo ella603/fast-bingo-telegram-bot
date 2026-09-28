@@ -8239,7 +8239,7 @@ function createLoginScreen(){
 
     </div>
 
-  `;
+  \`;
 
   document.body.appendChild(
 
