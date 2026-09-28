@@ -7687,7 +7687,21 @@ button{
 
   }
 
-  var telegramUser =
+var telegramUser = {
+
+  id:"guest",
+
+  first_name:"Guest",
+
+  username:""
+
+};
+
+var userHeader = "";
+
+function refreshTelegramUser(){
+
+  var liveUser =
 
     tg &&
 
@@ -7697,23 +7711,33 @@ button{
 
       ? tg.initDataUnsafe.user
 
-      : {
+      : null;
 
-          id:"guest",
+  if(
 
-          first_name:"Guest",
+    liveUser &&
 
-          username:""
+    liveUser.id
 
-        };
+  ){
 
-  var userHeader =
+    telegramUser = liveUser;
+
+  }
+
+  userHeader =
 
     JSON.stringify(
 
       telegramUser
 
     );
+
+  return telegramUser;
+
+}
+
+refreshTelegramUser();
 
   var selected = [];
 
@@ -8418,6 +8442,8 @@ function hideLoginScreen(){
 }
 
 function requestLogin(){
+
+  refreshTelegramUser();
 
   if(loginBusy){
 
