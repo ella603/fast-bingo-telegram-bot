@@ -7945,7 +7945,7 @@ function addLoginStyles(){
 
     "fastBingoLoginStyles";
 
-  style.textContent = \`
+  style.textContent = `
 
     #fastBingoLogin{
 
@@ -8111,7 +8111,7 @@ function addLoginStyles(){
 
     }
 
-  \`;
+  `;
 
   document.head.appendChild(style);
 
@@ -8143,7 +8143,7 @@ function createLoginScreen(){
 
     "fastBingoLogin";
 
-  overlay.innerHTML = \`
+  overlay.innerHTML = `
 
     <div class="login-box">
 
@@ -8239,7 +8239,7 @@ function createLoginScreen(){
 
     </div>
 
-  \`;
+  `;
 
   document.body.appendChild(
 
