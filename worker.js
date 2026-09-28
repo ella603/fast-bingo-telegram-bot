@@ -13355,7 +13355,7 @@ export default {
 
       "/api/wallet",
 
-      "/api/claim"
+      "/api/claim",
 
       "/api/auth/status",
 
