@@ -7945,7 +7945,7 @@ function addLoginStyles(){
 
     "fastBingoLoginStyles";
 
-  style.textContent = `
+  style.textContent = \`
 
     #fastBingoLogin{
 
@@ -8111,7 +8111,7 @@ function addLoginStyles(){
 
     }
 
-  `;
+  \`;
 
   document.head.appendChild(style);
 
