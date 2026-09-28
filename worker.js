@@ -2657,6 +2657,434 @@ isRegistered(userId) {
 
   }
 
+     /* =========================================================
+
+   LOGIN REQUEST / VERIFY
+
+   ========================================================= */
+
+async requestLoginCode(user) {
+
+  if (!user || !user.id || user.id === "guest") {
+
+    return {
+
+      ok: false,
+
+      error: "TELEGRAM_USER_REQUIRED"
+
+    };
+
+  }
+
+  const userId = String(user.id);
+
+  const now = Date.now();
+
+  const existing = this.getAuth(userId);
+
+  /* Already registered */
+
+  if (existing) {
+
+    return {
+
+      ok: true,
+
+      registered: true,
+
+      authenticated: true
+
+    };
+
+  }
+
+  const code =
+
+    Math.floor(
+
+      LOGIN_CODE_MIN +
+
+      Math.random() *
+
+        (LOGIN_CODE_MAX - LOGIN_CODE_MIN + 1)
+
+    );
+
+  const hash =
+
+    await hashLoginCode(code);
+
+  this.ctx.storage.sql.exec(`
+
+    INSERT INTO user_auth
+
+    (
+
+      user_id,
+
+      login_code_hash,
+
+      login_code_expires_at,
+
+      created_at,
+
+      last_login_at,
+
+      bonus_given
+
+    )
+
+    VALUES (?, ?, ?, ?, NULL, 0)
+
+    ON CONFLICT(user_id)
+
+    DO UPDATE SET
+
+      login_code_hash = excluded.login_code_hash,
+
+      login_code_expires_at =
+
+        excluded.login_code_expires_at
+
+  `,
+
+    userId,
+
+    hash,
+
+    now + LOGIN_CODE_TTL,
+
+    now
+
+  );
+
+  try {
+
+    await sendLoginCode(
+
+      userId,
+
+      code
+
+      this.env
+       
+    );
+
+  } catch (error) {
+
+    this.ctx.storage.sql.exec(`
+
+      UPDATE user_auth
+
+      SET
+
+        login_code_hash = NULL,
+
+        login_code_expires_at = NULL
+
+      WHERE user_id = ?
+
+    `, userId);
+
+    console.error(
+
+      "LOGIN_CODE_SEND_ERROR:",
+
+      error?.message || String(error)
+
+    );
+
+    return {
+
+      ok: false,
+
+      error: "LOGIN_CODE_SEND_FAILED"
+
+    };
+
+  }
+
+  return {
+
+    ok: true,
+
+    registered: false,
+
+    codeSent: true,
+
+    expiresIn: Math.floor(
+
+      LOGIN_CODE_TTL / 1000
+
+    )
+
+  };
+
+}
+
+async verifyLoginCode(user, code) {
+
+  if (!user || !user.id || user.id === "guest") {
+
+    return {
+
+      ok: false,
+
+      error: "TELEGRAM_USER_REQUIRED"
+
+    };
+
+  }
+
+  const userId = String(user.id);
+
+  const cleanCode = String(code || "").trim();
+
+  if (!/^\d{6}$/.test(cleanCode)) {
+
+    return {
+
+      ok: false,
+
+      error: "INVALID_CODE"
+
+    };
+
+  }
+
+  const auth = this.getAuth(userId);
+
+  if (!auth) {
+
+    return {
+
+      ok: false,
+
+      error: "LOGIN_NOT_REQUESTED"
+
+    };
+
+  }
+
+  const expiresAt =
+
+    Number(
+
+      auth.login_code_expires_at || 0
+
+    );
+
+  if (
+
+    !auth.login_code_hash ||
+
+    !expiresAt ||
+
+    Date.now() > expiresAt
+
+  ) {
+
+    return {
+
+      ok: false,
+
+      error: "CODE_EXPIRED"
+
+    };
+
+  }
+
+  const submittedHash =
+
+    await hashLoginCode(cleanCode);
+
+  if (
+
+    submittedHash !==
+
+    String(auth.login_code_hash)
+
+  ) {
+
+    return {
+
+      ok: false,
+
+      error: "WRONG_CODE"
+
+    };
+
+  }
+
+  /* Make sure the Telegram user is registered */
+
+  await this.saveTelegramUser(user);
+
+  /* Make sure the balance row exists */
+
+  await this.ensureBalanceRow(userId);
+
+  const currentAuth =
+
+    this.getAuth(userId);
+
+  /* First-registration bonus: exactly once */
+
+  if (
+
+    Number(
+
+      currentAuth?.bonus_given || 0
+
+    ) !== 1
+
+  ) {
+
+    const balances =
+
+      this.getBalances(userId);
+
+    const nextMain =
+
+      Number(balances.mainBalance || 0) +
+
+      FIRST_REGISTRATION_BONUS;
+
+    this.ctx.storage.sql.exec(`
+
+      UPDATE balances
+
+      SET main_balance = ?
+
+      WHERE user_id = ?
+
+    `,
+
+      nextMain,
+
+      userId
+
+    );
+
+    this.ctx.storage.sql.exec(`
+
+      INSERT INTO transactions
+
+      (
+
+        user_id,
+
+        type,
+
+        method,
+
+        amount,
+
+        simulated,
+
+        created_at
+
+      )
+
+      VALUES (?, 'registration_bonus', NULL, ?, 1, ?)
+
+    `,
+
+      userId,
+
+      FIRST_REGISTRATION_BONUS,
+
+      Date.now()
+
+    );
+
+    this.ctx.storage.sql.exec(`
+
+      UPDATE user_auth
+
+      SET
+
+        bonus_given = 1,
+
+        last_login_at = ?,
+
+        login_code_hash = NULL,
+
+        login_code_expires_at = NULL
+
+      WHERE user_id = ?
+
+    `,
+
+      Date.now(),
+
+      userId
+
+    );
+
+  } else {
+
+    this.ctx.storage.sql.exec(`
+
+      UPDATE user_auth
+
+      SET
+
+        last_login_at = ?,
+
+        login_code_hash = NULL,
+
+        login_code_expires_at = NULL
+
+      WHERE user_id = ?
+
+    `,
+
+      Date.now(),
+
+      userId
+
+    );
+
+  }
+
+  const balances =
+
+    this.getBalances(userId);
+
+  return {
+
+    ok: true,
+
+    authenticated: true,
+
+    registered: true,
+
+    firstRegistrationBonus:
+
+      Number(
+
+        currentAuth?.bonus_given || 0
+
+      ) !== 1
+
+        ? FIRST_REGISTRATION_BONUS
+
+        : 0,
+
+    mainBalance:
+
+      balances.mainBalance,
+
+    playBalance:
+
+      balances.playBalance
+
+  };
+
+}
+   
   /* =========================================================
 
      WALLET — DEMO / PLAY-MONEY ONLY
@@ -4228,434 +4656,6 @@ if (
       });
 
     }
-
-   /* =========================================================
-
-   LOGIN REQUEST / VERIFY
-
-   ========================================================= */
-
-async requestLoginCode(user) {
-
-  if (!user || !user.id || user.id === "guest") {
-
-    return {
-
-      ok: false,
-
-      error: "TELEGRAM_USER_REQUIRED"
-
-    };
-
-  }
-
-  const userId = String(user.id);
-
-  const now = Date.now();
-
-  const existing = this.getAuth(userId);
-
-  /* Already registered */
-
-  if (existing) {
-
-    return {
-
-      ok: true,
-
-      registered: true,
-
-      authenticated: true
-
-    };
-
-  }
-
-  const code =
-
-    Math.floor(
-
-      LOGIN_CODE_MIN +
-
-      Math.random() *
-
-        (LOGIN_CODE_MAX - LOGIN_CODE_MIN + 1)
-
-    );
-
-  const hash =
-
-    await hashLoginCode(code);
-
-  this.ctx.storage.sql.exec(`
-
-    INSERT INTO user_auth
-
-    (
-
-      user_id,
-
-      login_code_hash,
-
-      login_code_expires_at,
-
-      created_at,
-
-      last_login_at,
-
-      bonus_given
-
-    )
-
-    VALUES (?, ?, ?, ?, NULL, 0)
-
-    ON CONFLICT(user_id)
-
-    DO UPDATE SET
-
-      login_code_hash = excluded.login_code_hash,
-
-      login_code_expires_at =
-
-        excluded.login_code_expires_at
-
-  `,
-
-    userId,
-
-    hash,
-
-    now + LOGIN_CODE_TTL,
-
-    now
-
-  );
-
-  try {
-
-    await sendLoginCode(
-
-      userId,
-
-      code
-
-      this.env
-       
-    );
-
-  } catch (error) {
-
-    this.ctx.storage.sql.exec(`
-
-      UPDATE user_auth
-
-      SET
-
-        login_code_hash = NULL,
-
-        login_code_expires_at = NULL
-
-      WHERE user_id = ?
-
-    `, userId);
-
-    console.error(
-
-      "LOGIN_CODE_SEND_ERROR:",
-
-      error?.message || String(error)
-
-    );
-
-    return {
-
-      ok: false,
-
-      error: "LOGIN_CODE_SEND_FAILED"
-
-    };
-
-  }
-
-  return {
-
-    ok: true,
-
-    registered: false,
-
-    codeSent: true,
-
-    expiresIn: Math.floor(
-
-      LOGIN_CODE_TTL / 1000
-
-    )
-
-  };
-
-}
-
-async verifyLoginCode(user, code) {
-
-  if (!user || !user.id || user.id === "guest") {
-
-    return {
-
-      ok: false,
-
-      error: "TELEGRAM_USER_REQUIRED"
-
-    };
-
-  }
-
-  const userId = String(user.id);
-
-  const cleanCode = String(code || "").trim();
-
-  if (!/^\d{6}$/.test(cleanCode)) {
-
-    return {
-
-      ok: false,
-
-      error: "INVALID_CODE"
-
-    };
-
-  }
-
-  const auth = this.getAuth(userId);
-
-  if (!auth) {
-
-    return {
-
-      ok: false,
-
-      error: "LOGIN_NOT_REQUESTED"
-
-    };
-
-  }
-
-  const expiresAt =
-
-    Number(
-
-      auth.login_code_expires_at || 0
-
-    );
-
-  if (
-
-    !auth.login_code_hash ||
-
-    !expiresAt ||
-
-    Date.now() > expiresAt
-
-  ) {
-
-    return {
-
-      ok: false,
-
-      error: "CODE_EXPIRED"
-
-    };
-
-  }
-
-  const submittedHash =
-
-    await hashLoginCode(cleanCode);
-
-  if (
-
-    submittedHash !==
-
-    String(auth.login_code_hash)
-
-  ) {
-
-    return {
-
-      ok: false,
-
-      error: "WRONG_CODE"
-
-    };
-
-  }
-
-  /* Make sure the Telegram user is registered */
-
-  await this.saveTelegramUser(user);
-
-  /* Make sure the balance row exists */
-
-  await this.ensureBalanceRow(userId);
-
-  const currentAuth =
-
-    this.getAuth(userId);
-
-  /* First-registration bonus: exactly once */
-
-  if (
-
-    Number(
-
-      currentAuth?.bonus_given || 0
-
-    ) !== 1
-
-  ) {
-
-    const balances =
-
-      this.getBalances(userId);
-
-    const nextMain =
-
-      Number(balances.mainBalance || 0) +
-
-      FIRST_REGISTRATION_BONUS;
-
-    this.ctx.storage.sql.exec(`
-
-      UPDATE balances
-
-      SET main_balance = ?
-
-      WHERE user_id = ?
-
-    `,
-
-      nextMain,
-
-      userId
-
-    );
-
-    this.ctx.storage.sql.exec(`
-
-      INSERT INTO transactions
-
-      (
-
-        user_id,
-
-        type,
-
-        method,
-
-        amount,
-
-        simulated,
-
-        created_at
-
-      )
-
-      VALUES (?, 'registration_bonus', NULL, ?, 1, ?)
-
-    `,
-
-      userId,
-
-      FIRST_REGISTRATION_BONUS,
-
-      Date.now()
-
-    );
-
-    this.ctx.storage.sql.exec(`
-
-      UPDATE user_auth
-
-      SET
-
-        bonus_given = 1,
-
-        last_login_at = ?,
-
-        login_code_hash = NULL,
-
-        login_code_expires_at = NULL
-
-      WHERE user_id = ?
-
-    `,
-
-      Date.now(),
-
-      userId
-
-    );
-
-  } else {
-
-    this.ctx.storage.sql.exec(`
-
-      UPDATE user_auth
-
-      SET
-
-        last_login_at = ?,
-
-        login_code_hash = NULL,
-
-        login_code_expires_at = NULL
-
-      WHERE user_id = ?
-
-    `,
-
-      Date.now(),
-
-      userId
-
-    );
-
-  }
-
-  const balances =
-
-    this.getBalances(userId);
-
-  return {
-
-    ok: true,
-
-    authenticated: true,
-
-    registered: true,
-
-    firstRegistrationBonus:
-
-      Number(
-
-        currentAuth?.bonus_given || 0
-
-      ) !== 1
-
-        ? FIRST_REGISTRATION_BONUS
-
-        : 0,
-
-    mainBalance:
-
-      balances.mainBalance,
-
-    playBalance:
-
-      balances.playBalance
-
-  };
-
-}
 
     /* =====================================================
 
