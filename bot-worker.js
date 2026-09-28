@@ -1,10 +1,78 @@
 const APP_URL = "https://fast-bingo-mini-app.dagnaeli21.workers.dev/";
 
+const WORKER_URL = "https://fast-bingo-telegram-bot.dagnaeli21.workers.dev";
+
 export default {
 
   async fetch(request, env) {
 
     const url = new URL(request.url);
+
+    // Temporary webhook setup route
+
+    if (request.method === "GET" && url.pathname === "/set-webhook") {
+
+      const key = url.searchParams.get("key");
+
+      if (!env.SETUP_KEY || key !== env.SETUP_KEY) {
+
+        return new Response("Unauthorized", { status: 401 });
+
+      }
+
+      if (!env.BOT_TOKEN) {
+
+        return new Response("BOT_TOKEN secret is missing.", {
+
+          status: 500
+
+        });
+
+      }
+
+      const webhookUrl = `${WORKER_URL}/webhook`;
+
+      const response = await fetch(
+
+        `https://api.telegram.org/bot${env.BOT_TOKEN}/setWebhook`,
+
+        {
+
+          method: "POST",
+
+          headers: {
+
+            "Content-Type": "application/json"
+
+          },
+
+          body: JSON.stringify({
+
+            url: webhookUrl,
+
+            allowed_updates: ["message", "callback_query"]
+
+          })
+
+        }
+
+      );
+
+      const result = await response.text();
+
+      return new Response(result, {
+
+        status: response.ok ? 200 : 500,
+
+        headers: {
+
+          "Content-Type": "application/json"
+
+        }
+
+      });
+
+    }
 
     // Telegram webhook
 
@@ -52,6 +120,8 @@ async function handleUpdate(update, env) {
 
   const text = message.text || "";
 
+  // /start
+
   if (text === "/start" || text.startsWith("/start ")) {
 
     await sendStartMenu(chatId, env);
@@ -60,6 +130,8 @@ async function handleUpdate(update, env) {
 
   }
 
+  // Play
+
   if (text === "🎮 ይጫወቱ") {
 
     await sendPlayMessage(chatId, env);
@@ -67,6 +139,8 @@ async function handleUpdate(update, env) {
     return;
 
   }
+
+  // Balance
 
   if (text === "💵 ሂሳብ") {
 
@@ -84,6 +158,8 @@ async function handleUpdate(update, env) {
 
   }
 
+  // Deposit
+
   if (text === "📤 ገቢ ለማድረግ") {
 
     await sendMessage(
@@ -99,6 +175,8 @@ async function handleUpdate(update, env) {
     return;
 
   }
+
+  // Withdrawal
 
   if (text === "📥 ወጪ ለማድረግ") {
 
@@ -116,6 +194,8 @@ async function handleUpdate(update, env) {
 
   }
 
+  // Invite
+
   if (text === "🔗 ጋብዝ & አግኝ") {
 
     await sendMessage(
@@ -131,6 +211,8 @@ async function handleUpdate(update, env) {
     return;
 
   }
+
+  // VIP
 
   if (text === "💎 VIP ክፍል") {
 
@@ -148,6 +230,8 @@ async function handleUpdate(update, env) {
 
   }
 
+  // Special promoter
+
   if (text === "📢 Special promoter") {
 
     await sendMessage(
@@ -163,6 +247,8 @@ async function handleUpdate(update, env) {
     return;
 
   }
+
+  // Help
 
   if (text === "📲 እርዳታ") {
 
@@ -374,4 +460,4 @@ async function sendMessage(chatId, text, env, extra = {}) {
 
   }
 
-} 
+}
