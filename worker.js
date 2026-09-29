@@ -8283,6 +8283,22 @@ function registerFromLogin(){
 
   );
 
+  var timeoutId = setTimeout(function(){
+
+    if(loginBusy){
+
+      setLoginBusy(false);
+
+      loginMessage(
+
+        "Server ምላሽ አልሰጠም። እባክዎ እንደገና ይሞክሩ።"
+
+      );
+
+    }
+
+  },10000);
+
   api(
 
     "/api/auth/register",
@@ -8296,6 +8312,8 @@ function registerFromLogin(){
   )
 
   .then(function(result){
+
+    clearTimeout(timeoutId);
 
     if(
 
@@ -8325,11 +8343,33 @@ function registerFromLogin(){
 
       if(
 
+        typeof loadMyCards ===
+
+        "function"
+
+      ){
+
+        loadMyCards();
+
+      }
+
+      if(
+
+        typeof refreshGame ===
+
+        "function"
+
+      ){
+
+        refreshGame();
+
+      }
+
+      if(
+
         Number(
 
-          result.firstRegistrationBonus ||
-
-          0
+          result.firstRegistrationBonus || 0
 
         ) > 0
 
@@ -8352,6 +8392,30 @@ function registerFromLogin(){
         }
 
       }
+
+      /*
+
+       * Start the normal Mini App refresh
+
+       * after successful registration.
+
+       */
+
+      setInterval(
+
+        refreshGame,
+
+        1000
+
+      );
+
+      setInterval(
+
+        loadBalance,
+
+        10000
+
+      );
 
       return;
 
@@ -8387,7 +8451,17 @@ function registerFromLogin(){
 
   })
 
-  .catch(function(){
+  .catch(function(error){
+
+    clearTimeout(timeoutId);
+
+    console.error(
+
+      "REGISTER ERROR:",
+
+      error
+
+    );
 
     loginMessage(
 
@@ -8399,81 +8473,9 @@ function registerFromLogin(){
 
   .finally(function(){
 
+    clearTimeout(timeoutId);
+
     setLoginBusy(false);
-
-  });
-
-}
-
-function checkLoginStatus(){
-
-  showLoginScreen();
-
-  refreshTelegramUser();
-
-  if(
-
-    !telegramUser ||
-
-    !telegramUser.id ||
-
-    String(telegramUser.id) === "guest"
-
-  ){
-
-    loginMessage(
-
-      "Fast Bingo ን በTelegram ውስጥ ይክፈቱ።"
-
-    );
-
-    return Promise.resolve(false);
-
-  }
-
-  return api(
-
-    "/api/auth/status"
-
-  )
-
-  .then(function(result){
-
-    if(
-
-      result &&
-
-      result.ok &&
-
-      result.authenticated
-
-    ){
-
-      hideLoginScreen();
-
-      return true;
-
-    }
-
-    loginMessage(
-
-      "Fast Bingo ቤተሰብ ለመቀላቀል ከታች ያለውን ይቀላቀሉ የሚለውን ይጫኑ።"
-
-    );
-
-    return false;
-
-  })
-
-  .catch(function(){
-
-    loginMessage(
-
-      "Login server ጋር መገናኘት አልተቻለም።"
-
-    );
-
-    return false;
 
   });
 
