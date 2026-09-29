@@ -7917,7 +7917,7 @@ function addLoginStyles(){
 
     "fastBingoLoginStyles";
 
-  style.textContent = `
+  style.textContent = ${String.fromCharCode(96)}
 
     #fastBingoLogin{
 
@@ -8043,7 +8043,7 @@ function addLoginStyles(){
 
     }
 
-  `;
+  ${String.fromCharCode(96)};
 
   document.head.appendChild(style);
 
@@ -8075,7 +8075,9 @@ function createLoginScreen(){
 
     "fastBingoLogin";
 
-  overlay.innerHTML = `
+  overlay.innerHTML =
+
+  ${String.fromCharCode(96)}
 
     <div class="login-box">
 
@@ -8123,7 +8125,7 @@ function createLoginScreen(){
 
     </div>
 
-  `;
+  ${String.fromCharCode(96)};
 
   document.body.appendChild(
 
