@@ -2715,7 +2715,7 @@ isRegistered(userId) {
 
   }
 
-     /* =========================================================
+/* =========================================================
 
    LOGIN REQUEST / VERIFY
 
@@ -2757,11 +2757,9 @@ async requestLoginCode(user) {
 
   /*
 
-   * Already fully registered.
+   * User is fully registered only when
 
-   * bonus_given = 1 means the first
-
-   * registration was successfully completed.
+   * the first registration was completed.
 
    */
 
@@ -2787,17 +2785,7 @@ async requestLoginCode(user) {
 
   /*
 
-   * If a previous code request failed,
-
-   * the user_auth row may still exist.
-
-   *
-
-   * Reuse/update that row and send a
-
-   * fresh code instead of treating the
-
-   * user as already registered.
+   * Generate a fresh 6-digit login code.
 
    */
 
@@ -2824,6 +2812,14 @@ async requestLoginCode(user) {
   const hash =
 
     await hashLoginCode(code);
+
+  /*
+
+   * Create or refresh the pending
+
+   * registration/login request.
+
+   */
 
   this.ctx.storage.sql.exec(`
 
@@ -2877,6 +2873,14 @@ async requestLoginCode(user) {
 
   try {
 
+    /*
+
+     * Send the code to the user's
+
+     * Telegram private chat.
+
+     */
+
     await sendLoginCode(
 
       userId,
@@ -2888,6 +2892,16 @@ async requestLoginCode(user) {
     );
 
   } catch (error) {
+
+    /*
+
+     * If Telegram sending fails,
+
+     * remove the pending code so the
+
+     * user is NOT treated as registered.
+
+     */
 
     this.ctx.storage.sql.exec(`
 
@@ -2957,7 +2971,15 @@ async requestLoginCode(user) {
 
 async verifyLoginCode(user, code) {
 
-  if (!user || !user.id || user.id === "guest") {
+  if (
+
+    !user ||
+
+    !user.id ||
+
+    user.id === "guest"
+
+  ) {
 
     return {
 
@@ -2969,11 +2991,19 @@ async verifyLoginCode(user, code) {
 
   }
 
-  const userId = String(user.id);
+  const userId =
 
-  const cleanCode = String(code || "").trim();
+    String(user.id);
 
-  if (!/^\d{6}$/.test(cleanCode)) {
+  const cleanCode =
+
+    String(code || "").trim();
+
+  if (
+
+    !/^\d{6}$/.test(cleanCode)
+
+  ) {
 
     return {
 
@@ -2985,7 +3015,9 @@ async verifyLoginCode(user, code) {
 
   }
 
-  const auth = this.getAuth(userId);
+  const auth =
+
+    this.getAuth(userId);
 
   if (!auth) {
 
@@ -3049,11 +3081,21 @@ async verifyLoginCode(user, code) {
 
   }
 
-  /* Make sure the Telegram user is registered */
+  /*
+
+   * Telegram user is now successfully
+
+   * authenticated/registered.
+
+   */
 
   await this.saveTelegramUser(user);
 
-  /* Make sure the balance row exists */
+  /*
+
+   * Make sure the balance row exists.
+
+   */
 
   await this.ensureBalanceRow(userId);
 
@@ -3061,7 +3103,15 @@ async verifyLoginCode(user, code) {
 
     this.getAuth(userId);
 
-  /* First-registration bonus: exactly once */
+  /*
+
+   * First-registration bonus:
+
+   * exactly 20 ETB to PLAY BALANCE,
+
+   * only once.
+
+   */
 
   if (
 
@@ -3077,27 +3127,55 @@ async verifyLoginCode(user, code) {
 
       this.getBalances(userId);
 
-    const nextMain =
+    const currentPlay =
 
-      Number(balances.mainBalance || 0) +
+      Number(
+
+        balances.playBalance || 0
+
+      );
+
+    const nextPlay =
+
+      currentPlay +
 
       FIRST_REGISTRATION_BONUS;
+
+    /*
+
+     * Keep the legacy balance field
+
+     * synchronized with play_balance.
+
+     */
 
     this.ctx.storage.sql.exec(`
 
       UPDATE balances
 
-      SET main_balance = ?
+      SET
+
+        balance = ?,
+
+        play_balance = ?
 
       WHERE user_id = ?
 
     `,
 
-      nextMain,
+      nextPlay,
+
+      nextPlay,
 
       userId
 
     );
+
+    /*
+
+     * Record the registration bonus.
+
+     */
 
     this.ctx.storage.sql.exec(`
 
@@ -3119,7 +3197,21 @@ async verifyLoginCode(user, code) {
 
       )
 
-      VALUES (?, 'registration_bonus', NULL, ?, 1, ?)
+      VALUES (
+
+        ?,
+
+        'registration_bonus',
+
+        NULL,
+
+        ?,
+
+        1,
+
+        ?
+
+      )
 
     `,
 
@@ -3130,6 +3222,14 @@ async verifyLoginCode(user, code) {
       Date.now()
 
     );
+
+    /*
+
+     * Mark registration as complete
+
+     * and invalidate the login code.
+
+     */
 
     this.ctx.storage.sql.exec(`
 
@@ -3156,6 +3256,14 @@ async verifyLoginCode(user, code) {
     );
 
   } else {
+
+    /*
+
+     * Existing registered user:
+
+     * no second bonus.
+
+     */
 
     this.ctx.storage.sql.exec(`
 
@@ -3214,6 +3322,8 @@ async verifyLoginCode(user, code) {
       balances.playBalance
 
   };
+
+}
 
 }
    
