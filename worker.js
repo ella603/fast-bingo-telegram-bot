@@ -497,17 +497,75 @@ async function sendLoginCode(
 
     );
 
-  if (!response.ok) {
+  const responseText =
+
+    await response.text();
+
+  let result = null;
+
+  try {
+
+    result =
+
+      JSON.parse(
+
+        responseText
+
+      );
+
+  } catch (_) {
+
+    result = {
+
+      ok: false,
+
+      error:
+
+        responseText ||
+
+        "INVALID_RESPONSE"
+
+    };
+
+  }
+
+  if (
+
+    !response.ok ||
+
+    !result ||
+
+    result.ok !== true
+
+  ) {
+
+    console.error(
+
+      "LOGIN_CODE_API_ERROR:",
+
+      JSON.stringify({
+
+        httpStatus: response.status,
+
+        result
+
+      })
+
+    );
 
     throw new Error(
 
-      "Telegram login message failed"
+      result?.message ||
+
+      result?.error ||
+
+      `Login API failed with HTTP ${response.status}`
 
     );
 
   }
 
-  return response.json();
+  return result;
 
 }
 
