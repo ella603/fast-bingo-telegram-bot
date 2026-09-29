@@ -848,15 +848,7 @@ async function sendStartMenu(
 
               text:
 
-                "🎮 ይጫወቱ",
-
-              web_app: {
-
-                url:
-
-                  APP_URL
-
-              }
+                "🎮 ይጫወቱ"
 
             },
 
