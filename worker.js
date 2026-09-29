@@ -2723,7 +2723,15 @@ isRegistered(userId) {
 
 async requestLoginCode(user) {
 
-  if (!user || !user.id || user.id === "guest") {
+  if (
+
+    !user ||
+
+    !user.id ||
+
+    user.id === "guest"
+
+  ) {
 
     return {
 
@@ -2735,15 +2743,35 @@ async requestLoginCode(user) {
 
   }
 
-  const userId = String(user.id);
+  const userId =
 
-  const now = Date.now();
+    String(user.id);
 
-  const existing = this.getAuth(userId);
+  const now =
 
-  /* Already registered */
+    Date.now();
 
-  if (existing) {
+  const existing =
+
+    this.getAuth(userId);
+
+  /*
+
+   * Already fully registered.
+
+   * bonus_given = 1 means the first
+
+   * registration was successfully completed.
+
+   */
+
+  if (
+
+    existing &&
+
+    Number(existing.bonus_given || 0) === 1
+
+  ) {
 
     return {
 
@@ -2757,6 +2785,22 @@ async requestLoginCode(user) {
 
   }
 
+  /*
+
+   * If a previous code request failed,
+
+   * the user_auth row may still exist.
+
+   *
+
+   * Reuse/update that row and send a
+
+   * fresh code instead of treating the
+
+   * user as already registered.
+
+   */
+
   const code =
 
     Math.floor(
@@ -2765,7 +2809,15 @@ async requestLoginCode(user) {
 
       Math.random() *
 
-        (LOGIN_CODE_MAX - LOGIN_CODE_MIN + 1)
+        (
+
+          LOGIN_CODE_MAX -
+
+          LOGIN_CODE_MIN +
+
+          1
+
+        )
 
     );
 
@@ -2799,7 +2851,9 @@ async requestLoginCode(user) {
 
     DO UPDATE SET
 
-      login_code_hash = excluded.login_code_hash,
+      login_code_hash =
+
+        excluded.login_code_hash,
 
       login_code_expires_at =
 
@@ -2813,7 +2867,11 @@ async requestLoginCode(user) {
 
     now + LOGIN_CODE_TTL,
 
-    now
+    existing
+
+      ? Number(existing.created_at || now)
+
+      : now
 
   );
 
@@ -2826,7 +2884,7 @@ async requestLoginCode(user) {
       code,
 
       this.env
-       
+
     );
 
   } catch (error) {
@@ -2843,13 +2901,19 @@ async requestLoginCode(user) {
 
       WHERE user_id = ?
 
-    `, userId);
+    `,
+
+      userId
+
+    );
 
     console.error(
 
       "LOGIN_CODE_SEND_ERROR:",
 
-      error?.message || String(error)
+      error?.message ||
+
+      String(error)
 
     );
 
@@ -2857,7 +2921,15 @@ async requestLoginCode(user) {
 
       ok: false,
 
-      error: "LOGIN_CODE_SEND_FAILED"
+      error:
+
+        "LOGIN_CODE_SEND_FAILED",
+
+      message:
+
+        error?.message ||
+
+        String(error)
 
     };
 
@@ -2871,11 +2943,13 @@ async requestLoginCode(user) {
 
     codeSent: true,
 
-    expiresIn: Math.floor(
+    expiresIn:
 
-      LOGIN_CODE_TTL / 1000
+      Math.floor(
 
-    )
+        LOGIN_CODE_TTL / 1000
+
+      )
 
   };
 
