@@ -8521,23 +8521,69 @@ function requestLogin(){
 
   if(
 
-    !telegramUser ||
+  !telegramUser ||
 
-    !telegramUser.id ||
+  !telegramUser.id ||
 
-    String(telegramUser.id) === "guest"
+  String(telegramUser.id) === "guest"
 
-  ){
+){
 
-    loginMessage(
+  var tgStatus =
 
-      "Telegram መለያ አልተገኘም።"
+    tg
 
-    );
+      ? "WebApp አለ"
 
-    return;
+      : "WebApp የለም";
 
-  }
+  var initStatus =
+
+    tg && tg.initData
+
+      ? "initData አለ"
+
+      : "initData የለም";
+
+  var unsafeStatus =
+
+    tg &&
+
+    tg.initDataUnsafe
+
+      ? "initDataUnsafe አለ"
+
+      : "initDataUnsafe የለም";
+
+  var userStatus =
+
+    tg &&
+
+    tg.initDataUnsafe &&
+
+    tg.initDataUnsafe.user
+
+      ? "User አለ"
+
+      : "User የለም";
+
+  loginMessage(
+
+    "Telegram መለያ አልተገኘም። " +
+
+    tgStatus + " | " +
+
+    initStatus + " | " +
+
+    unsafeStatus + " | " +
+
+    userStatus
+
+  );
+
+  return;
+
+}
 
   setLoginBusy(true);
 
