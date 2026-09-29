@@ -2721,7 +2721,7 @@ isRegistered(userId) {
 
    ========================================================= */
 
-async requestLoginCode(user) {
+async registerNewUser(user) {
 
   if (
 
@@ -2751,17 +2751,17 @@ async requestLoginCode(user) {
 
     Date.now();
 
+  /*
+
+   * Check whether this Telegram user
+
+   * has already completed registration.
+
+   */
+
   const existing =
 
     this.getAuth(userId);
-
-  /*
-
-   * User is fully registered only when
-
-   * the first registration was completed.
-
-   */
 
   if (
 
@@ -2771,13 +2771,27 @@ async requestLoginCode(user) {
 
   ) {
 
+    const balances =
+
+      await this.ensureBalanceRow(userId);
+
     return {
 
       ok: true,
 
+      authenticated: true,
+
       registered: true,
 
-      authenticated: true
+      alreadyRegistered: true,
+
+      mainBalance:
+
+        Number(balances.main_balance || 0),
+
+      playBalance:
+
+        Number(balances.play_balance || 0)
 
     };
 
@@ -2785,39 +2799,79 @@ async requestLoginCode(user) {
 
   /*
 
-   * Generate a fresh 6-digit login code.
+   * Save Telegram user.
 
    */
 
-  const code =
-
-    Math.floor(
-
-      LOGIN_CODE_MIN +
-
-      Math.random() *
-
-        (
-
-          LOGIN_CODE_MAX -
-
-          LOGIN_CODE_MIN +
-
-          1
-
-        )
-
-    );
-
-  const hash =
-
-    await hashLoginCode(code);
+  await this.saveTelegramUser(user);
 
   /*
 
-   * Create or refresh the pending
+   * Make sure balance row exists.
 
-   * registration/login request.
+   */
+
+  await this.ensureBalanceRow(userId);
+
+  /*
+
+   * Read current balance.
+
+   */
+
+  const balances =
+
+    this.getBalances(userId);
+
+  const currentPlay =
+
+    Number(
+
+      balances.playBalance || 0
+
+    );
+
+  const bonus =
+
+    FIRST_REGISTRATION_BONUS;
+
+  const nextPlay =
+
+    currentPlay + bonus;
+
+  /*
+
+   * Put the 20 ETB bonus into
+
+   * PLAY BALANCE only.
+
+   */
+
+  this.ctx.storage.sql.exec(`
+
+    UPDATE balances
+
+    SET
+
+      balance = ?,
+
+      play_balance = ?
+
+    WHERE user_id = ?
+
+  `,
+
+    nextPlay,
+
+    nextPlay,
+
+    userId
+
+  );
+
+  /*
+
+   * Create / complete registration.
 
    */
 
@@ -2841,455 +2895,83 @@ async requestLoginCode(user) {
 
     )
 
-    VALUES (?, ?, ?, ?, NULL, 0)
+    VALUES (?, NULL, NULL, ?, ?, 1)
 
     ON CONFLICT(user_id)
 
     DO UPDATE SET
 
-      login_code_hash =
+      bonus_given = 1,
 
-        excluded.login_code_hash,
+      last_login_at = excluded.last_login_at,
 
-      login_code_expires_at =
+      login_code_hash = NULL,
 
-        excluded.login_code_expires_at
+      login_code_expires_at = NULL
 
   `,
 
     userId,
 
-    hash,
+    now,
 
-    now + LOGIN_CODE_TTL,
-
-    existing
-
-      ? Number(existing.created_at || now)
-
-      : now
+    now
 
   );
 
-  try {
-
-    /*
-
-     * Send the code to the user's
-
-     * Telegram private chat.
-
-     */
-
-    await sendLoginCode(
-
-      userId,
-
-      code,
-
-      this.env
-
-    );
-
-  } catch (error) {
-
-    /*
-
-     * If Telegram sending fails,
-
-     * remove the pending code so the
-
-     * user is NOT treated as registered.
-
-     */
-
-    this.ctx.storage.sql.exec(`
-
-      UPDATE user_auth
-
-      SET
-
-        login_code_hash = NULL,
-
-        login_code_expires_at = NULL
-
-      WHERE user_id = ?
-
-    `,
-
-      userId
-
-    );
-
-    console.error(
-
-      "LOGIN_CODE_SEND_ERROR:",
-
-      error?.message ||
-
-      String(error)
-
-    );
-
-    return {
-
-      ok: false,
-
-      error:
-
-        "LOGIN_CODE_SEND_FAILED",
-
-      message:
-
-        error?.message ||
-
-        String(error)
-
-    };
-
-  }
-
-  return {
-
-    ok: true,
-
-    registered: false,
-
-    codeSent: true,
-
-    expiresIn:
-
-      Math.floor(
-
-        LOGIN_CODE_TTL / 1000
-
-      )
-
-  };
-
-}
-
-async verifyLoginCode(user, code) {
-
-  if (
-
-    !user ||
-
-    !user.id ||
-
-    user.id === "guest"
-
-  ) {
-
-    return {
-
-      ok: false,
-
-      error: "TELEGRAM_USER_REQUIRED"
-
-    };
-
-  }
-
-  const userId =
-
-    String(user.id);
-
-  const cleanCode =
-
-    String(code || "").trim();
-
-  if (
-
-    !/^\d{6}$/.test(cleanCode)
-
-  ) {
-
-    return {
-
-      ok: false,
-
-      error: "INVALID_CODE"
-
-    };
-
-  }
-
-  const auth =
-
-    this.getAuth(userId);
-
-  if (!auth) {
-
-    return {
-
-      ok: false,
-
-      error: "LOGIN_NOT_REQUESTED"
-
-    };
-
-  }
-
-  const expiresAt =
-
-    Number(
-
-      auth.login_code_expires_at || 0
-
-    );
-
-  if (
-
-    !auth.login_code_hash ||
-
-    !expiresAt ||
-
-    Date.now() > expiresAt
-
-  ) {
-
-    return {
-
-      ok: false,
-
-      error: "CODE_EXPIRED"
-
-    };
-
-  }
-
-  const submittedHash =
-
-    await hashLoginCode(cleanCode);
-
-  if (
-
-    submittedHash !==
-
-    String(auth.login_code_hash)
-
-  ) {
-
-    return {
-
-      ok: false,
-
-      error: "WRONG_CODE"
-
-    };
-
-  }
-
   /*
 
-   * Telegram user is now successfully
-
-   * authenticated/registered.
+   * Record the one-time registration bonus.
 
    */
 
-  await this.saveTelegramUser(user);
+  this.ctx.storage.sql.exec(`
 
-  /*
+    INSERT INTO transactions
 
-   * Make sure the balance row exists.
+    (
 
-   */
+      user_id,
 
-  await this.ensureBalanceRow(userId);
+      type,
 
-  const currentAuth =
+      method,
 
-    this.getAuth(userId);
+      amount,
 
-  /*
+      simulated,
 
-   * First-registration bonus:
+      created_at
 
-   * exactly 20 ETB to PLAY BALANCE,
+    )
 
-   * only once.
+    VALUES (
 
-   */
+      ?,
 
-  if (
+      'registration_bonus',
 
-    Number(
+      NULL,
 
-      currentAuth?.bonus_given || 0
+      ?,
 
-    ) !== 1
+      1,
 
-  ) {
+      ?
 
-    const balances =
+    )
 
-      this.getBalances(userId);
+  `,
 
-    const currentPlay =
+    userId,
 
-      Number(
+    bonus,
 
-        balances.playBalance || 0
+    now
 
-      );
+  );
 
-    const nextPlay =
-
-      currentPlay +
-
-      FIRST_REGISTRATION_BONUS;
-
-    /*
-
-     * Keep the legacy balance field
-
-     * synchronized with play_balance.
-
-     */
-
-    this.ctx.storage.sql.exec(`
-
-      UPDATE balances
-
-      SET
-
-        balance = ?,
-
-        play_balance = ?
-
-      WHERE user_id = ?
-
-    `,
-
-      nextPlay,
-
-      nextPlay,
-
-      userId
-
-    );
-
-    /*
-
-     * Record the registration bonus.
-
-     */
-
-    this.ctx.storage.sql.exec(`
-
-      INSERT INTO transactions
-
-      (
-
-        user_id,
-
-        type,
-
-        method,
-
-        amount,
-
-        simulated,
-
-        created_at
-
-      )
-
-      VALUES (
-
-        ?,
-
-        'registration_bonus',
-
-        NULL,
-
-        ?,
-
-        1,
-
-        ?
-
-      )
-
-    `,
-
-      userId,
-
-      FIRST_REGISTRATION_BONUS,
-
-      Date.now()
-
-    );
-
-    /*
-
-     * Mark registration as complete
-
-     * and invalidate the login code.
-
-     */
-
-    this.ctx.storage.sql.exec(`
-
-      UPDATE user_auth
-
-      SET
-
-        bonus_given = 1,
-
-        last_login_at = ?,
-
-        login_code_hash = NULL,
-
-        login_code_expires_at = NULL
-
-      WHERE user_id = ?
-
-    `,
-
-      Date.now(),
-
-      userId
-
-    );
-
-  } else {
-
-    /*
-
-     * Existing registered user:
-
-     * no second bonus.
-
-     */
-
-    this.ctx.storage.sql.exec(`
-
-      UPDATE user_auth
-
-      SET
-
-        last_login_at = ?,
-
-        login_code_hash = NULL,
-
-        login_code_expires_at = NULL
-
-      WHERE user_id = ?
-
-    `,
-
-      Date.now(),
-
-      userId
-
-    );
-
-  }
-
-  const balances =
+  const finalBalances =
 
     this.getBalances(userId);
 
@@ -3301,25 +2983,15 @@ async verifyLoginCode(user, code) {
 
     registered: true,
 
-    firstRegistrationBonus:
-
-      Number(
-
-        currentAuth?.bonus_given || 0
-
-      ) !== 1
-
-        ? FIRST_REGISTRATION_BONUS
-
-        : 0,
+    firstRegistrationBonus: bonus,
 
     mainBalance:
 
-      balances.mainBalance,
+      finalBalances.mainBalance,
 
     playBalance:
 
-      balances.playBalance
+      finalBalances.playBalance
 
   };
 
@@ -4691,7 +4363,7 @@ if (
 
 if (
 
-  url.pathname === "/do/auth/request" &&
+  url.pathname === "/do/auth/register" &&
 
   request.method === "POST"
 
@@ -4699,39 +4371,7 @@ if (
 
   return json(
 
-    await this.requestLoginCode(user)
-
-  );
-
-}
-
-if (
-
-  url.pathname === "/do/auth/verify" &&
-
-  request.method === "POST"
-
-) {
-
-  let body = {};
-
-  try {
-
-    body =
-
-      await request.json();
-
-  } catch (_) {}
-
-  return json(
-
-    await this.verifyLoginCode(
-
-      user,
-
-      body.code
-
-    )
+    await this.registerNewUser(user)
 
   );
 
@@ -8245,7 +7885,7 @@ refreshTelegramUser();
 
   /* =======================================================
 
-   LOGIN SCREEN
+   LOGIN / FIRST REGISTRATION SCREEN
 
    ======================================================= */
 
@@ -8277,7 +7917,7 @@ function addLoginStyles(){
 
     "fastBingoLoginStyles";
 
-  style.textContent = ${String.fromCharCode(96)}
+  style.textContent = `
 
     #fastBingoLogin{
 
@@ -8311,7 +7951,7 @@ function addLoginStyles(){
 
       border-radius:22px;
 
-      padding:28px 22px;
+      padding:30px 22px;
 
       box-shadow:0 20px 60px rgba(0,0,0,.45);
 
@@ -8327,53 +7967,33 @@ function addLoginStyles(){
 
       color:#fff;
 
-      margin-bottom:7px;
+      margin-bottom:12px;
 
     }
 
     #fastBingoLogin .login-subtitle{
 
-      color:#9ca8bb;
+      color:#cbd5e1;
 
-      font-size:14px;
+      font-size:15px;
 
-      line-height:1.6;
+      line-height:1.8;
 
-      margin-bottom:24px;
-
-    }
-
-    #fastBingoLogin .login-input{
-
-      width:100%;
-
-      box-sizing:border-box;
-
-      background:#080d18;
-
-      border:1px solid rgba(255,255,255,.12);
-
-      color:#fff;
-
-      border-radius:14px;
-
-      padding:15px;
-
-      font-size:22px;
-
-      text-align:center;
-
-      letter-spacing:7px;
-
-      outline:none;
-
-      margin-bottom:12px;
+      margin-bottom:10px;
 
     }
 
-    #fastBingoLogin .login-input:focus{
+    #fastBingoLogin .login-bonus{
 
-      border-color:#e11d48;
+      color:#22c55e;
+
+      font-size:18px;
+
+      font-weight:800;
+
+      line-height:1.7;
+
+      margin:14px 0 22px;
 
     }
 
@@ -8385,13 +8005,13 @@ function addLoginStyles(){
 
       border-radius:14px;
 
-      padding:15px;
+      padding:16px;
 
       background:#e11d48;
 
       color:#fff;
 
-      font-size:16px;
+      font-size:17px;
 
       font-weight:800;
 
@@ -8423,27 +8043,7 @@ function addLoginStyles(){
 
     }
 
-    #fastBingoLogin .login-code-area{
-
-      display:none;
-
-      margin-top:4px;
-
-    }
-
-    #fastBingoLogin .login-welcome{
-
-      color:#22c55e;
-
-      font-size:14px;
-
-      font-weight:700;
-
-      margin-bottom:16px;
-
-    }
-
-  ${String.fromCharCode(96)};
+  `;
 
   document.head.appendChild(style);
 
@@ -8475,9 +8075,7 @@ function createLoginScreen(){
 
     "fastBingoLogin";
 
-  overlay.innerHTML =
-
-    ${String.fromCharCode(96)}
+  overlay.innerHTML = `
 
     <div class="login-box">
 
@@ -8487,25 +8085,19 @@ function createLoginScreen(){
 
       </div>
 
-      <div
+      <div class="login-subtitle">
 
-        class="login-subtitle"
-
-        id="loginSubtitle"
-
-      >
-
-        ወደ Fast Bingo ለመግባት የTelegram መለያዎን ያረጋግጡ።
+        🎉 Fast Bingo ቤተሰብ ይሁኑ!
 
       </div>
 
-      <div
+      <div class="login-bonus">
 
-        class="login-welcome"
+        የመጀመሪያ ምዝገባ<br>
 
-        id="loginWelcome"
+        20 ብር ጉርሻ ያግኙ!
 
-      ></div>
+      </div>
 
       <button
 
@@ -8513,55 +8105,13 @@ function createLoginScreen(){
 
         class="login-button"
 
-        id="loginRequestButton"
+        id="loginJoinButton"
 
       >
 
-        🔐 የመግቢያ ኮድ ላክ
+        🎮 ይቀላቀሉ
 
       </button>
-
-      <div
-
-        class="login-code-area"
-
-        id="loginCodeArea"
-
-      >
-
-        <input
-
-          id="loginCodeInput"
-
-          class="login-input"
-
-          type="tel"
-
-          inputmode="numeric"
-
-          maxlength="6"
-
-          autocomplete="one-time-code"
-
-          placeholder="••••••"
-
-        />
-
-        <button
-
-          type="button"
-
-          class="login-button"
-
-          id="loginVerifyButton"
-
-        >
-
-          ✅ ግባ
-
-        </button>
-
-      </div>
 
       <div
 
@@ -8573,7 +8123,7 @@ function createLoginScreen(){
 
     </div>
 
-    ${String.fromCharCode(96)};
+  `;
 
   document.body.appendChild(
 
@@ -8585,7 +8135,7 @@ function createLoginScreen(){
 
     .getElementById(
 
-      "loginRequestButton"
+      "loginJoinButton"
 
     )
 
@@ -8593,49 +8143,7 @@ function createLoginScreen(){
 
       "click",
 
-      requestLogin
-
-    );
-
-  document
-
-    .getElementById(
-
-      "loginVerifyButton"
-
-    )
-
-    .addEventListener(
-
-      "click",
-
-      verifyLogin
-
-    );
-
-  document
-
-    .getElementById(
-
-      "loginCodeInput"
-
-    )
-
-    .addEventListener(
-
-      "input",
-
-      function(){
-
-        this.value =
-
-          this.value
-
-            .replace(/\D/g,"")
-
-            .slice(0,6);
-
-      }
+      registerFromLogin
 
     );
 
@@ -8661,41 +8169,21 @@ function loginMessage(message){
 
 }
 
-function setLoginBusy(
-
-  busy
-
-){
+function setLoginBusy(busy){
 
   loginBusy = busy;
 
-  var requestButton =
+  var button =
 
     document.getElementById(
 
-      "loginRequestButton"
+      "loginJoinButton"
 
     );
 
-  var verifyButton =
+  if(button){
 
-    document.getElementById(
-
-      "loginVerifyButton"
-
-    );
-
-  if(requestButton){
-
-    requestButton.disabled =
-
-      busy;
-
-  }
-
-  if(verifyButton){
-
-    verifyButton.disabled =
+    button.disabled =
 
       busy;
 
@@ -8749,7 +8237,7 @@ function hideLoginScreen(){
 
 }
 
-function requestLogin(){
+function registerFromLogin(){
 
   refreshTelegramUser();
 
@@ -8761,267 +8249,39 @@ function requestLogin(){
 
   if(
 
-  !telegramUser ||
+    !telegramUser ||
 
-  !telegramUser.id ||
+    !telegramUser.id ||
 
-  String(telegramUser.id) === "guest"
+    String(telegramUser.id) === "guest"
 
-){
+  ){
 
-  var tgStatus =
+    loginMessage(
 
-    tg
+      "እባክዎ Fast Bingo ን በTelegram ውስጥ ይክፈቱ።"
 
-      ? "WebApp አለ"
+    );
 
-      : "WebApp የለም";
+    return;
 
-  var initStatus =
-
-    tg && tg.initData
-
-      ? "initData አለ"
-
-      : "initData የለም";
-
-  var unsafeStatus =
-
-    tg &&
-
-    tg.initDataUnsafe
-
-      ? "initDataUnsafe አለ"
-
-      : "initDataUnsafe የለም";
-
-  var userStatus =
-
-    tg &&
-
-    tg.initDataUnsafe &&
-
-    tg.initDataUnsafe.user
-
-      ? "User አለ"
-
-      : "User የለም";
-
-  loginMessage(
-
-    "Telegram መለያ አልተገኘም። " +
-
-    tgStatus + " | " +
-
-    initStatus + " | " +
-
-    unsafeStatus + " | " +
-
-    userStatus
-
-  );
-
-  return;
-
-}
+  }
 
   setLoginBusy(true);
 
   loginMessage(
 
-    "የመግቢያ ኮድ እየተላከ ነው..."
+    "Fast Bingo ላይ እየተመዘገቡ ነው..."
 
   );
 
   api(
 
-    "/api/auth/request",
+    "/api/auth/register",
 
     {
 
       method:"POST"
-
-    }
-
-  )
-
-  .then(function(result){
-
-    if(
-
-      result &&
-
-      result.ok &&
-
-      result.authenticated
-
-    ){
-
-      hideLoginScreen();
-
-      loginReady = true;
-
-      return;
-
-    }
-
-    if(
-
-      result &&
-
-      result.ok &&
-
-      result.codeSent
-
-    ){
-
-      document
-
-        .getElementById(
-
-          "loginCodeArea"
-
-        )
-
-        .style.display =
-
-          "block";
-
-      document
-
-        .getElementById(
-
-          "loginRequestButton"
-
-        )
-
-        .style.display =
-
-          "none";
-
-      document
-
-        .getElementById(
-
-          "loginCodeInput"
-
-        )
-
-        .focus();
-
-      loginMessage(
-
-        "Telegram ላይ የተላከውን 6 አሃዝ ኮድ እዚህ ያስገቡ።"
-
-      );
-
-      return;
-
-    }
-
-    loginMessage(
-
-  (
-
-    result &&
-
-    (
-
-      result.message ||
-
-      result.error
-
-    )
-
-  )
-
-    ? (
-
-        result.message ||
-
-        result.error
-
-      )
-
-    : "ኮዱን መላክ አልተቻለም። እባክዎ እንደገና ይሞክሩ።"
-
-);
-
-  .catch(function(){
-
-    loginMessage(
-
-      "Server error። እባክዎ እንደገና ይሞክሩ።"
-
-    );
-
-  })
-
-  .finally(function(){
-
-    setLoginBusy(false);
-
-  });
-
-}
-
-function verifyLogin(){
-
-  if(loginBusy){
-
-    return;
-
-  }
-
-  var input =
-
-    document.getElementById(
-
-      "loginCodeInput"
-
-    );
-
-  var code =
-
-    input
-
-      ? input.value.trim()
-
-      : "";
-
-  if(!/^\d{6}$/.test(code)){
-
-    loginMessage(
-
-      "እባክዎ 6 አሃዝ ኮድ ያስገቡ።"
-
-    );
-
-    return;
-
-  }
-
-  setLoginBusy(true);
-
-  loginMessage(
-
-    "Login እየተረጋገጠ ነው..."
-
-  );
-
-  api(
-
-    "/api/auth/verify",
-
-    {
-
-      method:"POST",
-
-      body:JSON.stringify({
-
-        code:code
-
-      })
 
     }
 
@@ -9067,11 +8327,21 @@ function verifyLogin(){
 
       ){
 
-        showToast(
+        if(
 
-          "🎉 እንኳን ደህና መጡ! 20 ETB የመጀመሪያ ምዝገባ ቦነስ ተጨምሯል።"
+          typeof showToast ===
 
-        );
+          "function"
+
+        ){
+
+          showToast(
+
+            "🎉 እንኳን ወደ Fast Bingo ቤተሰብ በደህና መጡ! 20 ብር ጉርሻ በመጫወቻ ሂሳብዎ ላይ ተጨምሯል።"
+
+          );
+
+        }
 
       }
 
@@ -9079,49 +8349,31 @@ function verifyLogin(){
 
     }
 
-    if(
-
-      result &&
-
-      result.error ===
-
-        "WRONG_CODE"
-
-    ){
-
-      loginMessage(
-
-        "❌ የገባው ኮድ ትክክል አይደለም።"
-
-      );
-
-      return;
-
-    }
-
-    if(
-
-      result &&
-
-      result.error ===
-
-        "CODE_EXPIRED"
-
-    ){
-
-      loginMessage(
-
-        "⏰ ኮዱ ጊዜው አልፎታል። አዲስ ኮድ ይጠይቁ።"
-
-      );
-
-      return;
-
-    }
-
     loginMessage(
 
-      "Login አልተሳካም። እባክዎ እንደገና ይሞክሩ።"
+      (
+
+        result &&
+
+        (
+
+          result.message ||
+
+          result.error
+
+        )
+
+      )
+
+        ? (
+
+            result.message ||
+
+            result.error
+
+          )
+
+        : "ምዝገባው አልተሳካም። እባክዎ እንደገና ይሞክሩ።"
 
     );
 
@@ -9148,6 +8400,8 @@ function verifyLogin(){
 function checkLoginStatus(){
 
   showLoginScreen();
+
+  refreshTelegramUser();
 
   if(
 
@@ -9195,7 +8449,7 @@ function checkLoginStatus(){
 
     loginMessage(
 
-      "ለመግባት የመግቢያ ኮድ ይጠይቁ።"
+      "Fast Bingo ቤተሰብ ለመቀላቀል ከታች ያለውን ይቀላቀሉ የሚለውን ይጫኑ።"
 
     );
 
