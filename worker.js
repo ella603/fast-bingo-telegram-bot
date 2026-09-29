@@ -8481,6 +8481,90 @@ function registerFromLogin(){
 
 }
 
+function checkLoginStatus(){
+
+  showLoginScreen();
+
+  refreshTelegramUser();
+
+  if(
+
+    !telegramUser ||
+
+    !telegramUser.id ||
+
+    String(telegramUser.id) === "guest"
+
+  ){
+
+    loginMessage(
+
+      "Fast Bingo ን በTelegram ውስጥ ይክፈቱ።"
+
+    );
+
+    return Promise.resolve(false);
+
+  }
+
+  return api(
+
+    "/api/auth/status"
+
+  )
+
+  .then(function(result){
+
+    if(
+
+      result &&
+
+      result.ok &&
+
+      result.authenticated === true
+
+    ){
+
+      hideLoginScreen();
+
+      loginReady = true;
+
+      return true;
+
+    }
+
+    loginMessage(
+
+      "Fast Bingo ቤተሰብ ለመቀላቀል ከታች ያለውን ይቀላቀሉ የሚለውን ይጫኑ።"
+
+    );
+
+    return false;
+
+  })
+
+  .catch(function(error){
+
+    console.error(
+
+      "AUTH STATUS ERROR:",
+
+      error
+
+    );
+
+    loginMessage(
+
+      "Login server ጋር መገናኘት አልተቻለም።"
+
+    );
+
+    return false;
+
+  });
+
+}
+
   /* =======================================================
 
      API
