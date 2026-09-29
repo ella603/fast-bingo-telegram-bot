@@ -7701,17 +7701,81 @@ var userHeader = "";
 
 function refreshTelegramUser(){
 
-  var liveUser =
+  var liveUser = null;
+
+  /* 1. Telegram WebApp user */
+
+  if(
 
     tg &&
 
     tg.initDataUnsafe &&
 
-    tg.initDataUnsafe.user
+    tg.initDataUnsafe.user &&
 
-      ? tg.initDataUnsafe.user
+    tg.initDataUnsafe.user.id
 
-      : null;
+  ){
+
+    liveUser =
+
+      tg.initDataUnsafe.user;
+
+  }
+
+  /* 2. Fallback: read user from Telegram initData */
+
+  if(
+
+    !liveUser &&
+
+    tg &&
+
+    tg.initData
+
+  ){
+
+    try{
+
+      var params =
+
+        new URLSearchParams(
+
+          tg.initData
+
+        );
+
+      var userData =
+
+        params.get("user");
+
+      if(userData){
+
+        liveUser =
+
+          JSON.parse(
+
+            userData
+
+          );
+
+      }
+
+    }catch(e){
+
+      console.error(
+
+        "Telegram user parse error:",
+
+        e
+
+      );
+
+    }
+
+  }
+
+  /* 3. Save Telegram user */
 
   if(
 
@@ -7721,9 +7785,13 @@ function refreshTelegramUser(){
 
   ){
 
-    telegramUser = liveUser;
+    telegramUser =
+
+      liveUser;
 
   }
+
+  /* 4. Send current user to API */
 
   userHeader =
 
