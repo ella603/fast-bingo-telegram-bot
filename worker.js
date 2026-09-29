@@ -8921,11 +8921,31 @@ function requestLogin(){
 
     loginMessage(
 
-      "ኮዱን መላክ አልተቻለም። እባክዎ እንደገና ይሞክሩ።"
+  (
 
-    );
+    result &&
 
-  })
+    (
+
+      result.message ||
+
+      result.error
+
+    )
+
+  )
+
+    ? (
+
+        result.message ||
+
+        result.error
+
+      )
+
+    : "ኮዱን መላክ አልተቻለም። እባክዎ እንደገና ይሞክሩ።"
+
+);
 
   .catch(function(){
 
