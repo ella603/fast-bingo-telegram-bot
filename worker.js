@@ -4349,13 +4349,19 @@ if (
 
     this.getAuth(user.id);
 
+  const registered =
+
+    !!auth &&
+
+    Number(auth.bonus_given || 0) === 1;
+
   return json({
 
     ok: true,
 
-    authenticated: !!auth,
+    authenticated: registered,
 
-    registered: !!auth
+    registered
 
   });
 
@@ -13016,6 +13022,8 @@ export default {
       "/api/claim",
 
       "/api/auth/status",
+
+      "/api/auth/register",
 
       "/api/auth/request",
 
