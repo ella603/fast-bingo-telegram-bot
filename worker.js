@@ -2325,11 +2325,43 @@ sql.exec(`
 
       }
 
-        await this.scheduleNext(
+      /*
 
-          BALL_INTERVAL
+       * =====================================================
 
-        );
+       * RESULT -> NEXT GAME
+
+       * =====================================================
+
+       */
+
+      if (state.status === "result") {
+
+        const winnerExpiresAt =
+
+          Number(
+
+            state.winner_expires_at || 0
+
+          );
+
+        const remaining =
+
+          winnerExpiresAt - Date.now();
+
+        if (remaining > 0) {
+
+          await this.scheduleNext(
+
+            remaining
+
+          );
+
+          return;
+
+        }
+
+        await this.startNextGame();
 
         return;
 
