@@ -10831,6 +10831,66 @@ function checkLoginStatus(){
 
   /* =======================================================
 
+     LOAD MY SELECTED CARDS
+
+     ======================================================= */
+
+  function loadMyCards(){
+
+    return api(
+
+      "/api/user-cards"
+
+    ).then(function(data){
+
+      if(
+
+        data &&
+
+        data.ok &&
+
+        Array.isArray(data.selected)
+
+      ){
+
+        selected =
+
+          data.selected.map(
+
+            Number
+
+          );
+
+        selected.sort(
+
+          function(a,b){
+
+            return a-b;
+
+          }
+
+        );
+
+        updateSelectionCount();
+
+        renderCards();
+
+        renderPreviews();
+
+      }
+
+      return data;
+
+    }).catch(function(){
+
+      return null;
+
+    });
+
+  }
+
+  /* =======================================================
+
      BALANCE
 
      ======================================================= */
