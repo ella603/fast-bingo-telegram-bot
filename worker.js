@@ -11719,8 +11719,6 @@ function checkLoginStatus(){
 
   setLanguage("am");
 
-  prepareAllCards();
-
   renderCards();
 
   renderPreviews();
