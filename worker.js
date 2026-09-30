@@ -11379,15 +11379,25 @@ function checkLoginStatus(){
 
         var previousGame =
 
-          currentGame
-
-            ? currentGame.gameNumber
-
-            : null;
-
-        var previousGame =
-
           currentGame;
+
+        var isNewResult =
+
+          data &&
+
+          data.status === "result" &&
+
+          (
+
+            !previousGame ||
+
+            previousGame.status !== "result" ||
+
+            previousGame.gameNumber !==
+
+              data.gameNumber
+
+          );
 
         var isNewResult =
 
