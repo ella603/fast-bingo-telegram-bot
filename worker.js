@@ -8253,6 +8253,8 @@ refreshTelegramUser();
 
   var selected = [];
 
+  var takenCards = [];
+
   var currentGame = null;
 
   var walletType = "deposit";
@@ -10753,13 +10755,33 @@ function checkLoginStatus(){
 
         /*
 
-          New game = clear only local selected
+          Load globally taken cards
 
-          cards if backend no longer has them.
+          from the current game.
 
-          Existing backend-selected cards are
+        */
 
-          loaded again below.
+        takenCards =
+
+          Array.isArray(
+
+            data.takenCards
+
+          )
+
+            ? data.takenCards.map(
+
+                Number
+
+              )
+
+            : [];
+
+        /*
+
+          If this is a new game,
+
+          reload the user's own cards.
 
         */
 
@@ -10776,6 +10798,18 @@ function checkLoginStatus(){
           loadMyCards();
 
         }
+
+        /*
+
+          Refresh the 400 cards so that
+
+          cards selected by other users
+
+          immediately show as "taken".
+
+        */
+
+        renderCards();
 
         updateGameUI();
 
