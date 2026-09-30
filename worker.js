@@ -779,6 +779,58 @@ sql.exec(`
 
 /* =========================================================
 
+   WINNER / RESULT STATE MIGRATION
+
+   ========================================================= */
+
+const winnerStateColumns =
+
+  sql.exec(`
+
+    PRAGMA table_info(state)
+
+  `).toArray();
+
+const winnerColumnsToAdd = [
+
+  ["winner_user_id", "TEXT"],
+
+  ["winner_card", "INTEGER"],
+
+  ["winner_name", "TEXT"],
+
+  ["winner_amount", "REAL"],
+
+  ["winner_expires_at", "INTEGER"]
+
+];
+
+for (const [columnName, columnType] of winnerColumnsToAdd) {
+
+  const exists =
+
+    winnerStateColumns.some(
+
+      c => c.name === columnName
+
+    );
+
+  if (!exists) {
+
+    sql.exec(`
+
+      ALTER TABLE state
+
+      ADD COLUMN ${columnName} ${columnType}
+
+    `);
+
+  }
+
+}
+     
+/* =========================================================
+
    USER AUTH TABLE
 
    ========================================================= */
@@ -1171,8 +1223,10 @@ sql.exec(`
 
       state.status !== "lobby" &&
 
-      state.status !== "live"
+      state.status !== "live" &&
 
+      state.status !== "result"
+       
     ) {
 
       const nextGame =
@@ -1401,7 +1455,13 @@ sql.exec(`
 
     if (
 
-      state.status !== "live" ||
+      (
+
+        state.status !== "live" &&
+
+        state.status !== "result"
+
+      ) ||
 
       Number(state.ball_index) < 0
 
@@ -1829,19 +1889,13 @@ sql.exec(`
 
         if (
 
-          !Number.isInteger(
-
-            currentIndex
-
-          ) ||
+          !Number.isInteger(currentIndex) ||
 
           currentIndex < 0
 
         ) {
 
-          this.ctx.storage.sql.exec(
-
-            `
+          this.ctx.storage.sql.exec(`
 
             UPDATE state
 
@@ -1861,11 +1915,7 @@ sql.exec(`
 
             WHERE id = 1
 
-            `,
-
-            now
-
-          );
+          `, now);
 
           await this.scheduleNext(
 
@@ -1879,9 +1929,349 @@ sql.exec(`
 
         /*
 
-         * After ball 75, immediately create the
+         * Get the balls already called.
 
-         * next 45-second lobby.
+         */
+
+        const called =
+
+          this.getCalledBalls(
+
+            state
+
+          );
+
+        /*
+
+         * Check every selected card in the
+
+         * current game for the first 2-line winner.
+
+         */
+
+        const selectedRows =
+
+          this.ctx.storage.sql
+
+            .exec(`
+
+              SELECT
+
+                sc.user_id,
+
+                sc.card_number,
+
+                sc.selected_at,
+
+                COALESCE(
+
+                  u.first_name,
+
+                  'Player'
+
+                ) AS first_name,
+
+                COALESCE(
+
+                  u.username,
+
+                  ''
+
+                ) AS username
+
+              FROM selected_cards sc
+
+              LEFT JOIN users u
+
+                ON u.user_id = sc.user_id
+
+              WHERE sc.game_number = ?
+
+              ORDER BY
+
+                sc.selected_at ASC,
+
+                sc.card_number ASC
+
+            `,
+
+            Number(state.game_number)
+
+          )
+
+          .toArray();
+
+        let winner = null;
+
+        for (
+
+          const row of selectedRows
+
+        ) {
+
+          const card =
+
+            makeCard(
+
+              Number(row.card_number)
+
+            );
+
+          if (
+
+            hasTwoLines(
+
+              card,
+
+              called
+
+            )
+
+          ) {
+
+            winner = {
+
+              userId:
+
+                String(row.user_id),
+
+              card:
+
+                Number(row.card_number),
+
+              name:
+
+                String(
+
+                  row.first_name ||
+
+                  row.username ||
+
+                  "Player"
+
+                ),
+
+              username:
+
+                String(
+
+                  row.username || ""
+
+                )
+
+            };
+
+            break;
+
+          }
+
+        }
+
+        /*
+
+         * WINNER FOUND
+
+         */
+
+        if (winner) {
+
+          const jackpot =
+
+            this.getJackpot(
+
+              Number(state.game_number)
+
+            );
+
+          const winningAmount =
+
+            Number(
+
+              jackpot.jackpot || 0
+
+            );
+
+          const winnerExpiresAt =
+
+            Date.now() + 3000;
+
+          /*
+
+           * Make sure winner balance exists.
+
+           */
+
+          await this.ensureBalanceRow(
+
+            winner.userId
+
+          );
+
+          const winnerBalances =
+
+            this.getBalances(
+
+              winner.userId
+
+            );
+
+          const oldPlayBalance =
+
+            Number(
+
+              winnerBalances.playBalance || 0
+
+            );
+
+          const newPlayBalance =
+
+            oldPlayBalance +
+
+            winningAmount;
+
+          /*
+
+           * Pay jackpot into PLAY BALANCE.
+
+           */
+
+          this.ctx.storage.sql.exec(`
+
+            UPDATE balances
+
+            SET
+
+              balance = ?,
+
+              play_balance = ?
+
+            WHERE user_id = ?
+
+          `,
+
+            newPlayBalance,
+
+            newPlayBalance,
+
+            winner.userId
+
+          );
+
+          /*
+
+           * Record winner payment.
+
+           */
+
+          this.ctx.storage.sql.exec(`
+
+            INSERT INTO transactions
+
+            (
+
+              user_id,
+
+              type,
+
+              method,
+
+              amount,
+
+              simulated,
+
+              created_at
+
+            )
+
+            VALUES
+
+            (
+
+              ?,
+
+              'bingo_win',
+
+              NULL,
+
+              ?,
+
+              1,
+
+              ?
+
+            )
+
+          `,
+
+            winner.userId,
+
+            winningAmount,
+
+            Date.now()
+
+          );
+
+          /*
+
+           * IMPORTANT:
+
+           * Keep the result visible for 3 seconds.
+
+           */
+
+          this.ctx.storage.sql.exec(`
+
+            UPDATE state
+
+            SET
+
+              status = 'result',
+
+              winner_user_id = ?,
+
+              winner_card = ?,
+
+              winner_name = ?,
+
+              winner_amount = ?,
+
+              winner_expires_at = ?
+
+            WHERE id = 1
+
+          `,
+
+            winner.userId,
+
+            winner.card,
+
+            winner.name,
+
+            winningAmount,
+
+            winnerExpiresAt
+
+          );
+
+          await this.scheduleNext(
+
+            3000
+
+          );
+
+          return;
+
+        }
+
+        /*
+
+         * GAME HAS REACHED BALL 75.
+
+         *
+
+         * If there is no winner by then,
+
+         * immediately start the next 45-second lobby.
 
          */
 
@@ -1910,7 +2300,7 @@ sql.exec(`
           currentIndex + 1;
 
         this.ctx.storage.sql.exec(
-
+ 
           `
 
           UPDATE state
@@ -1924,6 +2314,16 @@ sql.exec(`
           nextIndex
 
         );
+
+        await this.scheduleNext(
+
+          BALL_INTERVAL
+
+        );
+
+        return;
+
+      }
 
         await this.scheduleNext(
 
@@ -2175,6 +2575,44 @@ sql.exec(`
 
     }
 
+    /*
+
+     * RESULT -> NEXT 45 SECOND LOBBY
+
+     */
+
+    if (state.status === "result") {
+
+      const expires =
+
+        Number(
+
+          state.winner_expires_at || 0
+
+        );
+
+      const remaining =
+
+        expires - Date.now();
+
+      if (remaining > 0) {
+
+        await this.scheduleNext(
+
+          remaining
+
+        );
+
+        return;
+
+      }
+
+      await this.startNextGame();
+
+      return;
+
+    }
+     
     const currentBall =
 
       state.status === "live" &&
@@ -2259,7 +2697,9 @@ sql.exec(`
 
     return {
 
-      status: state.status,
+      status:
+
+        state.status,
 
       gameNumber:
 
@@ -2291,11 +2731,43 @@ sql.exec(`
 
         jackpot.jackpot,
 
-      takenCards
+      takenCards,
 
-    };
+      winnerUserId:
 
-  }
+        state.winner_user_id || null,
+
+      winnerCard:
+
+        state.winner_card === null ||
+
+        state.winner_card === undefined
+
+          ? null
+
+          : Number(state.winner_card),
+
+      winnerName:
+
+        state.winner_name || null,
+
+      winnerAmount:
+
+        Number(
+
+          state.winner_amount || 0
+
+        ),
+
+      winnerExpiresAt:
+
+        Number(
+
+          state.winner_expires_at || 0
+
+        )
+
+  };
 
   async selectCards(userId, cards) {
 
@@ -10723,6 +11195,166 @@ function checkLoginStatus(){
 
   }
 
+  function showBingoResult(game){
+
+    var old =
+
+      document.getElementById(
+
+        "fastBingoResult"
+
+      );
+
+    if(old){
+
+      old.remove();
+
+    }
+
+    var myId =
+
+      telegramUser &&
+
+      telegramUser.id
+
+        ? String(
+
+            telegramUser.id
+
+          )
+
+        : "";
+
+    var winnerId =
+
+      game.winnerUserId
+
+        ? String(
+
+            game.winnerUserId
+
+          )
+
+        : "";
+
+    var isWinner =
+
+      myId !== "" &&
+
+      winnerId !== "" &&
+
+      myId === winnerId;
+
+    var card =
+
+      game.winnerCard ||
+
+      "—";
+
+    var name =
+
+      game.winnerName ||
+
+      "Player";
+
+    var amount =
+
+      Number(
+
+        game.winnerAmount || 0
+
+      );
+
+    var overlay =
+
+      document.createElement(
+
+        "div"
+
+      );
+
+    overlay.id =
+
+      "fastBingoResult";
+
+    overlay.innerHTML =
+
+      '<div class="fast-bingo-result-box">' +
+
+        '<div class="fast-bingo-result-title">' +
+
+          'BINGO' +
+
+        '</div>' +
+
+        '<div class="fast-bingo-result-message">' +
+
+          (
+
+            isWinner
+
+              ? '🎉 አሸንፈዋል!'
+
+              : 'BINGO — ጨዋታው አልቋል'
+
+          ) +
+
+        '</div>' +
+
+        '<div class="fast-bingo-result-card">' +
+
+          'CARD #' +
+
+          card +
+
+        '</div>' +
+
+        '<div class="fast-bingo-result-name">' +
+
+          name +
+
+        '</div>' +
+
+        '<div class="fast-bingo-result-money">' +
+
+          amount.toLocaleString() +
+
+          ' ETB' +
+
+        '</div>' +
+
+      '</div>';
+
+    document.body.appendChild(
+
+      overlay
+
+    );
+
+    setTimeout(
+
+      function(){
+
+        if(
+
+          overlay &&
+
+          overlay.parentNode
+
+        ){
+
+          overlay.remove();
+
+        }
+
+      },
+
+      3000
+
+    );
+
+  }
+
   /* =======================================================
 
      GAME REFRESH
@@ -10753,9 +11385,37 @@ function checkLoginStatus(){
 
             : null;
 
+        var previousGame =
+
+          currentGame;
+
+        var isNewResult =
+
+          data &&
+
+          data.status === "result" &&
+
+          (
+
+            !previousGame ||
+
+            previousGame.status !== "result" ||
+
+            previousGame.gameNumber !==
+
+              data.gameNumber
+
+          );
+        
         currentGame =
 
           data;
+
+        if (isNewResult) {
+
+          showBingoResult(data);
+
+        }
 
         /*
 
