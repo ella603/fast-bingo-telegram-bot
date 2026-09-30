@@ -2397,21 +2397,27 @@ sql.exec(`
 
       ) + 1;
 
-    const now = Date.now();
+    const now =
+
+      Date.now();
 
     const lobbyEnds =
 
-      now + LOBBY_SECONDS * 1000;
+      now +
+
+      LOBBY_SECONDS * 1000;
 
     const order =
 
-      makeBallOrder(nextGame);
+      makeBallOrder(
+
+        nextGame
+
+      );
 
     /*
 
      * Remove old card selections.
-
-     * Current/new game selections remain available.
 
      */
 
@@ -2428,6 +2434,16 @@ sql.exec(`
       nextGame
 
     );
+
+    /*
+
+     * Start the new 45-second lobby.
+
+     *
+
+     * Clear the previous winner/result.
+
+     */
 
     this.ctx.storage.sql.exec(
 
@@ -2447,7 +2463,17 @@ sql.exec(`
 
         ball_index = -1,
 
-        ball_order = ?
+        ball_order = ?,
+
+        winner_user_id = NULL,
+
+        winner_card = NULL,
+
+        winner_name = NULL,
+
+        winner_amount = NULL,
+
+        winner_expires_at = NULL
 
       WHERE id = 1
 
@@ -2457,7 +2483,11 @@ sql.exec(`
 
       lobbyEnds,
 
-      JSON.stringify(order)
+      JSON.stringify(
+
+        order
+
+      )
 
     );
 
@@ -2523,7 +2553,9 @@ sql.exec(`
 
         gameNumber: 1,
 
-        lobbyRemaining: LOBBY_SECONDS,
+        lobbyRemaining:
+
+          LOBBY_SECONDS,
 
         calledBalls: [],
 
@@ -2537,7 +2569,17 @@ sql.exec(`
 
         jackpot: 0,
 
-        takenCards: []
+        takenCards: [],
+
+        winnerUserId: null,
+
+        winnerCard: null,
+
+        winnerName: null,
+
+        winnerAmount: 0,
+
+        winnerExpiresAt: 0
 
       };
 
@@ -2545,7 +2587,11 @@ sql.exec(`
 
     const calledBalls =
 
-      this.getCalledBalls(state);
+      this.getCalledBalls(
+
+        state
+
+      );
 
     let order = [];
 
@@ -2574,6 +2620,236 @@ sql.exec(`
         );
 
     }
+
+    /*
+
+     * Current ball.
+
+     */
+
+    const currentBall =
+
+      (
+
+        state.status === "live" ||
+
+        state.status === "result"
+
+      ) &&
+
+      Number(
+
+        state.ball_index
+
+      ) >= 0
+
+        ? order[
+
+            Number(
+
+              state.ball_index
+
+            )
+
+          ]
+
+        : null;
+
+    /*
+
+     * Lobby countdown.
+
+     */
+
+    const lobbyRemaining =
+
+      state.status === "lobby"
+
+        ? Math.max(
+
+            0,
+
+            Math.ceil(
+
+              (
+
+                Number(
+
+                  state.lobby_ends_at || 0
+
+                ) -
+
+                Date.now()
+
+              ) / 1000
+
+            )
+
+          )
+
+        : 0;
+
+    /*
+
+     * Jackpot.
+
+     */
+
+    const jackpot =
+
+      this.getJackpot(
+
+        state.game_number
+
+      );
+
+    /*
+
+     * All cards already taken
+
+     * in this game.
+
+     */
+
+    const takenRows =
+
+      this.ctx.storage.sql
+
+        .exec(
+
+          `
+
+          SELECT card_number
+
+          FROM selected_cards
+
+          WHERE game_number = ?
+
+          ORDER BY card_number
+
+          `,
+
+          state.game_number
+
+        )
+
+        .toArray();
+
+    const takenCards =
+
+      takenRows.map(
+
+        row =>
+
+          Number(
+
+            row.card_number
+
+          )
+
+      );
+
+    /*
+
+     * Return complete game state.
+
+     */
+
+    return {
+
+      status:
+
+        state.status,
+
+      gameNumber:
+
+        Number(
+
+          state.game_number
+
+        ),
+
+      lobbyRemaining,
+
+      calledBalls,
+
+      calledCount:
+
+        calledBalls.length,
+
+      currentBall,
+
+      currentLetter:
+
+        currentBall
+
+          ? ballLetter(
+
+              currentBall
+
+            )
+
+          : null,
+
+      selectedCount:
+
+        jackpot.selectedCount,
+
+      jackpot:
+
+        jackpot.jackpot,
+
+      takenCards,
+
+      winnerUserId:
+
+        state.winner_user_id ||
+
+        null,
+
+      winnerCard:
+
+        state.winner_card === null ||
+
+        state.winner_card === undefined
+
+          ? null
+
+          : Number(
+
+              state.winner_card
+
+            ),
+
+      winnerName:
+
+        state.winner_name ||
+
+        null,
+
+      winnerAmount:
+
+        Number(
+
+          state.winner_amount ||
+
+          0
+
+        ),
+
+      winnerExpiresAt:
+
+        Number(
+
+          state.winner_expires_at ||
+
+          0
+
+        )
+
+    };
+
+  }
 
     /*
 
@@ -7626,6 +7902,124 @@ button{
     grid-template-columns:1fr;
 
   }
+
+}
+
+/* =========================================================
+
+   FAST BINGO RESULT / WINNER SCREEN
+
+   ========================================================= */
+
+#fastBingoResult{
+
+  position:fixed;
+
+  inset:0;
+
+  z-index:99999;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+  padding:20px;
+
+  background:
+
+    rgba(0,0,0,.82);
+
+}
+
+.fast-bingo-result-box{
+
+  width:
+
+    min(340px,90vw);
+
+  padding:
+
+    25px 18px;
+
+  text-align:center;
+
+  border-radius:20px;
+
+  background:#101722;
+
+  border:
+
+    2px solid #e50914;
+
+  box-shadow:
+
+    0 15px 60px
+
+    rgba(0,0,0,.60);
+
+}
+
+.fast-bingo-result-title{
+
+  font-size:40px;
+
+  line-height:1;
+
+  font-weight:1000;
+
+  letter-spacing:4px;
+
+  color:#fff;
+
+}
+
+.fast-bingo-result-message{
+
+  margin-top:12px;
+
+  font-size:17px;
+
+  font-weight:900;
+
+  color:#fff;
+
+}
+
+.fast-bingo-result-card{
+
+  margin-top:18px;
+
+  font-size:15px;
+
+  font-weight:900;
+
+  color:#e2e8f0;
+
+}
+
+.fast-bingo-result-name{
+
+  margin-top:7px;
+
+  font-size:17px;
+
+  font-weight:1000;
+
+  color:#e50914;
+
+}
+
+.fast-bingo-result-money{
+
+  margin-top:13px;
+
+  font-size:27px;
+
+  font-weight:1000;
+
+  color:#22c55e;
 
 }
 
