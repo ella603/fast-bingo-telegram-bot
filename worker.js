@@ -2123,9 +2123,7 @@ sql.exec(`
 
         gameNumber: 1,
 
-        lobbyRemaining:
-
-          LOBBY_SECONDS,
+        lobbyRemaining: LOBBY_SECONDS,
 
         calledBalls: [],
 
@@ -2137,7 +2135,9 @@ sql.exec(`
 
         selectedCount: 0,
 
-        jackpot: 0
+        jackpot: 0,
+
+        takenCards: []
 
       };
 
@@ -2223,6 +2223,40 @@ sql.exec(`
 
       );
 
+    const takenRows =
+
+      this.ctx.storage.sql
+
+        .exec(
+
+          `
+
+          SELECT card_number
+
+          FROM selected_cards
+
+          WHERE game_number = ?
+
+          ORDER BY card_number
+
+          `,
+
+          state.game_number
+
+        )
+
+        .toArray();
+
+    const takenCards =
+
+      takenRows.map(
+
+        row =>
+
+          Number(row.card_number)
+
+      );
+
     return {
 
       status: state.status,
@@ -2255,7 +2289,9 @@ sql.exec(`
 
       jackpot:
 
-        jackpot.jackpot
+        jackpot.jackpot,
+
+      takenCards
 
     };
 
@@ -2305,7 +2341,7 @@ sql.exec(`
 
             .filter(
 
-              (n) =>
+              n =>
 
                 Number.isInteger(n) &&
 
@@ -2341,7 +2377,351 @@ sql.exec(`
 
     }
 
-    this.ctx.storage.sql.exec(
+    const sql =
+
+      this.ctx.storage.sql;
+
+    /*
+
+     * Get this user's cards first.
+
+     */
+
+    const oldRows =
+
+      sql.exec(
+
+        `
+
+        SELECT card_number
+
+        FROM selected_cards
+
+        WHERE game_number = ?
+
+        AND user_id = ?
+
+        ORDER BY card_number
+
+        `,
+
+        state.game_number,
+
+        userId
+
+      ).toArray();
+
+    const oldCards =
+
+      oldRows.map(
+
+        row =>
+
+          Number(row.card_number)
+
+      );
+
+    /*
+
+     * Find newly requested cards.
+
+     */
+
+    const addedCards =
+
+      clean.filter(
+
+        card =>
+
+          oldCards.indexOf(card) === -1
+
+      );
+
+    /*
+
+     * A card already owned by another user
+
+     * cannot be selected.
+
+     */
+
+    if (addedCards.length) {
+
+      const placeholders =
+
+        addedCards
+
+          .map(() => "?")
+
+          .join(",");
+
+      const occupiedRows =
+
+        sql.exec(
+
+          `
+
+          SELECT card_number, user_id
+
+          FROM selected_cards
+
+          WHERE game_number = ?
+
+          AND card_number IN (${placeholders})
+
+          `,
+
+          state.game_number,
+
+          ...addedCards
+
+        ).toArray();
+
+      if (occupiedRows.length) {
+
+        const takenCard =
+
+          Number(
+
+            occupiedRows[0].card_number
+
+          );
+
+        return {
+
+          ok: false,
+
+          error: "CARD_TAKEN",
+
+          card: takenCard,
+
+          selected: oldCards,
+
+          ...this.getJackpot(
+
+            state.game_number
+
+          )
+
+        };
+
+      }
+
+    }
+
+    /*
+
+     * Make sure balance row exists.
+
+     */
+
+    await this.ensureBalanceRow(
+
+      userId
+
+    );
+
+    const balances =
+
+      this.getBalances(
+
+        userId
+
+      );
+
+    let nextPlay =
+
+      Number(
+
+        balances.playBalance || 0
+
+      );
+
+    let nextMain =
+
+      Number(
+
+        balances.mainBalance || 0
+
+      );
+
+    /*
+
+     * Every NEW card costs exactly 10 ETB.
+
+     *
+
+     * Priority:
+
+     * 1. Play Balance
+
+     * 2. Main Balance
+
+     */
+
+    for (
+
+      const card of addedCards
+
+    ) {
+
+      if (nextPlay >= CARD_PRICE) {
+
+        nextPlay -= CARD_PRICE;
+
+      } else if (
+
+        nextMain >= CARD_PRICE
+
+      ) {
+
+        nextMain -= CARD_PRICE;
+
+      } else {
+
+        return {
+
+          ok: false,
+
+          error: "INSUFFICIENT_BALANCE",
+
+          selected: oldCards,
+
+          ...this.getJackpot(
+
+            state.game_number
+
+          )
+
+        };
+
+      }
+
+    }
+
+    /*
+
+     * Update balances only after every
+
+     * requested new card has passed all checks.
+
+     */
+
+    if (
+
+      addedCards.length
+
+    ) {
+
+      sql.exec(
+
+        `
+
+        UPDATE balances
+
+        SET
+
+          balance = ?,
+
+          play_balance = ?,
+
+          main_balance = ?
+
+        WHERE user_id = ?
+
+        `,
+
+        nextPlay,
+
+        nextPlay,
+
+        nextMain,
+
+        userId
+
+      );
+
+      const now =
+
+        Date.now();
+
+      for (
+
+        const card of addedCards
+
+      ) {
+
+        sql.exec(
+
+          `
+
+          INSERT INTO transactions
+
+          (
+
+            user_id,
+
+            type,
+
+            method,
+
+            amount,
+
+            simulated,
+
+            created_at
+
+          )
+
+          VALUES (
+
+            ?,
+
+            'card_purchase',
+
+            NULL,
+
+            ?,
+
+            1,
+
+            ?
+
+          )
+
+          `,
+
+          userId,
+
+          CARD_PRICE,
+
+          now
+
+        );
+
+      }
+
+    }
+
+    /*
+
+     * Replace this user's selected cards.
+
+     *
+
+     * Cards removed from the local selection
+
+     * become available again.
+
+     *
+
+     * The 10 ETB already paid for them is NOT
+
+     * automatically refunded.
+
+     */
+
+    sql.exec(
 
       `
 
@@ -2359,17 +2739,21 @@ sql.exec(`
 
     );
 
-    const now = Date.now();
+    const now =
 
-    for (const card of clean) {
+      Date.now();
 
-      this.ctx.storage.sql.exec(
+    for (
+
+      const card of clean
+
+    ) {
+
+      sql.exec(
 
         `
 
-        INSERT OR IGNORE INTO
-
-        selected_cards
+        INSERT INTO selected_cards
 
         (
 
@@ -2409,55 +2793,17 @@ sql.exec(`
 
         state.game_number
 
-      )
+      ),
+
+      playBalance:
+
+        nextPlay,
+
+      mainBalance:
+
+        nextMain
 
     };
-
-  }
-
-  getUserCards(userId) {
-
-    const state =
-
-      this.getState();
-
-    if (!state) return [];
-
-    const rows =
-
-      this.ctx.storage.sql
-
-        .exec(
-
-          `
-
-          SELECT card_number
-
-          FROM selected_cards
-
-          WHERE game_number = ?
-
-          AND user_id = ?
-
-          ORDER BY card_number
-
-          `,
-
-          state.game_number,
-
-          userId
-
-        )
-
-        .toArray();
-
-    return rows.map(
-
-      (row) =>
-
-        Number(row.card_number)
-
-    );
 
   }
    
@@ -5877,19 +6223,51 @@ button{
 
 .selected-previews{
 
-  margin-top:13px;
+  position:fixed;
+
+  left:50%;
+
+  bottom:70px;
+
+  transform:translateX(-50%);
+
+  width:min(100%,720px);
+
+  margin:0;
+
+  padding:8px 8px 10px;
+
+  background:rgba(7,11,22,.96);
+
+  border:1px solid rgba(255,255,255,.10);
+
+  border-radius:16px 16px 0 0;
+
+  box-shadow:0 -10px 30px rgba(0,0,0,.35);
+
+  z-index:500;
+
+  max-height:38vh;
+
+  overflow-y:auto;
+
+  backdrop-filter:blur(12px);
+
+  -webkit-backdrop-filter:blur(12px);
 
 }
 
 .selected-previews-title{
 
-  color:var(--muted);
+  color:#dce2eb;
 
   font-size:10px;
 
-  font-weight:800;
+  font-weight:900;
 
-  margin-bottom:8px;
+  margin-bottom:7px;
+
+  text-align:center;
 
 }
 
@@ -5897,21 +6275,37 @@ button{
 
   display:grid;
 
-  grid-template-columns:repeat(2,minmax(0,1fr));
+  grid-template-columns:repeat(4,minmax(0,1fr));
 
-  gap:8px;
+  gap:6px;
 
 }
 
 .bingo-card{
 
-  background:#0d1118;
+  min-width:0;
 
-  border:1px solid #303949;
+  background:
 
-  border-radius:12px;
+    linear-gradient(
 
-  padding:7px;
+      145deg,
+
+      #151d2b,
+
+      #0b1019
+
+    );
+
+  border:1px solid #3b4658;
+
+  border-radius:10px;
+
+  padding:6px;
+
+  box-shadow:
+
+    0 5px 18px rgba(0,0,0,.30);
 
 }
 
@@ -5923,25 +6317,27 @@ button{
 
   justify-content:space-between;
 
-  margin-bottom:6px;
+  margin-bottom:5px;
 
 }
 
 .card-number-label{
 
-  color:#b7c0ce;
+  color:#f1f5f9;
 
-  font-size:9px;
+  font-size:8px;
 
-  font-weight:900;
+  font-weight:950;
 
 }
 
 .card-state{
 
-  color:var(--green);
+  color:#22c55e;
 
-  font-size:10px;
+  font-size:9px;
+
+  font-weight:950;
 
 }
 
@@ -5952,6 +6348,42 @@ button{
   grid-template-columns:repeat(5,1fr);
 
   gap:3px;
+
+}
+
+.bingo-letter{
+
+  aspect-ratio:1;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+  border-radius:4px;
+
+  background:
+
+    linear-gradient(
+
+      145deg,
+
+      #e50914,
+
+      #8f0710
+
+    );
+
+  color:#fff;
+
+  font-size:11px;
+
+  font-weight:950;
+
+  box-shadow:
+
+    0 2px 5px rgba(229,9,20,.25);
 
 }
 
@@ -5969,19 +6401,23 @@ button{
 
   justify-content:center;
 
-  font-size:8px;
+  font-size:11px;
 
-  font-weight:850;
+  font-weight:950;
 
-  color:#c5ccd7;
+  color:#e2e8f0;
+
+  border:1px solid rgba(255,255,255,.04);
 
 }
 
 .bingo-cell.called{
 
-  background:rgba(229,9,20,.85);
+  background:rgba(229,9,20,.90);
 
   color:#fff;
+
+  border-color:#ff4b52;
 
 }
 
@@ -5989,9 +6425,131 @@ button{
 
   background:#252d39;
 
-  color:var(--gold);
+  color:#f4c542;
 
-  font-size:7px;
+  font-size:8px;
+
+  font-weight:950;
+
+}
+
+.card-select{
+
+  min-width:0;
+
+  height:33px;
+
+  padding:0;
+
+  border-radius:8px;
+
+  border:1px solid #334155;
+
+  background:
+
+    linear-gradient(
+
+      145deg,
+
+      #182231,
+
+      #101722
+
+    );
+
+  color:#d7dee9;
+
+  font-size:10px;
+
+  font-weight:900;
+
+  box-shadow:
+
+    0 2px 6px rgba(0,0,0,.20);
+
+}
+
+.card-select.selected{
+
+  background:
+
+    linear-gradient(
+
+      145deg,
+
+      #f21b2b,
+
+      #a90712
+
+    );
+
+  border-color:#ff5a61;
+
+  color:#fff;
+
+  box-shadow:
+
+    0 4px 12px rgba(229,9,20,.30);
+
+}
+
+.card-select.taken{
+
+  background:#202631;
+
+  border-color:#303846;
+
+  color:#697586;
+
+  opacity:.55;
+
+  cursor:not-allowed;
+
+}
+
+@media(max-width:420px){
+
+  .selected-previews{
+
+    bottom:64px;
+
+    max-height:35vh;
+
+    padding:7px 5px 8px;
+
+  }
+
+  .preview-grid{
+
+    gap:4px;
+
+  }
+
+  .bingo-card{
+
+    padding:4px;
+
+    border-radius:8px;
+
+  }
+
+  .bingo-grid{
+
+    gap:2px;
+
+  }
+
+  .bingo-cell{
+
+    font-size:10px;
+
+  }
+
+  .bingo-letter{
+
+    font-size:10px;
+
+  }
 
 }
 
@@ -9077,6 +9635,20 @@ function checkLoginStatus(){
 
   function renderBingoCard(card){
 
+    var letters = [
+
+      "B",
+
+      "I",
+
+      "N",
+
+      "G",
+
+      "O"
+
+    ];
+
     var html =
 
       '<div class="bingo-card">' +
@@ -9096,6 +9668,38 @@ function checkLoginStatus(){
       '</div>' +
 
       '<div class="bingo-grid">';
+
+    /*
+
+     * Modern B I N G O header.
+
+     */
+
+    for(
+
+      var h=0;
+
+      h<5;
+
+      h++
+
+    ){
+
+      html +=
+
+        '<div class="bingo-letter">' +
+
+        letters[h] +
+
+        '</div>';
+
+    }
+
+    /*
+
+     * 25 bingo numbers.
+
+     */
 
     for(
 
@@ -9139,13 +9743,21 @@ function checkLoginStatus(){
 
           "bingo-cell";
 
-        if(value === "FREE"){
+        if(
+
+          value === "FREE"
+
+        ){
 
           classes +=
 
             " free";
 
-        }else if(called){
+        }else if(
+
+          called
+
+        ){
 
           classes +=
 
@@ -9209,23 +9821,45 @@ function checkLoginStatus(){
 
         selected.indexOf(i) !== -1;
 
+      var isTaken =
+
+        takenCards.indexOf(i) !== -1;
+
+      var takenByOther =
+
+        isTaken &&
+
+        !isSelected;
+
+      var classes =
+
+        "card-select";
+
+      if(isSelected){
+
+        classes +=
+
+          " selected";
+
+      }
+
+      if(takenByOther){
+
+        classes +=
+
+          " taken";
+
+      }
+
       html +=
 
         '<button ' +
 
         'type="button" ' +
 
-        'class="card-select' +
+        'class="' +
 
-        (
-
-          isSelected
-
-            ? " selected"
-
-            : ""
-
-        ) +
+        classes +
 
         '" ' +
 
@@ -9233,7 +9867,19 @@ function checkLoginStatus(){
 
         i +
 
-        '">' +
+        '"' +
+
+        (
+
+          takenByOther
+
+            ? ' disabled title="ይህ ካርቴላ ተይዟል።"'
+
+            : ''
+
+        ) +
+
+        '>' +
 
         i +
 
@@ -9247,31 +9893,39 @@ function checkLoginStatus(){
 
     grid
 
-      .querySelectorAll(".card-select")
+      .querySelectorAll(
 
-      .forEach(function(button){
+        ".card-select"
 
-        button.addEventListener(
+      )
 
-          "click",
+      .forEach(
 
-          function(){
+        function(button){
 
-            toggleCard(
+          button.addEventListener(
 
-              Number(
+            "click",
 
-                button.dataset.card
+            function(){
 
-              )
+              toggleCard(
 
-            );
+                Number(
 
-          }
+                  button.dataset.card
 
-        );
+                )
 
-      });
+              );
+
+            }
+
+          );
+
+        }
+
+      );
 
   }
 
@@ -9427,6 +10081,28 @@ function checkLoginStatus(){
 
     }
 
+    if(
+
+      takenCards.indexOf(number) !== -1 &&
+
+      selected.indexOf(number) === -1
+
+    ){
+
+      showToast(
+
+        language === "am"
+
+          ? "❌ ይህ ካርቴላ ተይዟል።"
+
+          : "❌ This card is already taken."
+
+      );
+
+      return;
+
+    }
+
     var index =
 
       selected.indexOf(
@@ -9557,6 +10233,66 @@ function checkLoginStatus(){
 
         loadBalance();
 
+        /*
+
+         * Jackpot is refreshed by
+
+         * the normal game refresh.
+
+         */
+
+      }else if(
+
+        data.error ===
+
+        "CARD_TAKEN"
+
+      ){
+
+        /*
+
+         * Restore the real server-side
+
+         * selection.
+
+         */
+
+        if(
+
+          Array.isArray(
+
+            data.selected
+
+          )
+
+        ){
+
+          selected =
+
+            data.selected.map(
+
+              Number
+
+            );
+
+        }
+
+        updateSelectionCount();
+
+        renderCards();
+
+        renderPreviews();
+
+        showToast(
+
+          language === "am"
+
+            ? "❌ ይህ ካርቴላ በሌላ user ተይዟል።"
+
+            : "❌ This card is already taken by another user."
+
+        );
+
       }else if(
 
         data.error ===
@@ -9565,6 +10301,42 @@ function checkLoginStatus(){
 
       ){
 
+        /*
+
+         * Server is authoritative.
+
+         * Restore the previous selection.
+
+         */
+
+        if(
+
+          Array.isArray(
+
+            data.selected
+
+          )
+
+        ){
+
+          selected =
+
+            data.selected.map(
+
+              Number
+
+            );
+
+        }
+
+        updateSelectionCount();
+
+        renderCards();
+
+        renderPreviews();
+
+        loadBalance();
+
         showToast(
 
           t("insufficient")
@@ -9572,44 +10344,6 @@ function checkLoginStatus(){
         );
 
       }
-
-    }).catch(function(){});
-
-  }
-
-  function loadMyCards(){
-
-    return api(
-
-      "/api/user-cards"
-
-    ).then(function(data){
-
-      selected =
-
-        Array.isArray(
-
-          data.selected
-
-        )
-
-          ? data.selected.map(
-
-              Number
-
-            )
-
-          : [];
-
-      updateSelectionCount();
-
-      renderCards();
-
-      renderPreviews();
-
-    });
-
-  }
 
   /* =======================================================
 
