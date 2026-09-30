@@ -11357,7 +11357,11 @@ function checkLoginStatus(){
 
   /* =======================================================
 
+  
+
      GAME REFRESH
+
+  
 
      ======================================================= */
 
@@ -11367,7 +11371,9 @@ function checkLoginStatus(){
 
       "/api/game"
 
-    ).then(function(data){
+    )
+
+    .then(function(data){
 
       if(
 
@@ -11377,27 +11383,31 @@ function checkLoginStatus(){
 
       ){
 
+        /*
+
+         * Save the previous game
+
+         * before replacing it.
+
+         */
+
         var previousGame =
 
           currentGame;
 
-        var isNewResult =
+        /*
 
-          data &&
+         * Detect a NEW result state.
 
-          data.status === "result" &&
+         *
 
-          (
+         * This prevents the BINGO
 
-            !previousGame ||
+         * screen from being created
 
-            previousGame.status !== "result" ||
+         * again on every refresh.
 
-            previousGame.gameNumber !==
-
-              data.gameNumber
-
-          );
+         */
 
         var isNewResult =
 
@@ -11409,31 +11419,53 @@ function checkLoginStatus(){
 
             !previousGame ||
 
-            previousGame.status !== "result" ||
+            previousGame.status !==
+
+              "result" ||
 
             previousGame.gameNumber !==
 
               data.gameNumber
 
           );
-        
+
+        /*
+
+         * Save current server state.
+
+         */
+
         currentGame =
 
           data;
 
-        if (isNewResult) {
+        /*
 
-          showBingoResult(data);
+         * Show BINGO result only once.
+
+         */
+
+        if(
+
+          isNewResult
+
+        ){
+
+          showBingoResult(
+
+            data
+
+          );
 
         }
 
         /*
 
-          Load globally taken cards
+         * Load globally taken cards
 
-          from the current game.
+         * from the current game.
 
-        */
+         */
 
         takenCards =
 
@@ -11453,17 +11485,17 @@ function checkLoginStatus(){
 
         /*
 
-          If this is a new game,
+         * If this is a new game,
 
-          reload the user's own cards.
+         * reload this user's cards.
 
-        */
+         */
 
         if(
 
-          previousGame !== null &&
+          previousGame &&
 
-          previousGame !==
+          previousGame.gameNumber !==
 
             data.gameNumber
 
@@ -11475,15 +11507,21 @@ function checkLoginStatus(){
 
         /*
 
-          Refresh the 400 cards so that
+         * Refresh the 400 cards so
 
-          cards selected by other users
+         * cards selected by other users
 
-          immediately show as "taken".
+         * immediately show as taken.
 
-        */
+         */
 
         renderCards();
+
+        /*
+
+         * Update the complete game UI.
+
+         */
 
         updateGameUI();
 
@@ -11491,7 +11529,9 @@ function checkLoginStatus(){
 
       return data;
 
-    }).catch(function(){
+    })
+
+    .catch(function(){
 
       return null;
 
