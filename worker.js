@@ -3439,437 +3439,117 @@ sql.exec(`
 
   async selectCards(userId, cards) {
 
-    const state =
+  const state =
 
-      this.getState();
+    this.getState();
 
-    if (!state) {
+  if (!state) {
 
-      return {
+    return {
 
-        ok: false,
+      ok: false,
 
-        error: "NO_GAME"
+      error: "NO_GAME"
 
-      };
+    };
 
-    }
+  }
 
-    if (
+  if (
 
-      state.status !== "lobby"
+    state.status !== "lobby"
 
-    ) {
+  ) {
 
-      return {
+    return {
 
-        ok: false,
+      ok: false,
 
-        error: "GAME_IN_PROGRESS"
+      error: "GAME_IN_PROGRESS"
 
-      };
+    };
 
-    }
+  }
 
-    let clean =
+  let clean =
 
-      Array.isArray(cards)
+    Array.isArray(cards)
 
-        ? cards
+      ? cards
 
-            .map(Number)
+          .map(Number)
 
-            .filter(
+          .filter(
 
-              n =>
+            n =>
 
-                Number.isInteger(n) &&
+              Number.isInteger(n) &&
 
-                n >= 1 &&
+              n >= 1 &&
 
-                n <= CARD_COUNT
-
-            )
-
-        : [];
-
-    clean = [
-
-      ...new Set(clean)
-
-    ];
-
-    if (
-
-      clean.length >
-
-      MAX_CARDS_PER_PLAYER
-
-    ) {
-
-      return {
-
-        ok: false,
-
-        error: "MAX_CARDS"
-
-      };
-
-    }
-
-    const sql =
-
-      this.ctx.storage.sql;
-
-    /*
-
-     * Get this user's cards first.
-
-     */
-
-    const oldRows =
-
-      sql.exec(
-
-        `
-
-        SELECT card_number
-
-        FROM selected_cards
-
-        WHERE game_number = ?
-
-        AND user_id = ?
-
-        ORDER BY card_number
-
-        `,
-
-        state.game_number,
-
-        userId
-
-      ).toArray();
-
-    const oldCards =
-
-      oldRows.map(
-
-        row =>
-
-          Number(row.card_number)
-
-      );
-
-    /*
-
-     * Find newly requested cards.
-
-     */
-
-    const addedCards =
-
-      clean.filter(
-
-        card =>
-
-          oldCards.indexOf(card) === -1
-
-      );
-
-    /*
-
-     * A card already owned by another user
-
-     * cannot be selected.
-
-     */
-
-    if (addedCards.length) {
-
-      const placeholders =
-
-        addedCards
-
-          .map(() => "?")
-
-          .join(",");
-
-      const occupiedRows =
-
-        sql.exec(
-
-          `
-
-          SELECT card_number, user_id
-
-          FROM selected_cards
-
-          WHERE game_number = ?
-
-          AND card_number IN (${placeholders})
-
-          `,
-
-          state.game_number,
-
-          ...addedCards
-
-        ).toArray();
-
-      if (occupiedRows.length) {
-
-        const takenCard =
-
-          Number(
-
-            occupiedRows[0].card_number
-
-          );
-
-        return {
-
-          ok: false,
-
-          error: "CARD_TAKEN",
-
-          card: takenCard,
-
-          selected: oldCards,
-
-          ...this.getJackpot(
-
-            state.game_number
+              n <= CARD_COUNT
 
           )
 
-        };
+      : [];
 
-      }
+  clean = [
 
-    }
+    ...new Set(clean)
 
-    /*
+  ];
 
-     * Make sure balance row exists.
+  if (
 
-     */
+    clean.length >
 
-    await this.ensureBalanceRow(
+    MAX_CARDS_PER_PLAYER
 
-      userId
+  ) {
 
-    );
+    return {
 
-    const balances =
+      ok: false,
 
-      this.getBalances(
+      error: "MAX_CARDS"
 
-        userId
+    };
 
-      );
+  }
 
-    let nextPlay =
+  const sql =
 
-      Number(
+    this.ctx.storage.sql;
 
-        balances.playBalance || 0
+  /*
 
-      );
+   * =======================================================
 
-    let nextMain =
+   * GET USER'S CURRENT CARDS
 
-      Number(
+   * =======================================================
 
-        balances.mainBalance || 0
+   */
 
-      );
-
-    /*
-
-     * Every NEW card costs exactly 10 ETB.
-
-     *
-
-     * Priority:
-
-     * 1. Play Balance
-
-     * 2. Main Balance
-
-     */
-
-    for (
-
-      const card of addedCards
-
-    ) {
-
-      if (nextPlay >= CARD_PRICE) {
-
-        nextPlay -= CARD_PRICE;
-
-      } else if (
-
-        nextMain >= CARD_PRICE
-
-      ) {
-
-        nextMain -= CARD_PRICE;
-
-      } else {
-
-        return {
-
-          ok: false,
-
-          error: "INSUFFICIENT_BALANCE",
-
-          selected: oldCards,
-
-          ...this.getJackpot(
-
-            state.game_number
-
-          )
-
-        };
-
-      }
-
-    }
-
-    /*
-
-     * Update balances only after every
-
-     * requested new card has passed all checks.
-
-     */
-
-    if (
-
-      addedCards.length
-
-    ) {
-
-      sql.exec(
-
-        `
-
-        UPDATE balances
-
-        SET
-
-          balance = ?,
-
-          play_balance = ?,
-
-          main_balance = ?
-
-        WHERE user_id = ?
-
-        `,
-
-        nextPlay,
-
-        nextPlay,
-
-        nextMain,
-
-        userId
-
-      );
-
-      const now =
-
-        Date.now();
-
-      for (
-
-        const card of addedCards
-
-      ) {
-
-        sql.exec(
-
-          `
-
-          INSERT INTO transactions
-
-          (
-
-            user_id,
-
-            type,
-
-            method,
-
-            amount,
-
-            simulated,
-
-            created_at
-
-          )
-
-          VALUES (
-
-            ?,
-
-            'card_purchase',
-
-            NULL,
-
-            ?,
-
-            1,
-
-            ?
-
-          )
-
-          `,
-
-          userId,
-
-          CARD_PRICE,
-
-          now
-
-        );
-
-      }
-
-    }
-
-    /*
-
-     * Replace this user's selected cards.
-
-     *
-
-     * Cards removed from the local selection
-
-     * become available again.
-
-     *
-
-     * The 10 ETB already paid for them is NOT
-
-     * automatically refunded.
-
-     */
+  const oldRows =
 
     sql.exec(
 
       `
 
-      DELETE FROM selected_cards
+      SELECT
+
+        card_number,
+
+        payment_source
+
+      FROM selected_cards
 
       WHERE game_number = ?
 
       AND user_id = ?
+
+      ORDER BY card_number
 
       `,
 
@@ -3877,75 +3557,681 @@ sql.exec(`
 
       userId
 
+    ).toArray();
+
+  const oldCards =
+
+    oldRows.map(
+
+      row =>
+
+        Number(
+
+          row.card_number
+
+        )
+
     );
 
-    const now =
+  /*
 
-      Date.now();
+   * =======================================================
 
-    for (
+   * FIND ADDED / REMOVED CARDS
 
-      const card of clean
+   * =======================================================
 
-    ) {
+   */
+
+  const addedCards =
+
+    clean.filter(
+
+      card =>
+
+        oldCards.indexOf(card) === -1
+
+    );
+
+  const removedCards =
+
+    oldRows.filter(
+
+      row =>
+
+        clean.indexOf(
+
+          Number(row.card_number)
+
+        ) === -1
+
+    );
+
+  /*
+
+   * =======================================================
+
+   * CHECK WHETHER NEW CARDS ARE ALREADY TAKEN
+
+   * =======================================================
+
+   */
+
+  if (addedCards.length) {
+
+    const placeholders =
+
+      addedCards
+
+        .map(() => "?")
+
+        .join(",");
+
+    const occupiedRows =
 
       sql.exec(
 
         `
 
-        INSERT INTO selected_cards
-
-        (
-
-          game_number,
-
-          user_id,
+        SELECT
 
           card_number,
 
-          selected_at
+          user_id
 
-        )
+        FROM selected_cards
 
-        VALUES (?, ?, ?, ?)
+        WHERE game_number = ?
+
+        AND card_number IN (${placeholders})
 
         `,
 
         state.game_number,
 
-        userId,
+        ...addedCards
+
+      ).toArray();
+
+    if (occupiedRows.length) {
+
+      const takenCard =
+
+        Number(
+
+          occupiedRows[0].card_number
+
+        );
+
+      return {
+
+        ok: false,
+
+        error: "CARD_TAKEN",
+
+        card: takenCard,
+
+        selected: oldCards,
+
+        ...this.getJackpot(
+
+          state.game_number
+
+        )
+
+      };
+
+    }
+
+  }
+
+  /*
+
+   * =======================================================
+
+   * BALANCE
+
+   * =======================================================
+
+   */
+
+  await this.ensureBalanceRow(
+
+    userId
+
+  );
+
+  const balances =
+
+    this.getBalances(
+
+      userId
+
+    );
+
+  let nextPlay =
+
+    Number(
+
+      balances.playBalance || 0
+
+    );
+
+  let nextMain =
+
+    Number(
+
+      balances.mainBalance || 0
+
+    );
+
+  /*
+
+   * =======================================================
+
+   * REFUND REMOVED CARDS FIRST
+
+   *
+
+   * Every unselected card returns its 10 ETB.
+
+   *
+
+   * If it was originally paid from PLAY,
+
+   * refund to PLAY.
+
+   *
+
+   * If it was originally paid from MAIN,
+
+   * refund to MAIN.
+
+   *
+
+   * Older cards with no payment_source are
+
+   * safely refunded to PLAY.
+
+   * =======================================================
+
+   */
+
+  for (
+
+    const row of removedCards
+
+  ) {
+
+    const source =
+
+      String(
+
+        row.payment_source || "play"
+
+      ).toLowerCase();
+
+    if (
+
+      source === "main"
+
+    ) {
+
+      nextMain +=
+
+        CARD_PRICE;
+
+    } else {
+
+      nextPlay +=
+
+        CARD_PRICE;
+
+    }
+
+  }
+
+  /*
+
+   * =======================================================
+
+   * CHARGE NEW CARDS
+
+   *
+
+   * Priority:
+
+   * 1. PLAY BALANCE
+
+   * 2. MAIN BALANCE
+
+   *
+
+   * Keep the payment source for every card
+
+   * so an unselect can refund the exact balance.
+
+   * =======================================================
+
+   */
+
+  const paymentSources =
+
+    new Map();
+
+  for (
+
+    const row of oldRows
+
+  ) {
+
+    const card =
+
+      Number(
+
+        row.card_number
+
+      );
+
+    if (
+
+      clean.indexOf(card) !== -1
+
+    ) {
+
+      paymentSources.set(
 
         card,
 
-        now
+        String(
+
+          row.payment_source ||
+
+          "play"
+
+        ).toLowerCase()
 
       );
 
     }
 
-    return {
+  }
 
-      ok: true,
+  for (
 
-      selected: clean,
+    const card of addedCards
 
-      ...this.getJackpot(
+  ) {
 
-        state.game_number
+    if (
 
-      ),
+      nextPlay >= CARD_PRICE
 
-      playBalance:
+    ) {
 
-        nextPlay,
+      nextPlay -=
 
-      mainBalance:
+        CARD_PRICE;
 
-        nextMain
+      paymentSources.set(
 
-    };
+        card,
+
+        "play"
+
+      );
+
+    } else if (
+
+      nextMain >= CARD_PRICE
+
+    ) {
+
+      nextMain -=
+
+        CARD_PRICE;
+
+      paymentSources.set(
+
+        card,
+
+        "main"
+
+      );
+
+    } else {
+
+      return {
+
+        ok: false,
+
+        error: "INSUFFICIENT_BALANCE",
+
+        selected: oldCards,
+
+        ...this.getJackpot(
+
+          state.game_number
+
+        )
+
+      };
+
+    }
 
   }
+
+  /*
+
+   * =======================================================
+
+   * SAVE BALANCES
+
+   * =======================================================
+
+   */
+
+  if (
+
+    addedCards.length ||
+
+    removedCards.length
+
+  ) {
+
+    sql.exec(
+
+      `
+
+      UPDATE balances
+
+      SET
+
+        balance = ?,
+
+        play_balance = ?,
+
+        main_balance = ?
+
+      WHERE user_id = ?
+
+      `,
+
+      nextPlay,
+
+      nextPlay,
+
+      nextMain,
+
+      userId
+
+    );
+
+  }
+
+  /*
+
+   * =======================================================
+
+   * TRANSACTIONS
+
+   * =======================================================
+
+   */
+
+  const now =
+
+    Date.now();
+
+  /*
+
+   * Purchase transactions.
+
+   */
+
+  for (
+
+    const card of addedCards
+
+  ) {
+
+    sql.exec(
+
+      `
+
+      INSERT INTO transactions
+
+      (
+
+        user_id,
+
+        type,
+
+        method,
+
+        amount,
+
+        simulated,
+
+        created_at
+
+      )
+
+      VALUES (
+
+        ?,
+
+        'card_purchase',
+
+        NULL,
+
+        ?,
+
+        1,
+
+        ?
+
+      )
+
+      `,
+
+      userId,
+
+      CARD_PRICE,
+
+      now
+
+    );
+
+  }
+
+  /*
+
+   * Refund transactions.
+
+   */
+
+  for (
+
+    const row of removedCards
+
+  ) {
+
+    sql.exec(
+
+      `
+
+      INSERT INTO transactions
+
+      (
+
+        user_id,
+
+        type,
+
+        method,
+
+        amount,
+
+        simulated,
+
+        created_at
+
+      )
+
+      VALUES (
+
+        ?,
+
+        'card_refund',
+
+        NULL,
+
+        ?,
+
+        1,
+
+        ?
+
+      )
+
+      `,
+
+      userId,
+
+      CARD_PRICE,
+
+      now
+
+    );
+
+  }
+
+  /*
+
+   * =======================================================
+
+   * REPLACE USER'S CURRENT SELECTION
+
+   * =======================================================
+
+   */
+
+  sql.exec(
+
+    `
+
+    DELETE FROM selected_cards
+
+    WHERE game_number = ?
+
+    AND user_id = ?
+
+    `,
+
+    state.game_number,
+
+    userId
+
+  );
+
+  for (
+
+    const card of clean
+
+  ) {
+
+    const source =
+
+      paymentSources.get(
+
+        card
+
+      ) || "play";
+
+    sql.exec(
+
+      `
+
+      INSERT INTO selected_cards
+
+      (
+
+        game_number,
+
+        user_id,
+
+        card_number,
+
+        selected_at,
+
+        payment_source
+
+      )
+
+      VALUES (?, ?, ?, ?, ?)
+
+      `,
+
+      state.game_number,
+
+      userId,
+
+      card,
+
+      now,
+
+      source
+
+    );
+
+  }
+
+  /*
+
+   * =======================================================
+
+   * RETURN UPDATED GLOBAL JACKPOT + BALANCES
+
+   * =======================================================
+
+   */
+
+  const jackpot =
+
+    this.getJackpot(
+
+      state.game_number
+
+    );
+
+  return {
+
+    ok: true,
+
+    selected:
+
+      clean,
+
+    selectedCount:
+
+      jackpot.selectedCount,
+
+    jackpot:
+
+      jackpot.jackpot,
+
+    playBalance:
+
+      nextPlay,
+
+    mainBalance:
+
+      nextMain
+
+  };
+
+}
    
   /* =========================================================
 
