@@ -1747,34 +1747,6 @@ sql.exec(`
 
   }
 
-  async alarm(alarmInfo) {
-
-   /*
-
-   * =========================================================
-
-   * FAST BINGO — SINGLE SOURCE OF TRUTH GAME ENGINE
-
-   *
-
-   * The game can advance from:
-
-   *
-
-   * 1. Durable Object alarm
-
-   * 2. Normal /api/game polling
-
-   *
-
-   * This prevents the game from ever remaining
-
-   * permanently at 75/75.
-
-   * =========================================================
-
-   */
-
   async advanceGameState() {
 
     let state =
