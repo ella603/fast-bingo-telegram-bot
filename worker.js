@@ -1089,31 +1089,113 @@ if (balanceTableInfo.length === 0) {
 
    ========================================================= */
 
-sql.exec(`
+const selectedCardsTableInfo =
 
-  CREATE TABLE IF NOT EXISTS selected_cards (
+  sql.exec(`
 
-    game_number INTEGER NOT NULL,
+    PRAGMA table_info(selected_cards)
 
-    user_id TEXT NOT NULL,
+  `).toArray();
 
-    card_number INTEGER NOT NULL,
+if (selectedCardsTableInfo.length === 0) {
 
-    selected_at INTEGER NOT NULL,
+  sql.exec(`
 
-    PRIMARY KEY (
+    CREATE TABLE selected_cards (
 
-      game_number,
+      game_number INTEGER NOT NULL,
 
-      user_id,
+      user_id TEXT NOT NULL,
 
-      card_number
+      card_number INTEGER NOT NULL,
+
+      selected_at INTEGER NOT NULL,
+
+      PRIMARY KEY (
+
+        game_number,
+
+        user_id,
+
+        card_number
+
+      )
 
     )
 
-  )
+  `);
 
-`);
+} else {
+
+  const hasSelectedCardsUserId =
+
+    selectedCardsTableInfo.some(
+
+      c => c.name === "user_id"
+
+    );
+
+  if (!hasSelectedCardsUserId) {
+
+    /*
+
+     * The old selected_cards table was created
+
+     * without user_id.
+
+     *
+
+     * Preserve the old rows in a backup table,
+
+     * then create the correct schema.
+
+     *
+
+     * Old selections cannot safely be assigned
+
+     * to Telegram users because the old table
+
+     * did not store user_id.
+
+     */
+
+    sql.exec(`
+
+      ALTER TABLE selected_cards
+
+      RENAME TO selected_cards_old
+
+    `);
+
+    sql.exec(`
+
+      CREATE TABLE selected_cards (
+
+        game_number INTEGER NOT NULL,
+
+        user_id TEXT NOT NULL,
+
+        card_number INTEGER NOT NULL,
+
+        selected_at INTEGER NOT NULL,
+
+        PRIMARY KEY (
+
+          game_number,
+
+          user_id,
+
+          card_number
+
+        )
+
+      )
+
+    `);
+
+  }
+
+}
 
 /* =========================================================
 
