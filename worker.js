@@ -5799,26 +5799,6 @@ if (
 
     ) {
 
-      /*
-
-       * =====================================================
-
-       * GAME ENGINE REQUEST SYNC
-
-       *
-
-       * The browser polls /api/game every second.
-
-       *
-
-       * Therefore the game is NEVER dependent on
-
-       * the Durable Object alarm alone.
-
-       * =====================================================
-
-       */
-
       try {
 
         await this.advanceGameState();
@@ -5836,62 +5816,6 @@ if (
           gameSyncError?.stack || ""
 
         );
-
-      }
-
-      return json(
-
-        this.getGameResponse()
-
-      );
-
-        /*
-
-         * Force the next scheduler alarm immediately.
-
-         *
-
-         * The alarm handler will:
-
-         *
-
-         * 1. detect the winner if there is one
-
-         * 2. show RESULT for 3 seconds
-
-         * 3. create the next 45-second lobby
-
-         *
-
-         * or, if there is no winner:
-
-         *
-
-         * 1. directly create the next 45-second lobby
-
-         */
-
-        try {
-
-          await this.ctx.storage.setAlarm(
-
-            Date.now() + 1
-
-          );
-
-        } catch (watchdogError) {
-
-          console.error(
-
-            "FAST BINGO 75/75 WATCHDOG ERROR:",
-
-            watchdogError?.message ||
-
-            String(watchdogError)
-
-          );
-
-        }
 
       }
 
