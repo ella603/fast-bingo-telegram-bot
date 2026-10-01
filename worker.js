@@ -1751,7 +1751,7 @@ sql.exec(`
 
     try {
 
-      const state =
+      let state =
 
         this.getState();
 
@@ -1763,25 +1763,27 @@ sql.exec(`
 
       }
 
-      const now = Date.now();
+      const now =
+
+        Date.now();
 
       /*
 
+       * =====================================================
+
        * LOBBY -> LIVE
 
-       *
-
-       * The first ball is called immediately.
-
-       * Therefore the UI goes directly to 1 / 75
-
-       * instead of staying at 0 / 75.
+       * =====================================================
 
        */
 
-      if (state.status === "lobby") {
+      if (
 
-        const ends =
+        state.status === "lobby"
+
+      ) {
+
+        const lobbyEnds =
 
           Number(
 
@@ -1789,11 +1791,21 @@ sql.exec(`
 
           );
 
-        if (now < ends) {
+        if (
+
+          now < lobbyEnds
+
+        ) {
 
           await this.scheduleNext(
 
-            ends - now
+            Math.max(
+
+              1000,
+
+              lobbyEnds - now
+
+            )
 
           );
 
@@ -1837,6 +1849,12 @@ sql.exec(`
 
         }
 
+        /*
+
+         * First ball is immediately available.
+
+         */
+
         this.ctx.storage.sql.exec(
 
           `
@@ -1865,6 +1883,12 @@ sql.exec(`
 
         );
 
+        /*
+
+         * Schedule the next ball.
+
+         */
+
         await this.scheduleNext(
 
           BALL_INTERVAL
@@ -1877,59 +1901,85 @@ sql.exec(`
 
       /*
 
+       * =====================================================
+
        * LIVE GAME
+
+       * =====================================================
 
        */
 
-      if (state.status === "live") {
+      if (
+
+        state.status === "live"
+
+      ) {
 
         let currentIndex =
 
-          Number(state.ball_index);
+          Number(
+
+            state.ball_index
+
+          );
+
+        /*
+
+         * Repair invalid index.
+
+         */
 
         if (
 
-          !Number.isInteger(currentIndex) ||
+          !Number.isInteger(
+
+            currentIndex
+
+          ) ||
 
           currentIndex < 0
 
         ) {
 
-          this.ctx.storage.sql.exec(`
+          this.ctx.storage.sql.exec(
+
+            `
 
             UPDATE state
 
             SET
 
+              status = 'live',
+
+              started_at =
+
+                COALESCE(
+
+                  started_at,
+
+                  ?
+
+                ),
+
               ball_index = 0,
-
-              started_at = COALESCE(
-
-                started_at,
-
-                ?
-
-              ),
 
               lobby_ends_at = NULL
 
             WHERE id = 1
 
-          `, now);
+            `,
 
-          await this.scheduleNext(
-
-            BALL_INTERVAL
+            now
 
           );
 
-          return;
+          currentIndex = 0;
 
         }
 
         /*
 
-         * Get the balls already called.
+         * Load called balls.
 
          */
 
@@ -1943,9 +1993,11 @@ sql.exec(`
 
         /*
 
-         * Check every selected card in the
+         * =================================================
 
-         * current game for the first 2-line winner.
+         * CHECK WINNER
+
+         * =================================================
 
          */
 
@@ -1953,7 +2005,9 @@ sql.exec(`
 
           this.ctx.storage.sql
 
-            .exec(`
+            .exec(
+
+              `
 
               SELECT
 
@@ -1983,7 +2037,9 @@ sql.exec(`
 
               LEFT JOIN users u
 
-                ON u.user_id = sc.user_id
+                ON u.user_id =
+
+                   sc.user_id
 
               WHERE sc.game_number = ?
 
@@ -1993,13 +2049,17 @@ sql.exec(`
 
                 sc.card_number ASC
 
-            `,
+              `,
 
-            Number(state.game_number)
+              Number(
 
-          )
+                state.game_number
 
-          .toArray();
+              )
+
+            )
+
+            .toArray();
 
         let winner = null;
 
@@ -2013,7 +2073,11 @@ sql.exec(`
 
             makeCard(
 
-              Number(row.card_number)
+              Number(
+
+                row.card_number
+
+              )
 
             );
 
@@ -2033,11 +2097,19 @@ sql.exec(`
 
               userId:
 
-                String(row.user_id),
+                String(
+
+                  row.user_id
+
+                ),
 
               card:
 
-                Number(row.card_number),
+                Number(
+
+                  row.card_number
+
+                ),
 
               name:
 
@@ -2055,7 +2127,9 @@ sql.exec(`
 
                 String(
 
-                  row.username || ""
+                  row.username ||
+
+                  ""
 
                 )
 
@@ -2069,7 +2143,11 @@ sql.exec(`
 
         /*
 
+         * =================================================
+
          * WINNER FOUND
+
+         * =================================================
 
          */
 
@@ -2079,7 +2157,11 @@ sql.exec(`
 
             this.getJackpot(
 
-              Number(state.game_number)
+              Number(
+
+                state.game_number
+
+              )
 
             );
 
@@ -2094,12 +2176,6 @@ sql.exec(`
           const winnerExpiresAt =
 
             Date.now() + 3000;
-
-          /*
-
-           * Make sure winner balance exists.
-
-           */
 
           await this.ensureBalanceRow(
 
@@ -2119,7 +2195,9 @@ sql.exec(`
 
             Number(
 
-              winnerBalances.playBalance || 0
+              winnerBalances.playBalance ||
+
+              0
 
             );
 
@@ -2131,11 +2209,13 @@ sql.exec(`
 
           /*
 
-           * Pay jackpot into PLAY BALANCE.
+           * Pay jackpot.
 
            */
 
-          this.ctx.storage.sql.exec(`
+          this.ctx.storage.sql.exec(
+
+            `
 
             UPDATE balances
 
@@ -2147,7 +2227,7 @@ sql.exec(`
 
             WHERE user_id = ?
 
-          `,
+            `,
 
             newPlayBalance,
 
@@ -2159,11 +2239,13 @@ sql.exec(`
 
           /*
 
-           * Record winner payment.
+           * Record win.
 
            */
 
-          this.ctx.storage.sql.exec(`
+          this.ctx.storage.sql.exec(
+
+            `
 
             INSERT INTO transactions
 
@@ -2201,7 +2283,7 @@ sql.exec(`
 
             )
 
-          `,
+            `,
 
             winner.userId,
 
@@ -2213,13 +2295,13 @@ sql.exec(`
 
           /*
 
-           * IMPORTANT:
-
-           * Keep the result visible for 3 seconds.
+           * Show result for 3 seconds.
 
            */
 
-          this.ctx.storage.sql.exec(`
+          this.ctx.storage.sql.exec(
+
+            `
 
             UPDATE state
 
@@ -2239,7 +2321,7 @@ sql.exec(`
 
             WHERE id = 1
 
-          `,
+            `,
 
             winner.userId,
 
@@ -2265,13 +2347,11 @@ sql.exec(`
 
         /*
 
-         * GAME HAS REACHED BALL 75.
+         * =================================================
 
-         *
+         * BALL 75 -> NEW GAME
 
-         * If there is no winner by then,
-
-         * immediately start the next 45-second lobby.
+         * =================================================
 
          */
 
@@ -2291,7 +2371,11 @@ sql.exec(`
 
         /*
 
-         * Call next ball.
+         * =================================================
+
+         * NEXT BALL
+
+         * =================================================
 
          */
 
@@ -2300,12 +2384,14 @@ sql.exec(`
           currentIndex + 1;
 
         this.ctx.storage.sql.exec(
- 
+
           `
 
           UPDATE state
 
-          SET ball_index = ?
+          SET
+
+            ball_index = ?
 
           WHERE id = 1
 
@@ -2314,6 +2400,14 @@ sql.exec(`
           nextIndex
 
         );
+
+        /*
+
+         * IMPORTANT:
+
+         * Always schedule another alarm.
+
+         */
 
         await this.scheduleNext(
 
@@ -2335,21 +2429,33 @@ sql.exec(`
 
        */
 
-      if (state.status === "result") {
+      if (
+
+        state.status === "result"
+
+      ) {
 
         const winnerExpiresAt =
 
           Number(
 
-            state.winner_expires_at || 0
+            state.winner_expires_at ||
+
+            0
 
           );
 
         const remaining =
 
-          winnerExpiresAt - Date.now();
+          winnerExpiresAt -
 
-        if (remaining > 0) {
+          Date.now();
+
+        if (
+
+          remaining > 0
+
+        ) {
 
           await this.scheduleNext(
 
@@ -2369,9 +2475,11 @@ sql.exec(`
 
       /*
 
-       * Unknown status:
+       * =====================================================
 
-       * recover into a fresh lobby.
+       * UNKNOWN STATUS
+
+       * =====================================================
 
        */
 
@@ -2389,9 +2497,11 @@ sql.exec(`
 
       console.error(
 
-        "Fast Bingo alarm error:",
+        "FAST BINGO ALARM ERROR:",
 
-        error?.message || String(error),
+        error?.message ||
+
+          String(error),
 
         error?.stack || "",
 
@@ -2399,17 +2509,151 @@ sql.exec(`
 
         alarmInfo?.retryCount || 0
 
-   );
+      );
 
       /*
 
-       * Do not let Cloudflare's limited alarm retries
+       * VERY IMPORTANT:
 
-       * permanently stop the 24/7 game loop.
+       *
+
+       * Even if something goes wrong,
+
+       * force another alarm so the
+
+       * 24-hour scheduler does not die.
 
        */
 
-      await this.recoverScheduler();
+      try {
+
+        const current =
+
+          this.getState();
+
+        if (!current) {
+
+          await this.createFreshLobby(
+
+            1
+
+          );
+
+          return;
+
+        }
+
+        if (
+
+          current.status === "lobby"
+
+        ) {
+
+          const remaining =
+
+            Math.max(
+
+              1000,
+
+              Number(
+
+                current.lobby_ends_at ||
+
+                0
+
+              ) - Date.now()
+
+            );
+
+          await this.scheduleNext(
+
+            remaining
+
+          );
+
+          return;
+
+        }
+
+        if (
+
+          current.status === "result"
+
+        ) {
+
+          const remaining =
+
+            Math.max(
+
+              1000,
+
+              Number(
+
+                current.winner_expires_at ||
+
+                0
+
+              ) - Date.now()
+
+            );
+
+          await this.scheduleNext(
+
+            remaining
+
+          );
+
+          return;
+
+        }
+
+        /*
+
+         * LIVE or unknown:
+
+         * retry quickly.
+
+         */
+
+        await this.scheduleNext(
+
+          2000
+
+        );
+
+      } catch (recoveryError) {
+
+        console.error(
+
+          "FAST BINGO RECOVERY ERROR:",
+
+          recoveryError?.message ||
+
+            String(
+
+              recoveryError
+
+            )
+
+        );
+
+        /*
+
+         * Last emergency retry.
+
+         */
+
+        try {
+
+          await this.ctx.storage.setAlarm(
+
+            Date.now() + 5000
+
+          );
+
+        } catch (_) {}
+
+      }
 
     }
 
