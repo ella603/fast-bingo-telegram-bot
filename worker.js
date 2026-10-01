@@ -6069,6 +6069,92 @@ if (
 
     ) {
 
+      /*
+
+       * =====================================================
+
+       * FAST BINGO — 75/75 WATCHDOG
+
+       *
+
+       * If the background alarm ever misses the final
+
+       * transition, the normal /api/game polling from
+
+       * the Mini App repairs the game automatically.
+
+       * =====================================================
+
+       */
+
+      const watchdogState =
+
+        this.getState();
+
+      if (
+
+        watchdogState &&
+
+        watchdogState.status === "live" &&
+
+        Number(
+
+          watchdogState.ball_index
+
+        ) >= TOTAL_BALLS - 1
+
+      ) {
+
+        /*
+
+         * Force the next scheduler alarm immediately.
+
+         *
+
+         * The alarm handler will:
+
+         *
+
+         * 1. detect the winner if there is one
+
+         * 2. show RESULT for 3 seconds
+
+         * 3. create the next 45-second lobby
+
+         *
+
+         * or, if there is no winner:
+
+         *
+
+         * 1. directly create the next 45-second lobby
+
+         */
+
+        try {
+
+          await this.ctx.storage.setAlarm(
+
+            Date.now() + 1
+
+          );
+
+        } catch (watchdogError) {
+
+          console.error(
+
+            "FAST BINGO 75/75 WATCHDOG ERROR:",
+
+            watchdogError?.message ||
+
+            String(watchdogError)
+
+          );
+
+        }
+
+      }
+
       return json(
 
         this.getGameResponse()
@@ -12419,9 +12505,35 @@ function checkLoginStatus(){
 
          */
 
+        /*
+
+         * =================================================
+
+         * BINGO RESULT VISIBILITY
+
+         *
+
+         * ONLY users who selected a card in THIS browser
+
+         * during this game see the 3-second BINGO screen.
+
+         *
+
+         * Users who did NOT participate do NOT see BINGO.
+
+         * They continue directly to the next 45-second lobby.
+
+         * =================================================
+
+         */
+
         if(
 
-          isNewResult
+          isNewResult &&
+
+          Array.isArray(selected) &&
+
+          selected.length > 0
 
         ){
 
