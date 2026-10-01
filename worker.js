@@ -2379,7 +2379,7 @@ sql.exec(`
 
          * =================================================
 
-         * BALL 75
+         * BALL 75 -> FORCE NEW 45 SECOND LOBBY
 
          * =================================================
 
@@ -2393,7 +2393,127 @@ sql.exec(`
 
         ) {
 
-          await this.startNextGame();
+          const nextGame =
+
+            Number(
+
+              state.game_number || 0
+
+            ) + 1;
+
+          const nextLobbyStart =
+
+            Date.now();
+
+          const nextLobbyEnds =
+
+            nextLobbyStart +
+
+            LOBBY_SECONDS * 1000;
+
+          const nextOrder =
+
+            makeBallOrder(
+
+              nextGame
+
+            );
+
+          /*
+
+           * Clear old selections.
+
+           */
+
+          this.ctx.storage.sql.exec(
+
+            `
+
+            DELETE FROM selected_cards
+
+            WHERE game_number < ?
+
+            `,
+
+            nextGame
+
+          );
+
+          /*
+
+           * DIRECTLY change the game
+
+           * from LIVE -> NEW LOBBY.
+
+           *
+
+           * Do not call startNextGame()
+
+           * here.
+
+           */
+
+          this.ctx.storage.sql.exec(
+
+            `
+
+            UPDATE state
+
+            SET
+
+              game_number = ?,
+
+              status = 'lobby',
+
+              lobby_ends_at = ?,
+
+              started_at = NULL,
+
+              ball_index = -1,
+
+              ball_order = ?,
+
+              winner_user_id = NULL,
+
+              winner_card = NULL,
+
+              winner_name = NULL,
+
+              winner_amount = NULL,
+
+              winner_expires_at = NULL
+
+            WHERE id = 1
+
+            `,
+
+            nextGame,
+
+            nextLobbyEnds,
+
+            JSON.stringify(
+
+              nextOrder
+
+            )
+
+          );
+
+          /*
+
+           * IMPORTANT:
+
+           * Start the new 45-second lobby alarm
+
+           * directly.
+
+           */
+
+          await this.ctx.storage.setAlarm(
+
+            nextLobbyEnds
+
+          );
 
           return;
 
