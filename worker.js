@@ -2379,7 +2379,7 @@ sql.exec(`
 
          * =================================================
 
-         * BALL 75 -> FORCE NEW 45 SECOND LOBBY
+         * BALL 75 -> NEXT GAME SAFELY
 
          * =================================================
 
@@ -2393,25 +2393,35 @@ sql.exec(`
 
         ) {
 
-          const nextGame =
+          /*
+
+           * IMPORTANT:
+
+           * Do NOT continue the current LIVE game.
+
+           * First move the state to LOBBY.
+
+           */
+
+          const currentGame =
 
             Number(
 
               state.game_number || 0
 
-            ) + 1;
+            );
 
-          const nextLobbyStart =
+          const nextGame =
 
-            Date.now();
+            currentGame + 1;
 
-          const nextLobbyEnds =
+          const lobbyEndsAt =
 
-            nextLobbyStart +
+            Date.now() +
 
             LOBBY_SECONDS * 1000;
 
-          const nextOrder =
+          const nextBallOrder =
 
             makeBallOrder(
 
@@ -2421,7 +2431,9 @@ sql.exec(`
 
           /*
 
-           * Clear old selections.
+           * Clear selections from
+
+           * previous games.
 
            */
 
@@ -2441,15 +2453,11 @@ sql.exec(`
 
           /*
 
-           * DIRECTLY change the game
-
-           * from LIVE -> NEW LOBBY.
+           * LIVE -> LOBBY
 
            *
 
-           * Do not call startNextGame()
-
-           * here.
+           * This is the important part.
 
            */
 
@@ -2489,11 +2497,11 @@ sql.exec(`
 
             nextGame,
 
-            nextLobbyEnds,
+            lobbyEndsAt,
 
             JSON.stringify(
 
-              nextOrder
+              nextBallOrder
 
             )
 
@@ -2501,17 +2509,87 @@ sql.exec(`
 
           /*
 
+           * Verify that the database
+
+           * really changed to LOBBY.
+
+           */
+
+          const verifiedState =
+
+            this.getState();
+
+          if (
+
+            !verifiedState ||
+
+            verifiedState.status !== "lobby" ||
+
+            Number(
+
+              verifiedState.game_number
+
+            ) !== nextGame
+
+          ) {
+
+            console.error(
+
+              "FAST BINGO: FAILED TO ENTER NEW LOBBY",
+
+              JSON.stringify(
+
+                verifiedState
+
+              )
+
+            );
+
+            /*
+
+             * Retry very shortly.
+
+             */
+
+            await this.ctx.storage.setAlarm(
+
+              Date.now() + 1000
+
+            );
+
+            return;
+
+          }
+
+          /*
+
            * IMPORTANT:
 
-           * Start the new 45-second lobby alarm
+           * Schedule the exact end of the
 
-           * directly.
+           * new 45-second lobby.
 
            */
 
           await this.ctx.storage.setAlarm(
 
-            nextLobbyEnds
+            lobbyEndsAt
+
+          );
+
+          console.log(
+
+            "FAST BINGO: GAME FINISHED -> NEW LOBBY",
+
+            {
+
+              previousGame: currentGame,
+
+              nextGame,
+
+              lobbyEndsAt
+
+            }
 
           );
 
