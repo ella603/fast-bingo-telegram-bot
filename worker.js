@@ -6173,17 +6173,17 @@ if (
 
        *
 
-       * A brand-new Telegram user must be able
+       * Every game request also guarantees that
 
-       * to enter the real shared game immediately.
+       * this Telegram user is registered.
 
        *
 
-       * Registration is idempotent:
+       * This gives a brand-new user the
 
-       * if the user is already registered,
+       * one-time 20 ETB Play Balance bonus
 
-       * no second 20 ETB bonus is given.
+       * before the game response is returned.
 
        */
 
@@ -6195,11 +6195,13 @@ if (
 
         console.error(
 
-          "FAST BINGO AUTO REGISTRATION ERROR:",
+          "FAST BINGO GAME REGISTRATION ERROR:",
 
           registrationError?.message ||
 
-          String(registrationError)
+          String(registrationError),
+
+          registrationError?.stack || ""
 
         );
 
@@ -6239,7 +6241,7 @@ if (
 
       );
 
-    }
+    } 
 
     if (
 
