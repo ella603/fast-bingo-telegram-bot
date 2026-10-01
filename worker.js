@@ -1749,11 +1749,41 @@ sql.exec(`
 
   async alarm(alarmInfo) {
 
+    /*
+
+     * =====================================================
+
+     * FAST BINGO — ROBUST 24H GAME SCHEDULER
+
+     *
+
+     * LOBBY 45s
+
+     * LIVE 75 BALLS
+
+     * WINNER -> RESULT 3s
+
+     * RESULT -> NEW LOBBY 45s
+
+     * NO DEAD-END AT 75/75
+
+     * =====================================================
+
+     */
+
     try {
 
-      let state =
+      let state = this.getState();
 
-        this.getState();
+      /*
+
+       * -----------------------------------------------------
+
+       * NO STATE
+
+       * -----------------------------------------------------
+
+       */
 
       if (!state) {
 
@@ -1763,9 +1793,7 @@ sql.exec(`
 
       }
 
-      const now =
-
-        Date.now();
+      const now = Date.now();
 
       /*
 
@@ -1791,21 +1819,21 @@ sql.exec(`
 
           );
 
+        /*
+
+         * Alarm may fire slightly early.
+
+         */
+
         if (
 
           now < lobbyEnds
 
         ) {
 
-          await this.scheduleNext(
+          await this.ctx.storage.setAlarm(
 
-            Math.max(
-
-              1000,
-
-              lobbyEnds - now
-
-            )
+            lobbyEnds
 
           );
 
@@ -1849,6 +1877,16 @@ sql.exec(`
 
         }
 
+        /*
+
+         * Start LIVE game.
+
+         *
+
+         * Ball index 0 = first ball.
+
+         */
+
         this.ctx.storage.sql.exec(
 
           `
@@ -1877,9 +1915,221 @@ sql.exec(`
 
         );
 
-        await this.scheduleNext(
+        /*
 
-          BALL_INTERVAL
+         * Next ball.
+
+         */
+
+        await this.ctx.storage.setAlarm(
+
+          now + BALL_INTERVAL
+
+        );
+
+        return;
+
+      }
+
+      /*
+
+       * =====================================================
+
+       * RESULT -> NEW LOBBY
+
+       *
+
+       * IMPORTANT:
+
+       * This is handled DIRECTLY.
+
+       * We do NOT depend on startNextGame()
+
+       * for the automatic loop.
+
+       * =====================================================
+
+       */
+
+      if (
+
+        state.status === "result"
+
+      ) {
+
+        const nextGame =
+
+          Number(
+
+            state.game_number || 0
+
+          ) + 1;
+
+        const lobbyEnds =
+
+          Date.now() +
+
+          LOBBY_SECONDS * 1000;
+
+        const nextOrder =
+
+          makeBallOrder(
+
+            nextGame
+
+          );
+
+        /*
+
+         * Remove old selections.
+
+         */
+
+        try {
+
+          this.ctx.storage.sql.exec(
+
+            `
+
+            DELETE FROM selected_cards
+
+            WHERE game_number < ?
+
+            `,
+
+            nextGame
+
+          );
+
+        } catch (cleanupError) {
+
+          console.error(
+
+            "FAST BINGO CLEANUP ERROR:",
+
+            cleanupError?.message ||
+
+            String(cleanupError)
+
+          );
+
+        }
+
+        /*
+
+         * RESULT -> LOBBY
+
+         */
+
+        this.ctx.storage.sql.exec(
+
+          `
+
+          UPDATE state
+
+          SET
+
+            game_number = ?,
+
+            status = 'lobby',
+
+            lobby_ends_at = ?,
+
+            started_at = NULL,
+
+            ball_index = -1,
+
+            ball_order = ?,
+
+            winner_user_id = NULL,
+
+            winner_card = NULL,
+
+            winner_name = NULL,
+
+            winner_amount = NULL,
+
+            winner_expires_at = NULL
+
+          WHERE id = 1
+
+          `,
+
+          nextGame,
+
+          lobbyEnds,
+
+          JSON.stringify(nextOrder)
+
+        );
+
+        /*
+
+         * Verify state.
+
+         */
+
+        const verify =
+
+          this.getState();
+
+        if (
+
+          !verify ||
+
+          verify.status !== "lobby" ||
+
+          Number(
+
+            verify.game_number
+
+          ) !== nextGame
+
+        ) {
+
+          console.error(
+
+            "FAST BINGO RESULT->LOBBY FAILED",
+
+            JSON.stringify(verify)
+
+          );
+
+          await this.ctx.storage.setAlarm(
+
+            Date.now() + 1000
+
+          );
+
+          return;
+
+        }
+
+        /*
+
+         * Exact alarm for end of
+
+         * new 45-second lobby.
+
+         */
+
+        await this.ctx.storage.setAlarm(
+
+          lobbyEnds
+
+        );
+
+        console.log(
+
+          "FAST BINGO: RESULT -> NEW LOBBY",
+
+          {
+
+            gameNumber: nextGame,
+
+            lobbyEnds
+
+          }
 
         );
 
@@ -1905,7 +2155,7 @@ sql.exec(`
 
         /*
 
-         * Re-read the state after every alarm.
+         * Always re-read.
 
          */
 
@@ -1921,9 +2171,9 @@ sql.exec(`
 
         ) {
 
-          await this.scheduleNext(
+          await this.ctx.storage.setAlarm(
 
-            1000
+            Date.now() + 1000
 
           );
 
@@ -1941,15 +2191,9 @@ sql.exec(`
 
         /*
 
-         * Calculate the ball that SHOULD
+         * Calculate current ball
 
-         * currently be active from real time.
-
-         *
-
-         * Ball 1 starts at started_at.
-
-         * Every BALL_INTERVAL adds one ball.
+         * from real elapsed time.
 
          */
 
@@ -1975,7 +2219,7 @@ sql.exec(`
 
         /*
 
-         * Never go beyond ball 75.
+         * Never exceed ball 75.
 
          */
 
@@ -1989,6 +2233,14 @@ sql.exec(`
 
           );
 
+        /*
+
+         * Make sure current index
+
+         * moves forward.
+
+         */
+
         const currentIndex =
 
           Number(
@@ -1996,12 +2248,6 @@ sql.exec(`
             state.ball_index
 
           );
-
-        /*
-
-         * Move forward to the time-based index.
-
-         */
 
         if (
 
@@ -2013,7 +2259,7 @@ sql.exec(`
 
           targetIndex >
 
-            currentIndex
+          currentIndex
 
         ) {
 
@@ -2023,9 +2269,7 @@ sql.exec(`
 
             UPDATE state
 
-            SET
-
-              ball_index = ?
+            SET ball_index = ?
 
             WHERE id = 1
 
@@ -2045,7 +2289,7 @@ sql.exec(`
 
          * =================================================
 
-         * CHECK WINNER
+         * GET CALLED BALLS
 
          * =================================================
 
@@ -2058,6 +2302,16 @@ sql.exec(`
             state
 
           );
+
+        /*
+
+         * =================================================
+
+         * FIND FIRST WINNER
+
+         * =================================================
+
+         */
 
         const selectedRows =
 
@@ -2193,7 +2447,23 @@ sql.exec(`
 
          * =================================================
 
-         * WINNER
+         * WINNER FOUND
+
+         *
+
+         * CRITICAL FIX:
+
+         *
+
+         * FIRST change state to RESULT.
+
+         * THEN do balance/payment work.
+
+         *
+
+         * Therefore a balance/transaction error
+
+         * can NEVER leave the game stuck at 75/75.
 
          * =================================================
 
@@ -2225,109 +2495,13 @@ sql.exec(`
 
             Date.now() + 3000;
 
-          await this.ensureBalanceRow(
+          /*
 
-            winner.userId
+           * STEP 1:
 
-          );
+           * Immediately lock game into RESULT.
 
-          const winnerBalances =
-
-            this.getBalances(
-
-              winner.userId
-
-            );
-
-          const oldPlayBalance =
-
-            Number(
-
-              winnerBalances.playBalance ||
-
-              0
-
-            );
-
-          const newPlayBalance =
-
-            oldPlayBalance +
-
-            winningAmount;
-
-          this.ctx.storage.sql.exec(
-
-            `
-
-            UPDATE balances
-
-            SET
-
-              balance = ?,
-
-              play_balance = ?
-
-            WHERE user_id = ?
-
-            `,
-
-            newPlayBalance,
-
-            newPlayBalance,
-
-            winner.userId
-
-          );
-
-          this.ctx.storage.sql.exec(
-
-            `
-
-            INSERT INTO transactions
-
-            (
-
-              user_id,
-
-              type,
-
-              method,
-
-              amount,
-
-              simulated,
-
-              created_at
-
-            )
-
-            VALUES
-
-            (
-
-              ?,
-
-              'bingo_win',
-
-              NULL,
-
-              ?,
-
-              1,
-
-              ?
-
-            )
-
-            `,
-
-            winner.userId,
-
-            winningAmount,
-
-            Date.now()
-
-          );
+           */
 
           this.ctx.storage.sql.exec(
 
@@ -2365,9 +2539,183 @@ sql.exec(`
 
           );
 
-          await this.scheduleNext(
+          /*
 
-            3000
+           * STEP 2:
+
+           * Pay winner separately.
+
+           *
+
+           * Any payout error is logged but does NOT
+
+           * stop the game scheduler.
+
+           */
+
+          try {
+
+            await this.ensureBalanceRow(
+
+              winner.userId
+
+            );
+
+            const winnerBalances =
+
+              this.getBalances(
+
+                winner.userId
+
+              );
+
+            const oldPlayBalance =
+
+              Number(
+
+                winnerBalances.playBalance ||
+
+                0
+
+              );
+
+            const newPlayBalance =
+
+              oldPlayBalance +
+
+              winningAmount;
+
+            this.ctx.storage.sql.exec(
+
+              `
+
+              UPDATE balances
+
+              SET
+
+                balance = ?,
+
+                play_balance = ?
+
+              WHERE user_id = ?
+
+              `,
+
+              newPlayBalance,
+
+              newPlayBalance,
+
+              winner.userId
+
+            );
+
+            this.ctx.storage.sql.exec(
+
+              `
+
+              INSERT INTO transactions
+
+              (
+
+                user_id,
+
+                type,
+
+                method,
+
+                amount,
+
+                simulated,
+
+                created_at
+
+              )
+
+              VALUES
+
+              (
+
+                ?,
+
+                'bingo_win',
+
+                NULL,
+
+                ?,
+
+                1,
+
+                ?
+
+              )
+
+              `,
+
+              winner.userId,
+
+              winningAmount,
+
+              Date.now()
+
+            );
+
+          } catch (payoutError) {
+
+            console.error(
+
+              "FAST BINGO WINNER PAYOUT ERROR:",
+
+              payoutError?.message ||
+
+              String(payoutError),
+
+              payoutError?.stack || ""
+
+            );
+
+          }
+
+          /*
+
+           * STEP 3:
+
+           * ALWAYS schedule the 3-second result.
+
+           */
+
+          await this.ctx.storage.setAlarm(
+
+            winnerExpiresAt
+
+          );
+
+          console.log(
+
+            "FAST BINGO: WINNER -> RESULT",
+
+            {
+
+              gameNumber:
+
+                Number(
+
+                  state.game_number
+
+                ),
+
+              winner:
+
+                winner.name,
+
+              card:
+
+                winner.card,
+
+              amount:
+
+                winningAmount
+
+            }
 
           );
 
@@ -2379,7 +2727,11 @@ sql.exec(`
 
          * =================================================
 
-         * BALL 75 -> NEXT GAME SAFELY
+         * NO WINNER
+
+         *
+
+         * BALL 75 COMPLETED
 
          * =================================================
 
@@ -2393,16 +2745,6 @@ sql.exec(`
 
         ) {
 
-          /*
-
-           * IMPORTANT:
-
-           * Do NOT continue the current LIVE game.
-
-           * First move the state to LOBBY.
-
-           */
-
           const currentGame =
 
             Number(
@@ -2415,13 +2757,13 @@ sql.exec(`
 
             currentGame + 1;
 
-          const lobbyEndsAt =
+          const lobbyEnds =
 
             Date.now() +
 
             LOBBY_SECONDS * 1000;
 
-          const nextBallOrder =
+          const nextOrder =
 
             makeBallOrder(
 
@@ -2431,33 +2773,43 @@ sql.exec(`
 
           /*
 
-           * Clear selections from
-
-           * previous games.
+           * Old selections are no longer needed.
 
            */
 
-          this.ctx.storage.sql.exec(
+          try {
 
-            `
+            this.ctx.storage.sql.exec(
 
-            DELETE FROM selected_cards
+              `
 
-            WHERE game_number < ?
+              DELETE FROM selected_cards
 
-            `,
+              WHERE game_number < ?
 
-            nextGame
+              `,
 
-          );
+              nextGame
+
+            );
+
+          } catch (cleanupError) {
+
+            console.error(
+
+              "FAST BINGO BALL75 CLEANUP ERROR:",
+
+              cleanupError?.message ||
+
+              String(cleanupError)
+
+            );
+
+          }
 
           /*
 
-           * LIVE -> LOBBY
-
-           *
-
-           * This is the important part.
+           * LIVE -> NEW LOBBY
 
            */
 
@@ -2497,37 +2849,31 @@ sql.exec(`
 
             nextGame,
 
-            lobbyEndsAt,
+            lobbyEnds,
 
-            JSON.stringify(
-
-              nextBallOrder
-
-            )
+            JSON.stringify(nextOrder)
 
           );
 
           /*
 
-           * Verify that the database
-
-           * really changed to LOBBY.
+           * Verify.
 
            */
 
-          const verifiedState =
+          const verify =
 
             this.getState();
 
           if (
 
-            !verifiedState ||
+            !verify ||
 
-            verifiedState.status !== "lobby" ||
+            verify.status !== "lobby" ||
 
             Number(
 
-              verifiedState.game_number
+              verify.game_number
 
             ) !== nextGame
 
@@ -2535,21 +2881,11 @@ sql.exec(`
 
             console.error(
 
-              "FAST BINGO: FAILED TO ENTER NEW LOBBY",
+              "FAST BINGO BALL75 -> LOBBY FAILED",
 
-              JSON.stringify(
-
-                verifiedState
-
-              )
+              JSON.stringify(verify)
 
             );
-
-            /*
-
-             * Retry very shortly.
-
-             */
 
             await this.ctx.storage.setAlarm(
 
@@ -2563,31 +2899,29 @@ sql.exec(`
 
           /*
 
-           * IMPORTANT:
-
-           * Schedule the exact end of the
-
-           * new 45-second lobby.
+           * Start exact 45-second lobby timer.
 
            */
 
           await this.ctx.storage.setAlarm(
 
-            lobbyEndsAt
+            lobbyEnds
 
           );
 
           console.log(
 
-            "FAST BINGO: GAME FINISHED -> NEW LOBBY",
+            "FAST BINGO: BALL 75 -> NEW LOBBY",
 
             {
 
-              previousGame: currentGame,
+              previousGame:
+
+                currentGame,
 
               nextGame,
 
-              lobbyEndsAt
+              lobbyEnds
 
             }
 
@@ -2601,7 +2935,7 @@ sql.exec(`
 
          * =================================================
 
-         * SCHEDULE NEXT CHECK
+         * NEXT BALL
 
          * =================================================
 
@@ -2619,75 +2953,17 @@ sql.exec(`
 
           BALL_INTERVAL;
 
-        const remaining =
+        await this.ctx.storage.setAlarm(
 
           Math.max(
 
-            1000,
+            Date.now() + 1000,
 
-            nextBallTime - Date.now()
+            nextBallTime
 
-          );
-
-        await this.scheduleNext(
-
-          remaining
+          )
 
         );
-
-        return;
-
-      }
-
-      /*
-
-       * =====================================================
-
-       * RESULT -> NEXT GAME
-
-       * =====================================================
-
-       */
-
-      if (
-
-        state.status === "result"
-
-      ) {
-
-        const expires =
-
-          Number(
-
-            state.winner_expires_at ||
-
-            0
-
-          );
-
-        const remaining =
-
-          expires -
-
-          Date.now();
-
-        if (
-
-          remaining > 0
-
-        ) {
-
-          await this.scheduleNext(
-
-            remaining
-
-          );
-
-          return;
-
-        }
-
-        await this.startNextGame();
 
         return;
 
@@ -2715,13 +2991,23 @@ sql.exec(`
 
     } catch (error) {
 
+      /*
+
+       * =====================================================
+
+       * NEVER LET THE SCHEDULER DIE
+
+       * =====================================================
+
+       */
+
       console.error(
 
         "FAST BINGO ALARM ERROR:",
 
         error?.message ||
 
-          String(error),
+        String(error),
 
         error?.stack || "",
 
@@ -2731,14 +3017,6 @@ sql.exec(`
 
       );
 
-      /*
-
-       * NEVER allow the scheduler
-
-       * to die permanently.
-
-       */
-
       try {
 
         const current =
@@ -2747,15 +3025,19 @@ sql.exec(`
 
         if (!current) {
 
-          await this.createFreshLobby(
-
-            1
-
-          );
+          await this.createFreshLobby(1);
 
           return;
 
         }
+
+        /*
+
+         * If already in lobby,
+
+         * keep lobby alive.
+
+         */
 
         if (
 
@@ -2763,57 +3045,23 @@ sql.exec(`
 
         ) {
 
-          const remaining =
+          const ends =
 
-            Math.max(
+            Number(
 
-              1000,
-
-              Number(
-
-                current.lobby_ends_at ||
-
-                0
-
-              ) - Date.now()
+              current.lobby_ends_at || 0
 
             );
 
-          await this.scheduleNext(
-
-            remaining
-
-          );
-
-          return;
-
-        }
-
-        if (
-
-          current.status === "result"
-
-        ) {
-
-          const remaining =
+          await this.ctx.storage.setAlarm(
 
             Math.max(
 
-              1000,
+              Date.now() + 1000,
 
-              Number(
+              ends
 
-                current.winner_expires_at ||
-
-                0
-
-              ) - Date.now()
-
-            );
-
-          await this.scheduleNext(
-
-            remaining
+            )
 
           );
 
@@ -2823,15 +3071,61 @@ sql.exec(`
 
         /*
 
-         * If LIVE crashes,
+         * If result exists, do NOT keep
 
-         * retry after 1 second.
+         * the old result forever.
 
          */
 
-        await this.scheduleNext(
+        if (
 
-          1000
+          current.status === "result"
+
+        ) {
+
+          const expires =
+
+            Number(
+
+              current.winner_expires_at || 0
+
+            );
+
+          await this.ctx.storage.setAlarm(
+
+            Math.max(
+
+              Date.now() + 1000,
+
+              expires
+
+            )
+
+          );
+
+          return;
+
+        }
+
+        /*
+
+         * LIVE error:
+
+         * retry after 1 second.
+
+         *
+
+         * If it is already ball 75,
+
+         * the next execution will run the
+
+         * BALL 75 -> NEW LOBBY path.
+
+         */
+
+        await this.ctx.storage.setAlarm(
+
+          Date.now() + 1000
 
         );
 
@@ -2843,11 +3137,7 @@ sql.exec(`
 
           recoveryError?.message ||
 
-            String(
-
-              recoveryError
-
-            )
+          String(recoveryError)
 
         );
 
