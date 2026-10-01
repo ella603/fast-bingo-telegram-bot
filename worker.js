@@ -10399,29 +10399,35 @@ function registerFromLogin(){
 
   }
 
+  /*
+
+   * OPEN THE MINI APP IMMEDIATELY.
+
+   *
+
+   * Registration continues in the background.
+
+   * The user does NOT wait for the server response.
+
+   */
+
   setLoginBusy(true);
 
-  loginMessage(
+  hideLoginScreen();
 
-    "Fast Bingo ላይ እየተመዘገቡ ነው..."
+  loginReady = true;
 
-  );
+  /*
 
-  var timeoutId = setTimeout(function(){
+   * Register this Telegram user in the background.
 
-    if(loginBusy){
+   *
 
-      setLoginBusy(false);
+   * The backend gives the first-time user
 
-      loginMessage(
+   * 20 ETB Play Balance.
 
-        "Server ምላሽ አልሰጠም። እባክዎ እንደገና ይሞክሩ።"
-
-      );
-
-    }
-
-  },10000);
+   */
 
   api(
 
@@ -10437,8 +10443,6 @@ function registerFromLogin(){
 
   .then(function(result){
 
-    clearTimeout(timeoutId);
-
     if(
 
       result &&
@@ -10449,9 +10453,13 @@ function registerFromLogin(){
 
     ){
 
-      hideLoginScreen();
+      /*
 
-      loginReady = true;
+       * Refresh the balance after registration
+
+       * so the 20 ETB bonus appears.
+
+       */
 
       if(
 
@@ -10517,59 +10525,15 @@ function registerFromLogin(){
 
       }
 
-      /*
-
-       * Start the normal Mini App refresh
-
-       * after successful registration.
-
-       */
-
-      setInterval(
-
-        refreshGame,
-
-        1000
-
-      );
-
-      setInterval(
-
-        loadBalance,
-
-        10000
-
-      );
-
       return;
 
     }
 
-    loginMessage(
+    console.error(
 
-      (
+      "BACKGROUND REGISTER FAILED:",
 
-        result &&
-
-        (
-
-          result.message ||
-
-          result.error
-
-        )
-
-      )
-
-        ? (
-
-            result.message ||
-
-            result.error
-
-          )
-
-        : "ምዝገባው አልተሳካም። እባክዎ እንደገና ይሞክሩ።"
+      result
 
     );
 
@@ -10577,19 +10541,11 @@ function registerFromLogin(){
 
   .catch(function(error){
 
-    clearTimeout(timeoutId);
-
     console.error(
 
-      "REGISTER ERROR:",
+      "BACKGROUND REGISTER ERROR:",
 
       error
-
-    );
-
-    loginMessage(
-
-      "Server error። እባክዎ እንደገና ይሞክሩ።"
 
     );
 
@@ -10597,11 +10553,55 @@ function registerFromLogin(){
 
   .finally(function(){
 
-    clearTimeout(timeoutId);
-
     setLoginBusy(false);
 
   });
+
+  /*
+
+   * Start normal Mini App refresh immediately.
+
+   */
+
+  if(
+
+    typeof refreshGame ===
+
+    "function"
+
+  ){
+
+    refreshGame();
+
+    setInterval(
+
+      refreshGame,
+
+      1000
+
+    );
+
+  }
+
+  if(
+
+    typeof loadBalance ===
+
+    "function"
+
+  ){
+
+    loadBalance();
+
+    setInterval(
+
+      loadBalance,
+
+      10000
+
+    );
+
+  }
 
 }
 
