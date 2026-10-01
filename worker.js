@@ -10403,9 +10403,7 @@ function registerFromLogin(){
 
   /*
 
-   * Hide the registration screen immediately.
-
-   * The user can enter the Mini App without waiting.
+   * Open the Mini App immediately.
 
    */
 
@@ -10415,17 +10413,13 @@ function registerFromLogin(){
 
   /*
 
-   * IMPORTANT:
+   * Register the new Telegram user.
 
    *
 
-   * Registration is started immediately.
+   * The backend adds the one-time
 
-   * We do NOT start balance/game refresh BEFORE
-
-   * registration finishes, because that can show
-
-   * 0 balance and stale game #1 to a new user.
+   * 20 ETB Play Balance bonus.
 
    */
 
@@ -10445,131 +10439,125 @@ function registerFromLogin(){
 
     if(
 
-      result &&
+      !result ||
 
-      result.ok &&
+      !result.ok ||
 
-      result.authenticated
+      !result.authenticated
 
     ){
 
-      /*
+      console.error(
 
-       * Registration is now complete.
+        "REGISTRATION FAILED:",
 
-       *
+        result
 
-       * The backend has already created the user
+      );
 
-       * and added the 20 ETB Play Balance.
+      loginMessage(
 
-       */
+        "ምዝገባው አልተሳካም። እባክዎ እንደገና ይሞክሩ።"
 
-      if(
-
-        typeof loadBalance ===
-
-        "function"
-
-      ){
-
-        loadBalance();
-
-      }
-
-      if(
-
-        typeof loadMyCards ===
-
-        "function"
-
-      ){
-
-        loadMyCards();
-
-      }
-
-      /*
-
-       * IMPORTANT:
-
-       * Refresh the real shared game state
-
-       * only after registration has completed.
-
-       */
-
-      if(
-
-        typeof refreshGame ===
-
-        "function"
-
-      ){
-
-        refreshGame();
-
-      }
-
-      if(
-
-        Number(
-
-          result.firstRegistrationBonus || 0
-
-        ) > 0
-
-      ){
-
-        if(
-
-          typeof showToast ===
-
-          "function"
-
-        ){
-
-          showToast(
-
-            "🎉 እንኳን ወደ Fast Bingo ቤተሰብ በደህና መጡ! 20 ብር ጉርሻ በመጫወቻ ሂሳብዎ ላይ ተጨምሯል።"
-
-          );
-
-        }
-
-      }
+      );
 
       return;
 
     }
 
-    console.error(
+    /*
 
-      "BACKGROUND REGISTER FAILED:",
+     * Registration is complete.
 
-      result
+     *
 
-    );
+     * The backend has now created the user
+
+     * and added 20 ETB to Play Balance.
+
+     */
+
+    loadBalance();
+
+    loadMyCards();
 
     /*
 
-     * Registration failed.
+     * Get the REAL current shared game.
 
-     * Do not fake a balance or game state.
+     *
+
+     * This is important because the user must
+
+     * join the game that is already running,
+
+     * not start from Game #1.
+
+     */
+
+    refreshGame();
+
+    /*
+
+     * IMPORTANT:
+
+     *
+
+     * New users do not pass through the
+
+     * authenticated=true branch inside boot(),
+
+     * so start the normal live polling here.
 
      */
 
     if(
 
-      typeof loginMessage ===
-
-      "function"
+      !window.fastBingoPlayerPollingStarted
 
     ){
 
-      loginMessage(
+      window.fastBingoPlayerPollingStarted =
 
-        "ምዝገባው አልተሳካም። እባክዎ እንደገና ይሞክሩ።"
+        true;
+
+      setInterval(
+
+        refreshGame,
+
+        1000
+
+      );
+
+      setInterval(
+
+        loadBalance,
+
+        10000
+
+      );
+
+    }
+
+    /*
+
+     * Show the first-registration bonus message.
+
+     */
+
+    if(
+
+      Number(
+
+        result.firstRegistrationBonus || 0
+
+      ) > 0
+
+    ){
+
+      showToast(
+
+        "🎉 እንኳን ወደ Fast Bingo ቤተሰብ በደህና መጡ! 20 ብር ጉርሻ በመጫወቻ ሂሳብዎ ላይ ተጨምሯል።"
 
       );
 
@@ -10581,27 +10569,17 @@ function registerFromLogin(){
 
     console.error(
 
-      "BACKGROUND REGISTER ERROR:",
+      "REGISTRATION ERROR:",
 
       error
 
     );
 
-    if(
+    loginMessage(
 
-      typeof loginMessage ===
+      "ምዝገባው አልተሳካም። እባክዎ እንደገና ይሞክሩ።"
 
-      "function"
-
-    ){
-
-      loginMessage(
-
-        "ምዝገባው አልተሳካም። እባክዎ እንደገና ይሞክሩ።"
-
-      );
-
-    }
+    );
 
   })
 
@@ -10610,72 +10588,6 @@ function registerFromLogin(){
     setLoginBusy(false);
 
   });
-
-  /*
-
-   * Do NOT call refreshGame() or loadBalance()
-
-   * here before registration finishes.
-
-   *
-
-   * The normal polling loops below will start
-
-   * after the registration result.
-
-   */
-
-  if(
-
-    typeof refreshGame ===
-
-    "function"
-
-  ){
-
-    setTimeout(
-
-      function(){
-
-        if(loginReady){
-
-          refreshGame();
-
-        }
-
-      },
-
-      100
-
-    );
-
-  }
-
-  if(
-
-    typeof loadBalance ===
-
-    "function"
-
-  ){
-
-    setTimeout(
-
-      function(){
-
-        if(loginReady){
-
-          loadBalance();
-
-        }
-
-      },
-
-      100
-
-    );
-
-  }
 
 }
 
