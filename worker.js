@@ -10399,19 +10399,15 @@ function registerFromLogin(){
 
   }
 
+  setLoginBusy(true);
+
   /*
 
-   * OPEN THE MINI APP IMMEDIATELY.
+   * Hide the registration screen immediately.
 
-   *
-
-   * Registration continues in the background.
-
-   * The user does NOT wait for the server response.
+   * The user can enter the Mini App without waiting.
 
    */
-
-  setLoginBusy(true);
 
   hideLoginScreen();
 
@@ -10419,13 +10415,17 @@ function registerFromLogin(){
 
   /*
 
-   * Register this Telegram user in the background.
+   * IMPORTANT:
 
    *
 
-   * The backend gives the first-time user
+   * Registration is started immediately.
 
-   * 20 ETB Play Balance.
+   * We do NOT start balance/game refresh BEFORE
+
+   * registration finishes, because that can show
+
+   * 0 balance and stale game #1 to a new user.
 
    */
 
@@ -10455,9 +10455,13 @@ function registerFromLogin(){
 
       /*
 
-       * Refresh the balance after registration
+       * Registration is now complete.
 
-       * so the 20 ETB bonus appears.
+       *
+
+       * The backend has already created the user
+
+       * and added the 20 ETB Play Balance.
 
        */
 
@@ -10484,6 +10488,16 @@ function registerFromLogin(){
         loadMyCards();
 
       }
+
+      /*
+
+       * IMPORTANT:
+
+       * Refresh the real shared game state
+
+       * only after registration has completed.
+
+       */
 
       if(
 
@@ -10537,6 +10551,30 @@ function registerFromLogin(){
 
     );
 
+    /*
+
+     * Registration failed.
+
+     * Do not fake a balance or game state.
+
+     */
+
+    if(
+
+      typeof loginMessage ===
+
+      "function"
+
+    ){
+
+      loginMessage(
+
+        "ምዝገባው አልተሳካም። እባክዎ እንደገና ይሞክሩ።"
+
+      );
+
+    }
+
   })
 
   .catch(function(error){
@@ -10549,6 +10587,22 @@ function registerFromLogin(){
 
     );
 
+    if(
+
+      typeof loginMessage ===
+
+      "function"
+
+    ){
+
+      loginMessage(
+
+        "ምዝገባው አልተሳካም። እባክዎ እንደገና ይሞክሩ።"
+
+      );
+
+    }
+
   })
 
   .finally(function(){
@@ -10559,7 +10613,15 @@ function registerFromLogin(){
 
   /*
 
-   * Start normal Mini App refresh immediately.
+   * Do NOT call refreshGame() or loadBalance()
+
+   * here before registration finishes.
+
+   *
+
+   * The normal polling loops below will start
+
+   * after the registration result.
 
    */
 
@@ -10571,13 +10633,19 @@ function registerFromLogin(){
 
   ){
 
-    refreshGame();
+    setTimeout(
 
-    setInterval(
+      function(){
 
-      refreshGame,
+        if(loginReady){
 
-      1000
+          refreshGame();
+
+        }
+
+      },
+
+      100
 
     );
 
@@ -10591,13 +10659,19 @@ function registerFromLogin(){
 
   ){
 
-    loadBalance();
+    setTimeout(
 
-    setInterval(
+      function(){
 
-      loadBalance,
+        if(loginReady){
 
-      10000
+          loadBalance();
+
+        }
+
+      },
+
+      100
 
     );
 
