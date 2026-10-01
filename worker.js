@@ -1111,6 +1111,8 @@ if (selectedCardsTableInfo.length === 0) {
 
       selected_at INTEGER NOT NULL,
 
+      payment_source TEXT NOT NULL DEFAULT 'play',
+
       PRIMARY KEY (
 
         game_number,
@@ -1135,29 +1137,21 @@ if (selectedCardsTableInfo.length === 0) {
 
     );
 
+  /*
+
+   * Existing selected_cards table from the
+
+   * previous version may not contain user_id.
+
+   *
+
+   * Preserve the old table and create the
+
+   * correct user-aware schema.
+
+   */
+
   if (!hasSelectedCardsUserId) {
-
-    /*
-
-     * The old selected_cards table was created
-
-     * without user_id.
-
-     *
-
-     * Preserve the old rows in a backup table,
-
-     * then create the correct schema.
-
-     *
-
-     * Old selections cannot safely be assigned
-
-     * to Telegram users because the old table
-
-     * did not store user_id.
-
-     */
 
     sql.exec(`
 
@@ -1179,6 +1173,8 @@ if (selectedCardsTableInfo.length === 0) {
 
         selected_at INTEGER NOT NULL,
 
+        payment_source TEXT NOT NULL DEFAULT 'play',
+
         PRIMARY KEY (
 
           game_number,
@@ -1192,6 +1188,52 @@ if (selectedCardsTableInfo.length === 0) {
       )
 
     `);
+
+  } else {
+
+    /*
+
+     * IMPORTANT:
+
+     *
+
+     * The current card-payment system stores
+
+     * whether each card was paid from PLAY
+
+     * or MAIN balance.
+
+     *
+
+     * Add this column to existing databases
+
+     * that were created before payment_source
+
+     * was introduced.
+
+     */
+
+    const hasPaymentSource =
+
+      selectedCardsTableInfo.some(
+
+        c => c.name === "payment_source"
+
+      );
+
+    if (!hasPaymentSource) {
+
+      sql.exec(`
+
+        ALTER TABLE selected_cards
+
+        ADD COLUMN payment_source
+
+        TEXT NOT NULL DEFAULT 'play'
+
+      `);
+
+    }
 
   }
 
