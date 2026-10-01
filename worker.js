@@ -6167,6 +6167,52 @@ if (
 
     ) {
 
+      /*
+
+       * IMPORTANT:
+
+       *
+
+       * A brand-new Telegram user must be able
+
+       * to enter the real shared game immediately.
+
+       *
+
+       * Registration is idempotent:
+
+       * if the user is already registered,
+
+       * no second 20 ETB bonus is given.
+
+       */
+
+      try {
+
+        await this.registerNewUser(user);
+
+      } catch (registrationError) {
+
+        console.error(
+
+          "FAST BINGO AUTO REGISTRATION ERROR:",
+
+          registrationError?.message ||
+
+          String(registrationError)
+
+        );
+
+      }
+
+      /*
+
+       * Always synchronize with the REAL shared
+
+       * GameScheduler state.
+
+       */
+
       try {
 
         await this.advanceGameState();
@@ -6297,6 +6343,34 @@ if (
 
     ) {
 
+      /*
+
+       * Make sure a new Telegram user is
+
+       * registered and receives the one-time
+
+       * 20 ETB Play Balance bonus.
+
+       */
+
+      try {
+
+        await this.registerNewUser(user);
+
+      } catch (registrationError) {
+
+        console.error(
+
+          "FAST BINGO BALANCE REGISTRATION ERROR:",
+
+          registrationError?.message ||
+
+          String(registrationError)
+
+        );
+
+      }
+
       const balances =
 
         this.getBalances(
@@ -6308,16 +6382,6 @@ if (
       return json({
 
         ok: true,
-
-        /*
-
-         * Old "balance" field remains
-
-         * for compatibility with the
-
-         * existing Mini App.
-
-         */
 
         balance:
 
@@ -10403,7 +10467,7 @@ function registerFromLogin(){
 
   /*
 
-   * Open the Mini App immediately.
+   * Open Mini App immediately.
 
    */
 
@@ -10413,13 +10477,71 @@ function registerFromLogin(){
 
   /*
 
-   * Register the user.
+   * Start REAL GAME polling immediately.
 
    *
 
-   * The server gives the one-time
+   * /do/game now also guarantees that the
 
-   * 20 ETB Play Balance bonus.
+   * new user is registered and receives 20 ETB.
+
+   */
+
+  refreshGame();
+
+  loadBalance();
+
+  if(
+
+    !window.fastBingoPlayerPollingStarted
+
+  ){
+
+    window.fastBingoPlayerPollingStarted =
+
+      true;
+
+    setInterval(
+
+      function(){
+
+        if(loginReady){
+
+          refreshGame();
+
+        }
+
+      },
+
+      1000
+
+    );
+
+    setInterval(
+
+      function(){
+
+        if(loginReady){
+
+          loadBalance();
+
+        }
+
+      },
+
+      10000
+
+    );
+
+  }
+
+  /*
+
+   * Registration is also requested directly.
+
+   *
+
+   * The game does NOT wait for this request.
 
    */
 
@@ -10439,167 +10561,37 @@ function registerFromLogin(){
 
     if(
 
-      !result ||
+      result &&
 
-      result.ok !== true ||
+      result.ok &&
 
-      result.authenticated !== true
-
-    ){
-
-      console.error(
-
-        "FAST BINGO REGISTRATION FAILED:",
-
-        result
-
-      );
-
-      /*
-
-       * Keep trying registration in the background.
-
-       * This prevents a temporary server response
-
-       * from leaving the new user at 0 balance.
-
-       */
-
-      setTimeout(
-
-        function(){
-
-          if(
-
-            loginReady &&
-
-            telegramUser &&
-
-            telegramUser.id &&
-
-            String(telegramUser.id) !== "guest"
-
-          ){
-
-            registerFromLogin();
-
-          }
-
-        },
-
-        1000
-
-      );
-
-      return;
-
-    }
-
-    /*
-
-     * Registration is now confirmed by the server.
-
-     *
-
-     * The 20 ETB bonus has already been written
-
-     * to Play Balance by registerNewUser().
-
-     */
-
-    loadBalance();
-
-    loadMyCards();
-
-    /*
-
-     * IMPORTANT:
-
-     *
-
-     * Ask the shared GameScheduler for the REAL
-
-     * current game immediately.
-
-     *
-
-     * This must never create Game #1 for the user.
-
-     */
-
-    refreshGame();
-
-    /*
-
-     * Start live polling exactly once.
-
-     */
-
-    if(
-
-      !window.fastBingoPlayerPollingStarted
+      result.authenticated
 
     ){
 
-      window.fastBingoPlayerPollingStarted =
+      loadBalance();
 
-        true;
+      loadMyCards();
 
-      setInterval(
+      refreshGame();
 
-        function(){
+      if(
 
-          if(loginReady){
+        Number(
 
-            refreshGame();
+          result.firstRegistrationBonus || 0
 
-          }
+        ) > 0
 
-        },
+      ){
 
-        1000
+        showToast(
 
-      );
+          "🎉 እንኳን ወደ Fast Bingo ቤተሰብ በደህና መጡ! 20 ብር ጉርሻ በመጫወቻ ሂሳብዎ ላይ ተጨምሯል።"
 
-      setInterval(
+        );
 
-        function(){
-
-          if(loginReady){
-
-            loadBalance();
-
-          }
-
-        },
-
-        10000
-
-      );
-
-    }
-
-    /*
-
-     * Show the 20 ETB welcome bonus.
-
-     */
-
-    if(
-
-      Number(
-
-        result.firstRegistrationBonus || 0
-
-      ) > 0
-
-    ){
-
-      showToast(
-
-        "🎉 እንኳን ወደ Fast Bingo ቤተሰብ በደህና መጡ! 20 ብር ጉርሻ በመጫወቻ ሂሳብዎ ላይ ተጨምሯል።"
-
-      );
+      }
 
     }
 
@@ -10607,45 +10599,23 @@ function registerFromLogin(){
 
   .catch(function(error){
 
-    console.error(
-
-      "FAST BINGO REGISTRATION ERROR:",
-
-      error
-
-    );
-
     /*
 
-     * Retry automatically instead of showing
+     * Do not block the Mini App.
 
-     * a broken 0-balance Mini App.
+     *
+
+     * /api/game and /api/balance already
+
+     * perform the same idempotent registration.
 
      */
 
-    setTimeout(
+    console.error(
 
-      function(){
+      "FAST BINGO REGISTRATION BACKGROUND ERROR:",
 
-        if(
-
-          loginReady &&
-
-          telegramUser &&
-
-          telegramUser.id &&
-
-          String(telegramUser.id) !== "guest"
-
-        ){
-
-          registerFromLogin();
-
-        }
-
-      },
-
-      1000
+      error
 
     );
 
