@@ -10413,11 +10413,11 @@ function registerFromLogin(){
 
   /*
 
-   * Register the new Telegram user.
+   * Register the user.
 
    *
 
-   * The backend adds the one-time
+   * The server gives the one-time
 
    * 20 ETB Play Balance bonus.
 
@@ -10441,23 +10441,53 @@ function registerFromLogin(){
 
       !result ||
 
-      !result.ok ||
+      result.ok !== true ||
 
-      !result.authenticated
+      result.authenticated !== true
 
     ){
 
       console.error(
 
-        "REGISTRATION FAILED:",
+        "FAST BINGO REGISTRATION FAILED:",
 
         result
 
       );
 
-      loginMessage(
+      /*
 
-        "ምዝገባው አልተሳካም። እባክዎ እንደገና ይሞክሩ።"
+       * Keep trying registration in the background.
+
+       * This prevents a temporary server response
+
+       * from leaving the new user at 0 balance.
+
+       */
+
+      setTimeout(
+
+        function(){
+
+          if(
+
+            loginReady &&
+
+            telegramUser &&
+
+            telegramUser.id &&
+
+            String(telegramUser.id) !== "guest"
+
+          ){
+
+            registerFromLogin();
+
+          }
+
+        },
+
+        1000
 
       );
 
@@ -10467,13 +10497,13 @@ function registerFromLogin(){
 
     /*
 
-     * Registration is complete.
+     * Registration is now confirmed by the server.
 
      *
 
-     * The backend has now created the user
+     * The 20 ETB bonus has already been written
 
-     * and added 20 ETB to Play Balance.
+     * to Play Balance by registerNewUser().
 
      */
 
@@ -10483,15 +10513,17 @@ function registerFromLogin(){
 
     /*
 
-     * Get the REAL current shared game.
+     * IMPORTANT:
 
      *
 
-     * This is important because the user must
+     * Ask the shared GameScheduler for the REAL
 
-     * join the game that is already running,
+     * current game immediately.
 
-     * not start from Game #1.
+     *
+
+     * This must never create Game #1 for the user.
 
      */
 
@@ -10499,15 +10531,7 @@ function registerFromLogin(){
 
     /*
 
-     * IMPORTANT:
-
-     *
-
-     * New users do not pass through the
-
-     * authenticated=true branch inside boot(),
-
-     * so start the normal live polling here.
+     * Start live polling exactly once.
 
      */
 
@@ -10523,7 +10547,15 @@ function registerFromLogin(){
 
       setInterval(
 
-        refreshGame,
+        function(){
+
+          if(loginReady){
+
+            refreshGame();
+
+          }
+
+        },
 
         1000
 
@@ -10531,7 +10563,15 @@ function registerFromLogin(){
 
       setInterval(
 
-        loadBalance,
+        function(){
+
+          if(loginReady){
+
+            loadBalance();
+
+          }
+
+        },
 
         10000
 
@@ -10541,7 +10581,7 @@ function registerFromLogin(){
 
     /*
 
-     * Show the first-registration bonus message.
+     * Show the 20 ETB welcome bonus.
 
      */
 
@@ -10569,15 +10609,43 @@ function registerFromLogin(){
 
     console.error(
 
-      "REGISTRATION ERROR:",
+      "FAST BINGO REGISTRATION ERROR:",
 
       error
 
     );
 
-    loginMessage(
+    /*
 
-      "ምዝገባው አልተሳካም። እባክዎ እንደገና ይሞክሩ።"
+     * Retry automatically instead of showing
+
+     * a broken 0-balance Mini App.
+
+     */
+
+    setTimeout(
+
+      function(){
+
+        if(
+
+          loginReady &&
+
+          telegramUser &&
+
+          telegramUser.id &&
+
+          String(telegramUser.id) !== "guest"
+
+        ){
+
+          registerFromLogin();
+
+        }
+
+      },
+
+      1000
 
     );
 
