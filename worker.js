@@ -1747,6 +1747,16 @@ sql.exec(`
 
   }
 
+  /*
+
+   * =========================================================
+
+   * FAST BINGO — SINGLE SOURCE OF TRUTH GAME ENGINE
+
+   * =========================================================
+
+   */
+
   async advanceGameState() {
 
     let state =
