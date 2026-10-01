@@ -3479,6 +3479,374 @@ sql.exec(`
 
   }
 
+  async unselectCard(
+
+    userId,
+
+    cardNumber
+
+  ) {
+
+    const state =
+  
+      this.getState();
+
+    if (!state) {
+
+      return {
+
+        ok: false,
+
+        error: "NO_GAME"
+
+      };
+
+    }
+
+    if (
+
+      state.status !== "lobby"
+
+    ) {
+
+      return {
+
+        ok: false,
+
+        error: "GAME_IN_PROGRESS"
+
+      };
+
+    }
+
+    const card =
+
+      Number(cardNumber);
+
+    if (
+
+      !Number.isInteger(card) ||
+
+      card < 1 ||
+
+      card > CARD_COUNT
+
+    ) {
+
+      return {
+
+        ok: false,
+
+        error: "INVALID_CARD"
+
+      };
+
+    }
+
+    const sql =
+
+      this.ctx.storage.sql;
+
+    /*
+
+     * Find THIS user's selected card
+
+     * and remember exactly where the
+
+     * 10 ETB originally came from.
+
+     */
+
+    const row =
+
+      sql.exec(
+
+        `
+
+        SELECT
+
+          card_number,
+
+          payment_source
+
+        FROM selected_cards
+
+        WHERE game_number = ?
+
+        AND user_id = ?
+
+        AND card_number = ?
+
+        LIMIT 1
+
+        `,
+
+        state.game_number,
+
+        userId,
+
+        card
+
+      ).toArray()[0];
+
+    /*
+
+     * Nothing to refund if the card is
+
+     * not currently selected by this user.
+
+     */
+
+    if (!row) {
+
+      return {
+
+        ok: true,
+
+        selected:
+
+          this.getUserCards(userId),
+
+        ...this.getJackpot(
+
+          state.game_number
+
+        ),
+
+        ...this.getBalances(
+
+          userId
+
+        )
+
+      };
+
+    }
+
+    await this.ensureBalanceRow(
+
+      userId
+
+    );
+
+    const balances =
+
+      this.getBalances(
+  
+        userId
+
+      );
+
+    let nextPlay =
+
+      Number(
+
+        balances.playBalance || 0
+
+      );
+
+    let nextMain =
+
+      Number(
+
+        balances.mainBalance || 0
+
+      );
+
+    const source =
+
+      String(
+
+        row.payment_source || "play"
+
+      ).toLowerCase();
+
+    /*
+
+     * Refund the exact balance source.
+
+     */
+
+    if (
+
+      source === "main"
+
+    ) {
+
+      nextMain +=
+
+        CARD_PRICE;
+
+    } else {
+
+      nextPlay +=
+
+        CARD_PRICE;
+
+    }
+
+    /*
+
+     * Delete the selected card FIRST.
+
+     *
+
+     * This makes the unselect operation
+
+     * safe against duplicate clicks.
+
+     */
+
+    sql.exec(
+
+      `
+
+      DELETE FROM selected_cards
+
+      WHERE game_number = ?
+
+      AND user_id = ?
+
+      AND card_number = ?
+
+      `,
+
+      state.game_number,
+
+      userId,
+
+      card
+
+    );
+
+    /*
+
+     * Save refunded balances.
+
+     */
+
+    sql.exec(
+ 
+      `
+
+      UPDATE balances
+
+      SET
+
+        balance = ?,
+
+        play_balance = ?,
+
+        main_balance = ?
+
+      WHERE user_id = ?
+
+      `,
+
+      nextPlay,
+
+      nextPlay,
+
+      nextMain,
+
+      userId
+
+    );
+
+    /*
+
+     * Record refund transaction.
+
+     */
+
+    sql.exec(
+
+      `
+
+      INSERT INTO transactions
+
+      (
+
+        user_id,
+
+        type,
+
+        method,
+
+        amount,
+
+        simulated,
+ 
+        created_at
+
+      )
+
+      VALUES (
+
+        ?,
+
+        'card_refund',
+ 
+        NULL,
+
+        ?,
+
+        1,
+
+        ?
+
+      )
+
+      `,
+
+      userId,
+
+      CARD_PRICE,
+
+      Date.now()
+
+    );
+
+    const jackpot =
+
+      this.getJackpot(
+
+        state.game_number
+
+      );
+
+    return {
+
+      ok: true,
+
+      selected:
+
+        this.getUserCards(
+
+          userId
+
+        ),
+
+      selectedCount:
+
+        jackpot.selectedCount,
+
+      jackpot:
+
+        jackpot.jackpot,
+
+      playBalance:
+
+        nextPlay,
+
+      mainBalance:
+
+        nextMain
+
+    };
+
+  }
+   
   async selectCards(userId, cards) {
 
   const state =
@@ -6360,6 +6728,40 @@ if (
           await request.json();
 
       } catch (_) {}
+
+      /*
+
+       * Dedicated atomic unselect.
+
+       */
+
+      if (
+
+        body &&
+
+        body.action === "unselect"
+
+      ) {
+
+        return json(
+
+          await this.unselectCard(
+
+            user.id,
+
+            body.card
+
+          )
+
+        );
+
+      }
+
+      /*
+
+       * Normal card selection.
+
+       */
 
       return json(
 
