@@ -1849,12 +1849,6 @@ sql.exec(`
 
         }
 
-        /*
-
-         * First ball is immediately available.
-
-         */
-
         this.ctx.storage.sql.exec(
 
           `
@@ -1883,12 +1877,6 @@ sql.exec(`
 
         );
 
-        /*
-
-         * Schedule the next ball.
-
-         */
-
         await this.scheduleNext(
 
           BALL_INTERVAL
@@ -1915,7 +1903,93 @@ sql.exec(`
 
       ) {
 
-        let currentIndex =
+        /*
+
+         * Re-read the state after every alarm.
+
+         */
+
+        state =
+
+          this.getState();
+
+        if (
+
+          !state ||
+
+          state.status !== "live"
+
+        ) {
+
+          await this.scheduleNext(
+
+            1000
+
+          );
+
+          return;
+
+        }
+
+        const startedAt =
+
+          Number(
+
+            state.started_at || now
+
+          );
+
+        /*
+
+         * Calculate the ball that SHOULD
+
+         * currently be active from real time.
+
+         *
+
+         * Ball 1 starts at started_at.
+
+         * Every BALL_INTERVAL adds one ball.
+
+         */
+
+        const elapsed =
+
+          Math.max(
+
+            0,
+
+            now - startedAt
+
+          );
+
+        let targetIndex =
+
+          Math.floor(
+
+            elapsed /
+
+            BALL_INTERVAL
+
+          );
+
+        /*
+
+         * Never go beyond ball 75.
+
+         */
+
+        targetIndex =
+
+          Math.min(
+
+            targetIndex,
+
+            TOTAL_BALLS - 1
+
+          );
+
+        const currentIndex =
 
           Number(
 
@@ -1925,7 +1999,7 @@ sql.exec(`
 
         /*
 
-         * Repair invalid index.
+         * Move forward to the time-based index.
 
          */
 
@@ -1937,7 +2011,9 @@ sql.exec(`
 
           ) ||
 
-          currentIndex < 0
+          targetIndex >
+
+            currentIndex
 
         ) {
 
@@ -1949,47 +2025,21 @@ sql.exec(`
 
             SET
 
-              status = 'live',
-
-              started_at =
-
-                COALESCE(
-
-                  started_at,
-
-                  ?
-
-                ),
-
-              ball_index = 0,
-
-              lobby_ends_at = NULL
+              ball_index = ?
 
             WHERE id = 1
 
             `,
 
-            now
+            targetIndex
 
           );
 
-          currentIndex = 0;
+          state =
+
+            this.getState();
 
         }
-
-        /*
-
-         * Load called balls.
-
-         */
-
-        const called =
-
-          this.getCalledBalls(
-
-            state
-
-          );
 
         /*
 
@@ -2000,6 +2050,14 @@ sql.exec(`
          * =================================================
 
          */
+
+        const called =
+
+          this.getCalledBalls(
+
+            state
+
+          );
 
         const selectedRows =
 
@@ -2121,16 +2179,6 @@ sql.exec(`
 
                   "Player"
 
-                ),
-
-              username:
-
-                String(
-
-                  row.username ||
-
-                  ""
-
                 )
 
             };
@@ -2145,7 +2193,7 @@ sql.exec(`
 
          * =================================================
 
-         * WINNER FOUND
+         * WINNER
 
          * =================================================
 
@@ -2207,12 +2255,6 @@ sql.exec(`
 
             winningAmount;
 
-          /*
-
-           * Pay jackpot.
-
-           */
-
           this.ctx.storage.sql.exec(
 
             `
@@ -2236,12 +2278,6 @@ sql.exec(`
             winner.userId
 
           );
-
-          /*
-
-           * Record win.
-
-           */
 
           this.ctx.storage.sql.exec(
 
@@ -2293,12 +2329,6 @@ sql.exec(`
 
           );
 
-          /*
-
-           * Show result for 3 seconds.
-
-           */
-
           this.ctx.storage.sql.exec(
 
             `
@@ -2349,7 +2379,7 @@ sql.exec(`
 
          * =================================================
 
-         * BALL 75 -> NEW GAME
+         * BALL 75
 
          * =================================================
 
@@ -2357,7 +2387,7 @@ sql.exec(`
 
         if (
 
-          currentIndex >=
+          targetIndex >=
 
           TOTAL_BALLS - 1
 
@@ -2373,45 +2403,37 @@ sql.exec(`
 
          * =================================================
 
-         * NEXT BALL
+         * SCHEDULE NEXT CHECK
 
          * =================================================
 
          */
 
-        const nextIndex =
+        const nextBallTime =
 
-          currentIndex + 1;
+          startedAt +
 
-        this.ctx.storage.sql.exec(
+          (
 
-          `
+            targetIndex + 1
 
-          UPDATE state
+          ) *
 
-          SET
+          BALL_INTERVAL;
 
-            ball_index = ?
+        const remaining =
 
-          WHERE id = 1
+          Math.max(
 
-          `,
+            1000,
 
-          nextIndex
+            nextBallTime - Date.now()
 
-        );
-
-        /*
-
-         * IMPORTANT:
-
-         * Always schedule another alarm.
-
-         */
+          );
 
         await this.scheduleNext(
 
-          BALL_INTERVAL
+          remaining
 
         );
 
@@ -2435,7 +2457,7 @@ sql.exec(`
 
       ) {
 
-        const winnerExpiresAt =
+        const expires =
 
           Number(
 
@@ -2447,7 +2469,7 @@ sql.exec(`
 
         const remaining =
 
-          winnerExpiresAt -
+          expires -
 
           Date.now();
 
@@ -2477,7 +2499,7 @@ sql.exec(`
 
        * =====================================================
 
-       * UNKNOWN STATUS
+       * UNKNOWN STATE
 
        * =====================================================
 
@@ -2513,15 +2535,9 @@ sql.exec(`
 
       /*
 
-       * VERY IMPORTANT:
+       * NEVER allow the scheduler
 
-       *
-
-       * Even if something goes wrong,
-
-       * force another alarm so the
-
-       * 24-hour scheduler does not die.
+       * to die permanently.
 
        */
 
@@ -2609,15 +2625,15 @@ sql.exec(`
 
         /*
 
-         * LIVE or unknown:
+         * If LIVE crashes,
 
-         * retry quickly.
+         * retry after 1 second.
 
          */
 
         await this.scheduleNext(
 
-          2000
+          1000
 
         );
 
@@ -2637,17 +2653,11 @@ sql.exec(`
 
         );
 
-        /*
-
-         * Last emergency retry.
-
-         */
-
         try {
 
           await this.ctx.storage.setAlarm(
 
-            Date.now() + 5000
+            Date.now() + 2000
 
           );
 
