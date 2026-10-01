@@ -10711,6 +10711,22 @@ function checkLoginStatus(){
 
     }
 
+    /*
+
+     * New Telegram user.
+
+     *
+
+     * Do not stop boot().
+
+     *
+
+     * Registration is handled by the
+
+     * "ይቀላቀሉ" button.
+
+     */
+
     loginMessage(
 
       "Fast Bingo ቤተሰብ ለመቀላቀል ከታች ያለውን ይቀላቀሉ የሚለውን ይጫኑ።"
@@ -10741,7 +10757,7 @@ function checkLoginStatus(){
 
   });
 
-}
+} 
 
   /* =======================================================
 
@@ -13671,21 +13687,43 @@ function checkLoginStatus(){
 
     .then(function(authenticated){
 
-      if(!authenticated){
+      /*
 
-        return;
+       * Existing users:
+
+       * load everything immediately.
+
+       */
+
+      if(authenticated){
+
+        return Promise.all([
+
+          loadBalance(),
+
+          loadMyCards(),
+
+          refreshGame()
+
+        ]);
 
       }
 
-      return Promise.all([
+      /*
 
-        loadBalance(),
+       * New users:
 
-        loadMyCards(),
+       *
 
-        refreshGame()
+       * The Join button will register the user.
 
-      ]);
+       * Do not start the normal authenticated
+
+       * polling until registration succeeds.
+
+       */
+
+      return Promise.resolve();
 
     })
 
