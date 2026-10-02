@@ -3127,6 +3127,60 @@ sql.exec(`
 
   }
 
+    getUserCards(userId) {
+
+    const state =
+
+      this.getState();
+
+    if (!state) {
+
+      return [];
+
+    }
+
+    const rows =
+
+      this.ctx.storage.sql
+
+        .exec(
+
+          `
+
+          SELECT card_number
+
+          FROM selected_cards
+
+          WHERE game_number = ?
+
+          AND user_id = ?
+
+          ORDER BY card_number
+
+          `,
+
+          state.game_number,
+
+          userId
+
+        )
+
+        .toArray();
+
+    return rows.map(
+
+      row =>
+
+        Number(
+
+          row.card_number
+
+        )
+
+    );
+
+  }
+   
   getJackpot(gameNumber) {
 
     const row =
