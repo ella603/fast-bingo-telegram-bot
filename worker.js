@@ -8195,21 +8195,31 @@ button{
 
   min-width:0;
 
-  height:31px;
+  height:34px;
 
   padding:0;
 
-  border-radius:7px;
+  border-radius:9px;
 
-  border:1px solid #2a3444;
+  border:1px solid #303a4c;
 
-  background:#141a23;
+  background:linear-gradient(145deg,#151d2a,#0e141e);
 
-  color:#aeb8c8;
+  color:#cbd5e1;
 
-  font-size:9px;
+  font-size:10px;
 
-  font-weight:800;
+  font-weight:900;
+
+  transition:
+
+    transform .15s ease,
+
+    background .15s ease,
+
+    border-color .15s ease,
+
+    box-shadow .15s ease;
 
 }
 
@@ -8221,13 +8231,35 @@ button{
 
 .card-select.selected{
 
-  background:var(--red);
+  background:linear-gradient(145deg,#ff2634,#b40712);
+
+  border-color:#ff6670;
+
+  color:#fff;
+
+  box-shadow:
+
+    0 4px 14px rgba(229,9,20,.35),
+
+    inset 0 1px 0 rgba(255,255,255,.16);
+
+}
+
+.card-select.taken{
+
+  background:linear-gradient(145deg,#ff2634,#8f0710);
 
   border-color:#ff4b52;
 
   color:#fff;
 
-  box-shadow:0 4px 12px rgba(229,9,20,.25);
+  opacity:.72;
+
+  cursor:not-allowed;
+
+  box-shadow:
+
+    0 3px 10px rgba(229,9,20,.20);
 
 }
 
@@ -8245,21 +8277,21 @@ button{
 
   margin:0;
 
-  padding:8px 8px 10px;
+  padding:7px 7px 9px;
 
-  background:rgba(7,11,22,.96);
+  background:rgba(7,11,22,.97);
 
   border:1px solid rgba(255,255,255,.10);
 
-  border-radius:16px 16px 0 0;
+  border-radius:15px 15px 0 0;
 
   box-shadow:0 -10px 30px rgba(0,0,0,.35);
 
   z-index:500;
 
-  max-height:38vh;
+  max-height:31vh;
 
-  overflow-y:auto;
+  overflow:hidden;
 
   backdrop-filter:blur(12px);
 
@@ -8267,15 +8299,53 @@ button{
 
 }
 
+/*
+
+ * When the game is LIVE, selected cards move
+
+ * into the normal page flow directly below
+
+ * the current ball/recent balls.
+
+ */
+
+.selected-previews.live-mode{
+
+  position:relative;
+
+  left:auto;
+
+  bottom:auto;
+
+  transform:none;
+
+  width:100%;
+
+  margin-top:10px;
+
+  padding:6px;
+
+  max-height:none;
+
+  overflow:hidden;
+
+  border-radius:13px;
+
+  box-shadow:none;
+
+  z-index:auto;
+
+}
+
 .selected-previews-title{
 
-  color:#dce2eb;
+  color:#aeb8c8;
 
-  font-size:10px;
+  font-size:9px;
 
   font-weight:900;
 
-  margin-bottom:7px;
+  margin-bottom:5px;
 
   text-align:center;
 
@@ -8285,9 +8355,29 @@ button{
 
   display:grid;
 
-  grid-template-columns:repeat(4,minmax(0,1fr));
+  grid-template-columns:repeat(2,minmax(0,1fr));
 
-  gap:6px;
+  gap:5px;
+
+  align-items:start;
+
+}
+
+.preview-grid.count-1{
+
+  grid-template-columns:minmax(0,220px);
+
+  justify-content:center;
+
+}
+
+.preview-grid.count-2,
+
+.preview-grid.count-3,
+
+.preview-grid.count-4{
+
+  grid-template-columns:repeat(2,minmax(0,1fr));
 
 }
 
@@ -8295,59 +8385,15 @@ button{
 
   min-width:0;
 
-  background:
-
-    linear-gradient(
-
-      145deg,
-
-      #151d2b,
-
-      #0b1019
-
-    );
+  background:linear-gradient(145deg,#151d2b,#0b1019);
 
   border:1px solid #3b4658;
 
-  border-radius:10px;
+  border-radius:9px;
 
-  padding:6px;
+  padding:4px;
 
-  box-shadow:
-
-    0 5px 18px rgba(0,0,0,.30);
-
-}
-
-.bingo-card-head{
-
-  display:flex;
-
-  align-items:center;
-
-  justify-content:space-between;
-
-  margin-bottom:5px;
-
-}
-
-.card-number-label{
-
-  color:#f1f5f9;
-
-  font-size:8px;
-
-  font-weight:950;
-
-}
-
-.card-state{
-
-  color:#22c55e;
-
-  font-size:9px;
-
-  font-weight:950;
+  box-shadow:0 4px 14px rgba(0,0,0,.25);
 
 }
 
@@ -8357,7 +8403,7 @@ button{
 
   grid-template-columns:repeat(5,1fr);
 
-  gap:3px;
+  gap:2px;
 
 }
 
@@ -8371,29 +8417,17 @@ button{
 
   justify-content:center;
 
-  border-radius:4px;
+  border-radius:3px;
 
-  background:
-
-    linear-gradient(
-
-      145deg,
-
-      #e50914,
-
-      #8f0710
-
-    );
+  background:linear-gradient(145deg,#f21b2b,#a90712);
 
   color:#fff;
 
-  font-size:11px;
+  font-size:10px;
 
   font-weight:950;
 
-  box-shadow:
-
-    0 2px 5px rgba(229,9,20,.25);
+  box-shadow:0 2px 5px rgba(229,9,20,.22);
 
 }
 
@@ -8401,7 +8435,7 @@ button{
 
   aspect-ratio:1;
 
-  border-radius:4px;
+  border-radius:3px;
 
   background:#181f2a;
 
@@ -8411,9 +8445,9 @@ button{
 
   justify-content:center;
 
-  font-size:11px;
+  font-size:10px;
 
-  font-weight:950;
+  font-weight:900;
 
   color:#e2e8f0;
 
@@ -8423,7 +8457,7 @@ button{
 
 .bingo-cell.called{
 
-  background:rgba(229,9,20,.90);
+  background:rgba(229,9,20,.92);
 
   color:#fff;
 
@@ -8437,83 +8471,9 @@ button{
 
   color:#f4c542;
 
-  font-size:8px;
+  font-size:7px;
 
   font-weight:950;
-
-}
-
-.card-select{
-
-  min-width:0;
-
-  height:33px;
-
-  padding:0;
-
-  border-radius:8px;
-
-  border:1px solid #334155;
-
-  background:
-
-    linear-gradient(
-
-      145deg,
-
-      #182231,
-
-      #101722
-
-    );
-
-  color:#d7dee9;
-
-  font-size:10px;
-
-  font-weight:900;
-
-  box-shadow:
-
-    0 2px 6px rgba(0,0,0,.20);
-
-}
-
-.card-select.selected{
-
-  background:
-
-    linear-gradient(
-
-      145deg,
-
-      #f21b2b,
-
-      #a90712
-
-    );
-
-  border-color:#ff5a61;
-
-  color:#fff;
-
-  box-shadow:
-
-    0 4px 12px rgba(229,9,20,.30);
-
-}
-
-.card-select.taken{
-
-  background:#202631;
-
-  border-color:#303846;
-
-  color:#697586;
-
-  opacity:.55;
-
-  cursor:not-allowed;
 
 }
 
@@ -8523,11 +8483,51 @@ button{
 
     bottom:64px;
 
-    max-height:35vh;
+    max-height:28vh;
 
-    padding:7px 5px 8px;
+    padding:6px 5px 7px;
 
   }
+
+  .selected-previews.live-mode{
+
+    max-height:none;
+
+  }
+
+  .preview-grid{
+
+    gap:4px;
+
+  }
+
+  .bingo-card{
+
+    padding:3px;
+
+    border-radius:7px;
+
+  }
+
+  .bingo-grid{
+
+    gap:2px;
+
+  }
+
+  .bingo-cell{
+
+    font-size:9px;
+
+  }
+
+  .bingo-letter{
+
+    font-size:9px;
+
+  }
+
+}
 
   .preview-grid{
 
@@ -11759,27 +11759,7 @@ function checkLoginStatus(){
 
       '<div class="bingo-card">' +
 
-      '<div class="bingo-card-head">' +
-
-      '<div class="card-number-label">' +
-
-      'CARD #' +
-
-      card.number +
-
-      '</div>' +
-
-      '<div class="card-state">✓</div>' +
-
-      '</div>' +
-
       '<div class="bingo-grid">';
-
-    /*
-
-     * Modern B I N G O header.
-
-     */
 
     for(
 
@@ -11800,12 +11780,6 @@ function checkLoginStatus(){
         '</div>';
 
     }
-
-    /*
-
-     * 25 bingo numbers.
-
-     */
 
     for(
 
@@ -11987,7 +11961,15 @@ function checkLoginStatus(){
 
         '>' +
 
-        i +
+        (
+
+          takenByOther
+
+            ? "✓"
+
+            : i
+
+        ) +
 
         "</button>";
 
@@ -12051,53 +12033,53 @@ function checkLoginStatus(){
 
       );
 
+    grid.className =
+
+      "preview-grid";
+
     if(!selected.length){
 
-      grid.innerHTML =
-
-        '<div style="' +
-
-        'grid-column:1/-1;' +
-
-        'color:#667184;' +
-
-        'font-size:10px;' +
-
-        'padding:8px 0">' +
-
-        (
-
-          language === "am"
-
-            ? "ካርድ አልመረጡም።"
-
-            : "No cards selected."
-
-        ) +
-
-        "</div>";
+      grid.innerHTML = "";
 
       return;
 
     }
 
-    var html="";
+    grid.classList.add(
 
-    selected.forEach(
+      "count-" +
 
-      function(number){
+      Math.min(
 
-        html +=
+        selected.length,
 
-          renderBingoCard(
+        4
 
-            makeClientCard(number)
-
-          );
-
-      }
+      )
 
     );
+
+    var html = "";
+
+    selected
+
+      .slice(0,4)
+
+      .forEach(
+
+        function(number){
+
+          html +=
+
+            renderBingoCard(
+
+              makeClientCard(number)
+
+            );
+
+        }
+
+      );
 
     grid.innerHTML =
 
@@ -12861,7 +12843,39 @@ function checkLoginStatus(){
 
       live
 
-        ? t("liveMessage")
+        ? (
+
+            selected.length > 0
+
+              ? (
+
+                  language === "am"
+
+                    ? "ጨዋታው ተጀምሯል • ደራሽ " +
+
+                      Number(
+
+                        currentGame.jackpot || 0
+
+                      ).toLocaleString() +
+
+                      " ETB"
+
+                    : "GAME STARTED • JACKPOT " +
+
+                      Number(
+
+                        currentGame.jackpot || 0
+
+                      ).toLocaleString() +
+
+                      " ETB"
+
+                )
+
+              : t("liveMessage")
+
+          )
 
         : t("lobbyMessage");
 
@@ -12939,13 +12953,29 @@ function checkLoginStatus(){
 
         : "block";
 
-    document.getElementById(
+    var selectedPreviewArea =
 
-      "selectedPreviewArea"
+      document.getElementById(
 
-    ).style.display =
+        "selectedPreviewArea"
 
-      "block";
+      );
+
+    selectedPreviewArea.style.display =
+
+      selected.length > 0
+
+        ? "block"
+
+        : "none";
+
+    selectedPreviewArea.classList.toggle(
+
+      "live-mode",
+
+      live
+
+    );
 
     var recent =
 
@@ -13248,6 +13278,46 @@ function checkLoginStatus(){
         currentGame =
 
           data;
+
+        /*
+
+         * Speak every newly called Bingo number.
+
+         */
+
+        if(
+
+          data.status === "live" &&
+
+          data.currentBall
+
+        ){
+
+          speakBingoBall(
+
+            data.currentBall,
+
+            data.currentLetter
+
+          );
+
+        }
+
+        /*
+
+         * Speak when the Bingo game ends.
+
+         */
+
+        if(
+
+          isNewResult
+
+        ){
+
+          speakGameFinished();
+
+        }
 
         /*
 
