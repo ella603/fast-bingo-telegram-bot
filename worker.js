@@ -10399,6 +10399,418 @@ refreshTelegramUser();
 
   var lobbyDeadline = 0;
 
+  var lastSpokenBallKey = "";
+
+  var lastSpokenResultGame = "";
+
+  function bingoNumberAmharic(number){
+
+    var words = {
+
+      1:"አንድ",
+
+      2:"ሁለት",
+
+      3:"ሶስት",
+
+      4:"አራት",
+
+      5:"አምስት",
+
+      6:"ስድስት",
+
+      7:"ሰባት",
+
+      8:"ስምንት",
+
+      9:"ዘጠኝ",
+
+      10:"አስር",
+
+      11:"አስራ አንድ",
+
+      12:"አስራ ሁለት",
+
+      13:"አስራ ሶስት",
+
+      14:"አስራ አራት",
+
+      15:"አስራ አምስት",
+
+      16:"አስራ ስድስት",
+
+      17:"አስራ ሰባት",
+
+      18:"አስራ ስምንት",
+
+      19:"አስራ ዘጠኝ",
+
+      20:"ሃያ",
+
+      21:"ሃያ አንድ",
+
+      22:"ሃያ ሁለት",
+
+      23:"ሃያ ሶስት",
+
+      24:"ሃያ አራት",
+
+      25:"ሃያ አምስት",
+
+      26:"ሃያ ስድስት",
+
+      27:"ሃያ ሰባት",
+
+      28:"ሃያ ስምንት",
+
+      29:"ሃያ ዘጠኝ",
+
+      30:"ሰላሳ",
+
+      31:"ሰላሳ አንድ",
+
+      32:"ሰላሳ ሁለት",
+
+      33:"ሰላሳ ሶስት",
+
+      34:"ሰላሳ አራት",
+
+      35:"ሰላሳ አምስት",
+
+      36:"ሰላሳ ስድስት",
+
+      37:"ሰላሳ ሰባት",
+
+      38:"ሰላሳ ስምንት",
+
+      39:"ሰላሳ ዘጠኝ",
+
+      40:"አርባ",
+
+      41:"አርባ አንድ",
+
+      42:"አርባ ሁለት",
+
+      43:"አርባ ሶስት",
+
+      44:"አርባ አራት",
+
+      45:"አርባ አምስት",
+
+      46:"አርባ ስድስት",
+
+      47:"አርባ ሰባት",
+
+      48:"አርባ ስምንት",
+
+      49:"አርባ ዘጠኝ",
+
+      50:"ሃምሳ",
+
+      51:"ሃምሳ አንድ",
+
+      52:"ሃምሳ ሁለት",
+
+      53:"ሃምሳ ሶስት",
+
+      54:"ሃምሳ አራት",
+
+      55:"ሃምሳ አምስት",
+
+      56:"ሃምሳ ስድስት",
+
+      57:"ሃምሳ ሰባት",
+
+      58:"ሃምሳ ስምንት",
+
+      59:"ሃምሳ ዘጠኝ",
+
+      60:"ስልሳ",
+
+      61:"ስልሳ አንድ",
+
+      62:"ስልሳ ሁለት",
+
+      63:"ስልሳ ሶስት",
+
+      64:"ስልሳ አራት",
+
+      65:"ስልሳ አምስት",
+
+      66:"ስልሳ ስድስት",
+
+      67:"ስልሳ ሰባት",
+
+      68:"ስልሳ ስምንት",
+
+      69:"ስልሳ ዘጠኝ",
+
+      70:"ሰባ",
+
+      71:"ሰባ አንድ",
+
+      72:"ሰባ ሁለት",
+
+      73:"ሰባ ሶስት",
+
+      74:"ሰባ አራት",
+
+      75:"ሰባ አምስት"
+
+    };
+
+    return words[number] ||
+
+      String(number);
+
+  }
+
+  function bingoNumberEnglish(number){
+
+    var words = [
+
+      "",
+
+      "one","two","three","four","five",
+
+      "six","seven","eight","nine","ten",
+
+      "eleven","twelve","thirteen","fourteen","fifteen",
+
+      "sixteen","seventeen","eighteen","nineteen","twenty",
+
+      "twenty one","twenty two","twenty three","twenty four","twenty five",
+
+      "twenty six","twenty seven","twenty eight","twenty nine","thirty",
+
+      "thirty one","thirty two","thirty three","thirty four","thirty five",
+
+      "thirty six","thirty seven","thirty eight","thirty nine","forty",
+
+      "forty one","forty two","forty three","forty four","forty five",
+
+      "forty six","forty seven","forty eight","forty nine","fifty",
+
+      "fifty one","fifty two","fifty three","fifty four","fifty five",
+
+      "fifty six","fifty seven","fifty eight","fifty nine","sixty",
+
+      "sixty one","sixty two","sixty three","sixty four","sixty five",
+
+      "sixty six","sixty seven","sixty eight","sixty nine","seventy",
+
+      "seventy one","seventy two","seventy three","seventy four","seventy five"
+
+    ];
+
+    return words[number] ||
+
+      String(number);
+
+  }
+
+  function speakBingoBall(number, letter){
+
+    if(
+
+      !window.speechSynthesis ||
+
+      !number
+
+    ){
+
+      return;
+
+    }
+
+    var key =
+
+      String(
+
+        currentGame
+
+          ? currentGame.gameNumber
+
+          : ""
+
+      ) +
+
+      ":" +
+
+      String(number);
+
+    if(
+
+      key === lastSpokenBallKey
+
+    ){
+
+      return;
+
+    }
+
+    lastSpokenBallKey =
+
+      key;
+
+    var text;
+
+    if(language === "am"){
+
+      text =
+
+        String(letter || "") +
+
+        " " +
+
+        bingoNumberAmharic(
+
+          Number(number)
+
+        );
+
+    }else{
+
+      text =
+
+        String(letter || "") +
+
+        " " +
+
+        bingoNumberEnglish(
+
+          Number(number)
+
+        );
+
+    }
+
+    try{
+
+      window.speechSynthesis.cancel();
+
+      var utterance =
+
+        new SpeechSynthesisUtterance(
+
+          text
+
+        );
+
+      utterance.lang =
+
+        language === "am"
+
+          ? "am-ET"
+
+          : "en-US";
+
+      utterance.rate =
+
+        0.85;
+
+      utterance.pitch =
+
+        1;
+
+      utterance.volume =
+
+        1;
+
+      window.speechSynthesis.speak(
+
+        utterance
+
+      );
+
+    }catch(_){}
+
+  }
+
+  function speakGameFinished(){
+
+    if(
+
+      !window.speechSynthesis
+
+    ){
+
+      return;
+
+    }
+
+    var gameNumber =
+
+      currentGame &&
+
+      currentGame.gameNumber
+
+        ? String(
+
+            currentGame.gameNumber
+
+          )
+
+        : "";
+
+    if(
+
+      gameNumber ===
+
+      lastSpokenResultGame
+
+    ){
+
+      return;
+
+    }
+
+    lastSpokenResultGame =
+
+      gameNumber;
+
+    try{
+
+      window.speechSynthesis.cancel();
+
+      var utterance =
+
+        new SpeechSynthesisUtterance(
+
+          language === "am"
+
+            ? "ጨዋታው አልቋል"
+
+            : "The game is over"
+
+        );
+
+      utterance.lang =
+
+        language === "am"
+
+          ? "am-ET"
+
+          : "en-US";
+
+      utterance.rate =
+
+        0.85;
+
+      utterance.volume =
+
+        1;
+
+      window.speechSynthesis.speak(
+
+        utterance
+
+      );
+
+    }catch(_){}
+
+  }
+
   var cardCache = {};
 
   var cardSignatures = {};
