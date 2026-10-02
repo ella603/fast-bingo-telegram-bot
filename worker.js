@@ -12165,13 +12165,191 @@ function checkLoginStatus(){
 
     if(index >= 0){
 
-      selected.splice(
+      /*
 
-        index,
+       * This card already belongs to this user.
 
-        1
+       *
 
-      );
+       * Use the dedicated server-side unselect
+
+       * endpoint so the exact 10 ETB refund is
+
+       * performed atomically.
+
+       */
+
+      api(
+
+        "/api/select-cards",
+
+        {
+
+          method:"POST",
+
+          body:JSON.stringify({
+
+            action:"unselect",
+
+            card:number
+
+          })
+
+        }
+
+      ).then(function(data){
+
+        if(
+
+          data &&
+
+          data.ok
+
+        ){
+
+          selected =
+
+            Array.isArray(
+
+              data.selected
+
+            )
+
+              ? data.selected.map(
+
+                  Number
+
+                )
+
+              : [];
+
+          updateSelectionCount();
+
+          renderCards();
+
+          renderPreviews();
+
+          /*
+
+           * Apply the server's exact balances
+
+           * immediately.
+
+           */
+
+          if(
+
+            data.playBalance !== undefined
+
+          ){
+
+            playBalance =
+
+              Number(
+
+                data.playBalance
+
+              );
+
+          }
+
+          if(
+
+            data.mainBalance !== undefined
+
+          ){
+
+            mainBalance =
+
+              Number(
+
+                data.mainBalance
+
+              );
+
+          }
+
+          var formatted =
+
+            playBalance.toFixed(2) +
+
+            " ETB";
+
+          document.getElementById(
+
+            "topBalance"
+
+          ).textContent =
+
+            formatted;
+
+          document.getElementById(
+
+            "mainBalance"
+
+          ).textContent =
+
+            mainBalance.toFixed(2);
+
+          document.getElementById(
+
+            "walletBalance"
+
+          ).textContent =
+
+            formatted;
+
+          /*
+
+           * Jackpot is returned directly by
+
+           * the server after the refund.
+
+           */
+
+          if(
+
+            currentGame &&
+
+            data.jackpot !== undefined
+
+          ){
+
+            currentGame.jackpot =
+
+              Number(
+
+                data.jackpot
+
+              );
+
+            currentGame.selectedCount =
+
+              Number(
+
+                data.selectedCount || 0
+
+              );
+
+            updateGameUI();
+
+          }
+
+        }
+
+      }).catch(function(error){
+
+        console.error(
+
+          "FAST BINGO UNSELECT ERROR:",
+
+          error
+
+        );
+
+      });
+
+      return;
 
     }else{
 
