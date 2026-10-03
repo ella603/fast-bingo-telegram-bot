@@ -10697,13 +10697,127 @@ refreshTelegramUser();
 
         );
 
-      utterance.lang =
+      /*
 
-        language === "am"
+       * IMPORTANT:
 
-          ? "am-ET"
+       * Explicitly select an Amharic voice
 
-          : "en-US";
+       * when Amharic language is active.
+
+       */
+
+      if(language === "am"){
+
+        var voices =
+
+          window.speechSynthesis.getVoices();
+
+        var amharicVoice =
+
+          voices.find(
+
+            function(voice){
+
+              var lang =
+
+                String(
+
+                  voice.lang || ""
+
+                ).toLowerCase();
+
+              return (
+
+                lang === "am-et" ||
+
+                lang.startsWith("am-") ||
+
+                lang === "am"
+
+              );
+
+            }
+
+          );
+
+        if(amharicVoice){
+
+          utterance.voice =
+
+            amharicVoice;
+
+          utterance.lang =
+
+            amharicVoice.lang;
+
+        }else{
+
+          /*
+
+           * Keep Amharic text if the device
+
+           * has not exposed the Amharic voice yet.
+
+           */
+
+          utterance.lang =
+
+            "am-ET";
+
+        }
+
+      }else{
+
+        var englishVoices =
+
+          window.speechSynthesis.getVoices();
+
+        var englishVoice =
+
+          englishVoices.find(
+
+            function(voice){
+
+              var lang =
+
+                String(
+
+                  voice.lang || ""
+
+                ).toLowerCase();
+
+              return (
+
+                lang === "en-us" ||
+
+                lang.startsWith("en-")
+
+              );
+
+            }
+
+          );
+
+        if(englishVoice){
+
+          utterance.voice =
+
+            englishVoice;
+
+          utterance.lang =
+
+            englishVoice.lang;
+
+        }else{
+
+          utterance.lang =
+
+            "en-US";
+
+        }
+
+      }
 
       utterance.rate =
 
