@@ -10649,45 +10649,35 @@ refreshTelegramUser();
 
     }
 
-    lastSpokenBallKey =
-
-      key;
-
-    var text;
-
-    if(language === "am"){
-
-      text =
-
-        String(letter || "") +
-
-        " " +
-
-        bingoNumberAmharic(
-
-          Number(number)
-
-        );
-
-    }else{
-
-      text =
-
-        String(letter || "") +
-
-        " " +
-
-        bingoNumberEnglish(
-
-          Number(number)
-
-        );
-
-    }
+    lastSpokenBallKey = key;
 
     try{
 
       window.speechSynthesis.cancel();
+
+      var text =
+
+        language === "am"
+
+          ? String(letter || "") +
+
+            " " +
+
+            bingoNumberAmharic(
+
+              Number(number)
+
+            )
+
+          : String(letter || "") +
+
+            " " +
+
+            bingoNumberEnglish(
+
+              Number(number)
+
+            );
 
       var utterance =
 
@@ -10697,21 +10687,23 @@ refreshTelegramUser();
 
         );
 
-      /*
+      var voices =
 
-       * IMPORTANT:
-
-       * Explicitly select an Amharic voice
-
-       * when Amharic language is active.
-
-       */
+        window.speechSynthesis.getVoices();
 
       if(language === "am"){
 
-        var voices =
+        /*
 
-          window.speechSynthesis.getVoices();
+         * AMHARIC MODE
+
+         *
+
+         * Use ONLY a real Amharic voice.
+
+         * Do NOT use Latin/English fallback.
+
+         */
 
         var amharicVoice =
 
@@ -10731,9 +10723,9 @@ refreshTelegramUser();
 
                 lang === "am-et" ||
 
-                lang.startsWith("am-") ||
+                lang === "am" ||
 
-                lang === "am"
+                lang.indexOf("am-") === 0
 
               );
 
@@ -10741,41 +10733,45 @@ refreshTelegramUser();
 
           );
 
-        if(amharicVoice){
-
-          utterance.voice =
-
-            amharicVoice;
-
-          utterance.lang =
-
-            amharicVoice.lang;
-
-        }else{
+        if(!amharicVoice){
 
           /*
 
-           * Keep Amharic text if the device
+           * No real Amharic voice is available
 
-           * has not exposed the Amharic voice yet.
+           * in this browser/device.
+
+           *
+
+           * Do not pronounce the letter only.
 
            */
 
-          utterance.lang =
+          lastSpokenBallKey = "";
 
-            "am-ET";
+          return;
 
         }
 
+        utterance.voice =
+
+          amharicVoice;
+
+        utterance.lang =
+
+          amharicVoice.lang;
+
       }else{
 
-        var englishVoices =
+        /*
 
-          window.speechSynthesis.getVoices();
+         * ENGLISH MODE
+
+         */
 
         var englishVoice =
 
-          englishVoices.find(
+          voices.find(
 
             function(voice){
 
@@ -10791,7 +10787,7 @@ refreshTelegramUser();
 
                 lang === "en-us" ||
 
-                lang.startsWith("en-")
+                lang.indexOf("en-") === 0
 
               );
 
@@ -10821,7 +10817,7 @@ refreshTelegramUser();
 
       utterance.rate =
 
-        0.85;
+        0.82;
 
       utterance.pitch =
 
@@ -10837,9 +10833,13 @@ refreshTelegramUser();
 
       );
 
-    }catch(_){}
+    }catch(error){
 
-  }
+      lastSpokenBallKey = "";
+
+    }
+
+  }  
 
   function speakGameFinished(){
 
