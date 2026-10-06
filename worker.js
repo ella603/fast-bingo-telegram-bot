@@ -10611,13 +10611,7 @@ refreshTelegramUser();
 
   function speakBingoBall(number, letter){
 
-    if(
-
-      !window.speechSynthesis ||
-
-      !number
-
-    ){
+    if(!number){
 
       return;
 
@@ -10639,11 +10633,7 @@ refreshTelegramUser();
 
       String(number);
 
-    if(
-
-      key === lastSpokenBallKey
-
-    ){
+    if(key === lastSpokenBallKey){
 
       return;
 
@@ -10653,31 +10643,171 @@ refreshTelegramUser();
 
     try{
 
+      /*
+
+       * AMHARIC MODE
+
+       *
+
+       * Use the pre-generated real Amharic
+
+       * WAV audio files from Cloudflare Static Assets.
+
+       *
+
+       * Files:
+
+       * 01_B.wav ... 75_O.wav
+
+       */
+
+      if(language === "am"){
+
+        var audioNumber =
+
+          String(
+
+            Number(number)
+
+          ).padStart(2, "0");
+
+        var audioLetter =
+
+          String(letter || "")
+
+            .trim()
+
+            .toUpperCase();
+
+        var audioFile =
+
+          "/" +
+
+          audioNumber +
+
+          "_" +
+
+          audioLetter +
+
+          ".wav";
+
+        if(
+
+          window.fastBingoVoiceAudio
+
+        ){
+
+          window.fastBingoVoiceAudio.pause();
+
+          try{
+
+            window.fastBingoVoiceAudio.currentTime = 0;
+
+          }catch(_){}
+
+        }else{
+
+          window.fastBingoVoiceAudio =
+
+            new Audio();
+
+        }
+
+        var audio =
+
+          window.fastBingoVoiceAudio;
+
+        audio.src =
+
+          new URL(
+
+            audioFile,
+
+            window.location.origin
+
+          ).href;
+
+        audio.preload = "auto";
+
+        audio.volume = 1;
+
+        var playPromise =
+
+          audio.play();
+
+        if(
+
+          playPromise &&
+
+          typeof playPromise.catch === "function"
+
+        ){
+
+          playPromise.catch(
+
+            function(){
+
+              /*
+
+               * iPhone / Telegram may block
+
+               * audio until a user gesture.
+
+               *
+
+               * Do not fall back to English
+
+               * or Latin pronunciation.
+
+               */
+
+              lastSpokenBallKey = "";
+
+            }
+
+          );
+
+        }
+
+        return;
+
+      }
+
+      /*
+
+       * ENGLISH MODE
+
+       *
+
+       * Keep the existing browser English
+
+       * voice behavior unchanged.
+
+       */
+
+      if(
+
+        !window.speechSynthesis
+
+      ){
+
+        return;
+
+      }
+
       window.speechSynthesis.cancel();
 
       var text =
 
-        language === "am"
+        String(letter || "") +
 
-          ? String(letter || "") +
+        " " +
 
-            " " +
+        bingoNumberEnglish(
 
-            bingoNumberAmharic(
+          Number(number)
 
-              Number(number)
-
-            )
-
-          : String(letter || "") +
-
-            " " +
-
-            bingoNumberEnglish(
-
-              Number(number)
-
-            );
+        );
 
       var utterance =
 
@@ -10691,127 +10821,47 @@ refreshTelegramUser();
 
         window.speechSynthesis.getVoices();
 
-      if(language === "am"){
+      var englishVoice =
 
-        /*
+        voices.find(
 
-         * AMHARIC MODE
+          function(voice){
 
-         *
+            var lang =
 
-         * Use ONLY a real Amharic voice.
+              String(
 
-         * Do NOT use Latin/English fallback.
+                voice.lang || ""
 
-         */
+              ).toLowerCase();
 
-        var amharicVoice =
+            return (
 
-          voices.find(
+              lang === "en-us" ||
 
-            function(voice){
+              lang.indexOf("en-") === 0
 
-              var lang =
+            );
 
-                String(
+          }
 
-                  voice.lang || ""
+        );
 
-                ).toLowerCase();
-
-              return (
-
-                lang === "am-et" ||
-
-                lang === "am" ||
-
-                lang.indexOf("am-") === 0
-
-              );
-
-            }
-
-          );
-
-        if(!amharicVoice){
-
-          /*
-
-           * No real Amharic voice is available
-
-           * in this browser/device.
-
-           *
-
-           * Do not pronounce the letter only.
-
-           */
-
-          lastSpokenBallKey = "";
-
-          return;
-
-        }
+      if(englishVoice){
 
         utterance.voice =
 
-          amharicVoice;
+          englishVoice;
 
         utterance.lang =
 
-          amharicVoice.lang;
+          englishVoice.lang;
 
       }else{
 
-        /*
+        utterance.lang =
 
-         * ENGLISH MODE
-
-         */
-
-        var englishVoice =
-
-          voices.find(
-
-            function(voice){
-
-              var lang =
-
-                String(
-
-                  voice.lang || ""
-
-                ).toLowerCase();
-
-              return (
-
-                lang === "en-us" ||
-
-                lang.indexOf("en-") === 0
-
-              );
-
-            }
-
-          );
-
-        if(englishVoice){
-
-          utterance.voice =
-
-            englishVoice;
-
-          utterance.lang =
-
-            englishVoice.lang;
-
-        }else{
-
-          utterance.lang =
-
-            "en-US";
-
-        }
+          "en-US";
 
       }
 
@@ -10839,19 +10889,9 @@ refreshTelegramUser();
 
     }
 
-  }  
+  }
 
   function speakGameFinished(){
-
-    if(
-
-      !window.speechSynthesis
-
-    ){
-
-      return;
-
-    }
 
     var gameNumber =
 
@@ -10885,27 +10925,113 @@ refreshTelegramUser();
 
     try{
 
+      /*
+
+       * AMHARIC MODE
+
+       *
+
+       * Use the real generated Amharic
+
+       * game-over audio.
+
+       */
+
+      if(language === "am"){
+
+        if(
+
+          window.fastBingoVoiceAudio
+
+        ){
+
+          window.fastBingoVoiceAudio.pause();
+
+          try{
+
+            window.fastBingoVoiceAudio.currentTime = 0;
+
+          }catch(_){}
+
+        }else{
+
+          window.fastBingoVoiceAudio =
+
+            new Audio();
+
+        }
+
+        var audio =
+
+          window.fastBingoVoiceAudio;
+
+        audio.src =
+
+          new URL(
+
+            "/game_over.wav",
+
+            window.location.origin
+
+          ).href;
+
+        audio.preload = "auto";
+
+        audio.volume = 1;
+
+        var playPromise =
+
+          audio.play();
+
+        if(
+
+          playPromise &&
+
+          typeof playPromise.catch === "function"
+
+        ){
+
+          playPromise.catch(
+
+            function(){}
+
+          );
+
+        }
+
+        return;
+
+      }
+
+      /*
+
+       * ENGLISH MODE
+
+       */
+
+      if(
+
+        !window.speechSynthesis
+
+      ){
+
+        return;
+
+      }
+
       window.speechSynthesis.cancel();
 
       var utterance =
 
         new SpeechSynthesisUtterance(
 
-          language === "am"
-
-            ? "ጨዋታው አልቋል"
-
-            : "The game is over"
+          "The game is over"
 
         );
 
       utterance.lang =
 
-        language === "am"
-
-          ? "am-ET"
-
-          : "en-US";
+        "en-US";
 
       utterance.rate =
 
