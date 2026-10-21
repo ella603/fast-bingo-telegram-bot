@@ -885,6 +885,26 @@ sql.exec(`
 
 `);
 
+/* Add transaction link support without deleting old data. */
+
+const walletRequestColumns = sql.exec(`
+
+  PRAGMA table_info(wallet_requests)
+
+`).toArray();
+
+if (!walletRequestColumns.some(c => c.name === "transaction_link")) {
+
+  sql.exec(`
+
+    ALTER TABLE wallet_requests
+
+    ADD COLUMN transaction_link TEXT
+
+  `);
+
+}
+     
 sql.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_wallet_requests_status
@@ -5241,109 +5261,237 @@ async registerNewUser(user) {
 
   async walletRequest(userId, body) {
 
-    const amount = Number(body?.amount || 0);
+    const sql = this.ctx.storage.sql;
 
-    const type =
+    const type = String(body?.type || "deposit")
 
-      body?.type === "withdraw"
+      .trim()
 
-        ? "withdraw"
+      .toLowerCase();
 
-        : "deposit";
+    const methodInput = String(body?.method || "")
 
-    const method =
+      .trim()
 
-      String(body?.method || "Telebirr");
+      .toLowerCase();
+
+    const methodMap = {
+
+      telebirr: "Telebirr",
+
+      ebirr: "eBirr"
+
+    };
+
+    if (!["deposit", "withdraw"].includes(type)) {
+
+      throw new Error("INVALID_WALLET_REQUEST_TYPE");
+
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(methodMap, methodInput)) {
+
+      throw new Error("INVALID_PAYMENT_METHOD");
+
+    }
+
+    const method = methodMap[methodInput];
+
+    const amount = Number(body?.amount);
 
     if (!Number.isFinite(amount) || amount < 50) {
 
+      throw new Error("INVALID_AMOUNT");
+
+    }
+
+    if (amount > 1000000) {
+
+      throw new Error("AMOUNT_TOO_LARGE");
+
+    }
+
+    ensureBalanceRow(String(userId));
+
+    if (type === "deposit") {
+
+      const rawLink = String(
+
+        body?.transactionLink ||
+
+        body?.transaction_link ||
+
+        ""
+
+      ).trim();
+
+      if (!rawLink || rawLink.length > 2000) {
+
+        throw new Error("TRANSACTION_LINK_REQUIRED");
+
+      }
+
+      let transactionLink;
+
+      try {
+
+        const parsedUrl = new URL(rawLink);
+
+        if (
+
+          parsedUrl.protocol !== "https:" &&
+
+          parsedUrl.protocol !== "http:"
+
+        ) {
+
+          throw new Error("INVALID_TRANSACTION_LINK");
+
+        }
+
+        transactionLink = parsedUrl.href;
+
+      } catch (_) {
+
+        throw new Error("INVALID_TRANSACTION_LINK");
+
+      }
+
+      const result = sql.exec(
+
+        `
+
+          INSERT INTO wallet_requests (
+
+            user_id,
+
+            type,
+
+            method,
+
+            amount,
+
+            status,
+
+            transaction_link,
+
+            screenshot_data,
+
+            screenshot_mime,
+
+            created_at
+
+          )
+
+          VALUES (?, 'deposit', ?, ?, 'pending', ?, NULL, NULL, ?)
+
+        `,
+
+        String(userId),
+
+        method,
+
+        amount,
+
+        transactionLink,
+
+        Date.now()
+
+      );
+
+      sql.exec(
+
+        `
+
+          INSERT INTO transactions (
+
+            user_id,
+
+            type,
+
+            amount,
+
+            description,
+
+            created_at
+
+          )
+
+          VALUES (?, 'deposit_request', ?, ?, ?)
+
+        `,
+
+        String(userId),
+
+        amount,
+
+        `${method} deposit request`,
+
+        Date.now()
+
+      );
+
       return {
 
-        ok: false,
+        ok: true,
 
-        error: "MINIMUM_AMOUNT",
+        requestId: Number(result.lastInsertRowId),
 
-        minimum: 50
+        status: "pending",
+
+        message: "DEPOSIT_REQUEST_SUBMITTED",
+
+        balances: getBalances(String(userId))
 
       };
 
     }
 
-    await this.ensureBalanceRow(userId);
+    const balances = getBalances(String(userId));
 
-    const balances =
+    const playBalance = Number(balances?.play_balance || 0);
 
-      this.getBalances(userId);
+    if (amount > playBalance) {
 
-    /* =====================================================
+      throw new Error("INSUFFICIENT_PLAY_BALANCE");
 
-       WITHDRAW
+    }
 
-       Must have MORE THAN 100 ETB Play Balance.
+    sql.exec(
 
-       ===================================================== */
-
-    if (type === "withdraw") {
-
-      if (balances.playBalance <= 100) {
-
-        return {
-
-          ok: false,
-
-          error: "PLAY_BALANCE_TOO_LOW",
-
-          minimumBalance: 100
-
-        };
-
-      }
-
-      if (amount > balances.playBalance) {
-
-        return {
-
-          ok: false,
-
-          error: "INSUFFICIENT_BALANCE",
-
-          balance: balances.playBalance
-
-        };
-
-      }
-
-      const nextPlay =
-
-        balances.playBalance - amount;
-
-      this.ctx.storage.sql.exec(`
+      `
 
         UPDATE balances
 
-        SET
-
-          balance = ?,
-
-          play_balance = ?
+        SET play_balance = play_balance - ?
 
         WHERE user_id = ?
 
+          AND play_balance >= ?
+
       `,
 
-        nextPlay,
+      amount,
 
-        nextPlay,
+      String(userId),
 
-        userId
+      amount
 
-      );
+    );
 
-      this.ctx.storage.sql.exec(`
+    const updatedBalances = getBalances(String(userId));
 
-        INSERT INTO wallet_requests
+    if (Number(updatedBalances?.play_balance || 0) > playBalance - amount + 0.000001) {
 
-        (
+      throw new Error("WITHDRAWAL_DEDUCTION_FAILED");
+
+    }
+
+    const result = sql.exec(
+
+      `
+
+        INSERT INTO wallet_requests (
 
           user_id,
 
@@ -5355,6 +5503,8 @@ async registerNewUser(user) {
 
           status,
 
+          transaction_link,
+
           screenshot_data,
 
           screenshot_mime,
@@ -5363,191 +5513,47 @@ async registerNewUser(user) {
 
         )
 
-        VALUES (?, 'withdraw', ?, ?, 'pending', NULL, NULL, ?)
+        VALUES (?, 'withdraw', ?, ?, 'pending', NULL, NULL, NULL, ?)
 
       `,
 
-        userId,
-
-        method,
-
-        amount,
-
-        Date.now()
-
-      );
-
-      this.ctx.storage.sql.exec(`
-
-        INSERT INTO transactions
-
-        (
-
-          user_id,
-
-          type,
-
-          method,
-
-          amount,
-
-          simulated,
-
-          created_at
-
-        )
-
-        VALUES (?, 'withdraw', ?, ?, 1, ?)
-
-      `,
-
-        userId,
-
-        method,
-
-        amount,
-
-        Date.now()
-
-      );
-
-      return {
-
-        ok: true,
-
-        simulated: true,
-
-        pending: true,
-
-        type: "withdraw",
-
-        mainBalance: balances.mainBalance,
-
-        playBalance: nextPlay
-
-      };
-
-    }
-
-    /* =====================================================
-
-       DEPOSIT
-
-       Deposit DOES NOT immediately change balance.
-
-       Admin confirmation adds it to Main Balance.
-
-       ===================================================== */
-
-    const screenshot =
-
-      body?.screenshot || null;
-
-    const screenshotMime =
-
-      String(body?.screenshotMime || "");
-
-    if (!screenshot) {
-
-      return {
-
-        ok: false,
-
-        error: "SCREENSHOT_REQUIRED"
-
-      };
-
-    }
-
-    if (
-
-      typeof screenshot !== "string" ||
-
-      screenshot.length > 450000
-
-    ) {
-
-      return {
-
-        ok: false,
-
-        error: "SCREENSHOT_TOO_LARGE"
-
-      };
-
-    }
-
-    this.ctx.storage.sql.exec(`
-
-      INSERT INTO wallet_requests
-
-      (
-
-        user_id,
-
-        type,
-
-        method,
-
-        amount,
-
-        status,
-
-        screenshot_data,
-
-        screenshot_mime,
-
-        created_at
-
-      )
-
-      VALUES (?, 'deposit', ?, ?, 'pending', ?, ?, ?)
-
-    `,
-
-      userId,
+      String(userId),
 
       method,
 
       amount,
-
-      screenshot,
-
-      screenshotMime,
 
       Date.now()
 
     );
 
-    this.ctx.storage.sql.exec(`
+    sql.exec(
 
-      INSERT INTO transactions
+      `
 
-      (
+        INSERT INTO transactions (
 
-        user_id,
+          user_id,
 
-        type,
+          type,
 
-        method,
+          amount,
 
-        amount,
+          description,
 
-        simulated,
+          created_at
 
-        created_at
+        )
 
-      )
+        VALUES (?, 'withdraw_request', ?, ?, ?)
 
-      VALUES (?, 'deposit_request', ?, ?, 1, ?)
+      `,
 
-    `,
-
-      userId,
-
-      method,
+      String(userId),
 
       amount,
+
+      `${method} withdrawal request`,
 
       Date.now()
 
@@ -5557,15 +5563,13 @@ async registerNewUser(user) {
 
       ok: true,
 
-      simulated: true,
+      requestId: Number(result.lastInsertRowId),
 
-      pending: true,
+      status: "pending",
 
-      type: "deposit",
+      message: "WITHDRAWAL_REQUEST_SUBMITTED",
 
-      mainBalance: balances.mainBalance,
-
-      playBalance: balances.playBalance
+      balances: updatedBalances
 
     };
 
@@ -5839,61 +5843,59 @@ isAdmin(request) {
 
   getAdminRequests() {
 
-    const rows =
+    const rows = this.ctx.storage.sql.exec(`
 
-      this.ctx.storage.sql.exec(`
+      SELECT
 
-        SELECT
+        wr.id,
 
-          wr.id,
+        wr.user_id,
 
-          wr.user_id,
+        wr.type,
 
-          wr.type,
+        wr.method,
 
-          wr.method,
+        wr.amount,
 
-          wr.amount,
+        wr.status,
 
-          wr.status,
+        wr.transaction_link,
 
-          wr.screenshot_data,
+        wr.screenshot_data,
 
-          wr.screenshot_mime,
+        wr.screenshot_mime,
 
-          wr.created_at,
+        wr.created_at,
 
-          wr.reviewed_at,
+        wr.reviewed_at,
 
-          wr.reviewed_by,
+        wr.reviewed_by,
 
-          COALESCE(u.first_name,'Player') AS first_name,
+        COALESCE(u.first_name, 'Player') AS first_name,
 
-          COALESCE(u.username,'') AS username
+        COALESCE(u.username, '') AS username
 
-        FROM wallet_requests wr
+      FROM wallet_requests wr
 
-        LEFT JOIN users u
+      LEFT JOIN users u
 
-          ON u.user_id = wr.user_id
+        ON u.user_id = wr.user_id
 
-        ORDER BY
+      ORDER BY
 
-          CASE
+        CASE
 
-            WHEN wr.status = 'pending'
+          WHEN wr.status = 'pending' THEN 0
 
-            THEN 0
+          ELSE 1
 
-            ELSE 1
+        END,
 
-          END,
+        wr.created_at DESC
 
-          wr.created_at DESC
+      LIMIT 200
 
-        LIMIT 200
-
-      `).toArray();
+    `).toArray();
 
     return rows.map(row => ({
 
@@ -5913,39 +5915,39 @@ isAdmin(request) {
 
       status: String(row.status),
 
-      screenshot:
+      transactionLink: row.transaction_link
 
-        row.screenshot_data
+        ? String(row.transaction_link)
 
-          ? String(row.screenshot_data)
+        : null,
 
-          : null,
+      // Keep old fields so existing records do not break.
 
-      screenshotMime:
+      screenshot: row.screenshot_data
 
-        row.screenshot_mime
+        ? String(row.screenshot_data)
 
-          ? String(row.screenshot_mime)
+        : null,
 
-          : null,
+      screenshotMime: row.screenshot_mime
+
+        ? String(row.screenshot_mime)
+
+        : null,
 
       createdAt: Number(row.created_at || 0),
 
-      reviewedAt:
+      reviewedAt: row.reviewed_at
 
-        row.reviewed_at
+        ? Number(row.reviewed_at)
 
-          ? Number(row.reviewed_at)
+        : null,
 
-          : null,
+      reviewedBy: row.reviewed_by
 
-      reviewedBy:
+        ? String(row.reviewed_by)
 
-        row.reviewed_by
-
-          ? String(row.reviewed_by)
-
-          : null
+        : null
 
     }));
 
@@ -6913,287 +6915,135 @@ if (
 
     ) {
 
+      let body = {};
+
       const contentType =
 
         request.headers.get("content-type") || "";
 
-      /*
+      try {
 
-       * Deposit screenshot uses
+        if (contentType.includes("application/json")) {
 
-       * multipart/form-data.
+          body = await request.json();
 
-       */
+        } else if (
 
-      if (
+          contentType.includes("multipart/form-data")
 
-        contentType.includes("multipart/form-data")
+        ) {
 
-      ) {
+          const form = await request.formData();
 
-        let form;
+          body = {
 
-        try {
+            type: String(form.get("type") || "deposit"),
 
-          form =
+            method: String(form.get("method") || ""),
 
-            await request.formData();
+            amount: Number(form.get("amount") || 0),
 
-        } catch (_) {
+            transactionLink: String(
+
+              form.get("transactionLink") ||
+
+              form.get("transaction_link") ||
+
+              ""
+
+            ).trim()
+
+          };
+
+        } else {
 
           return json({
 
             ok: false,
 
-            error: "INVALID_FORM"
+            error: "INVALID_REQUEST_FORMAT"
 
-          });
-
-        }
-
-        const type =
-
-          String(
-
-            form.get("type") || "deposit"
-
-          );
-
-        const method =
-
-          String(
-
-            form.get("method") || "Telebirr"
-
-          );
-
-        const amount =
-
-          Number(
-
-            form.get("amount") || 0
-
-          );
-
-        let screenshot =
-
-          form.get("screenshot");
-
-        if (
-
-          type !== "deposit"
-
-        ) {
-
-          return json(
-
-            await this.walletRequest(
-
-              user.id,
-
-              {
-
-                type,
-
-                method,
-
-                amount
-
-              }
-
-            )
-
-          );
+          }, 400);
 
         }
 
-        if (
+      } catch (_) {
 
-          !screenshot ||
+        return json({
 
-          typeof screenshot.arrayBuffer !==
+          ok: false,
 
-            "function"
+          error: "INVALID_REQUEST"
 
-        ) {
-
-          return json({
-
-            ok: false,
-
-            error: "SCREENSHOT_REQUIRED"
-
-          });
-
-        }
-
-        const MAX_SCREENSHOT_BYTES =
-
-          300 * 1024;
-
-        if (
-
-          screenshot.size >
-
-          MAX_SCREENSHOT_BYTES
-
-        ) {
-
-          return json({
-
-            ok: false,
-
-            error: "SCREENSHOT_TOO_LARGE",
-
-            maxBytes:
-
-              MAX_SCREENSHOT_BYTES
-
-          });
-
-        }
-
-        const buffer =
-
-          await screenshot.arrayBuffer();
-
-        const bytes =
-
-          new Uint8Array(buffer);
-
-        let binary = "";
-
-        const CHUNK =
-
-          0x8000;
-
-        for (
-
-          let i = 0;
-
-          i < bytes.length;
-
-          i += CHUNK
-
-        ) {
-
-          binary +=
-
-            String.fromCharCode(
-
-              ...bytes.subarray(
-
-                i,
-
-                i + CHUNK
-
-              )
-
-            );
-
-        }
-
-        const base64 =
-
-          btoa(binary);
-
-        const mime =
-
-          screenshot.type ||
-
-          "image/jpeg";
-
-        const dataUrl =
-
-          `data:${mime};base64,${base64}`;
-
-        try {
-
-          return json(
-
-            await this.walletRequest(
-
-              user.id,
-
-              {
-
-                type: "deposit",
-
-                method,
-
-                amount,
-
-                screenshot: dataUrl,
-
-                screenshotMime: mime
-
-              }
-
-            )
-
-          );
-
-        } catch (error) {
-
-          console.error(
-
-            "DEPOSIT_ERROR:",
-
-            error
-
-          );
-
-          return json({
-
-            ok: false,
-
-            error: "DEPOSIT_SERVER_ERROR",
-
-            message: String(
-
-              error?.message ||
-
-              error ||
-
-              "Unknown error"
-
-            )
-
-          }, 500);
-
-        }
+        }, 400);
 
       }
 
-      /*
+      const type =
 
-       * Normal JSON request:
+        body.type === "withdraw" ? "withdraw" : "deposit";
 
-       * mainly withdrawal.
+      const method = String(body.method || "")
 
-       */
+        .trim()
 
-      let body = {};
+        .toLowerCase();
+
+      // M-PESA is not allowed for deposits or withdrawals.
+
+      const allowedMethods = ["telebirr", "ebirr"];
+
+      if (!allowedMethods.includes(method)) {
+
+        return json({
+
+          ok: false,
+
+          error: "INVALID_PAYMENT_METHOD",
+
+          allowedMethods: ["Telebirr", "eBirr"]
+
+        }, 400);
+
+      }
+
+      body.type = type;
+
+      body.method =
+
+        method === "telebirr" ? "Telebirr" : "eBirr";
 
       try {
 
-        body =
-
-          await request.json();
-
-      } catch (_) {}
-
-      return json(
-
-        await this.walletRequest(
+        const result = await this.walletRequest(
 
           user.id,
 
           body
 
-        )
+        );
 
-      );
+        return json(result);
+
+      } catch (error) {
+
+        console.error(
+
+          "WALLET_REQUEST_ERROR:",
+
+          error?.message || String(error)
+
+        );
+
+        return json({
+
+          ok: false,
+
+          error: "WALLET_SERVER_ERROR"
+
+        }, 500);
+
+      }
 
     }
 
@@ -9885,50 +9735,6 @@ button{
 
         </div>
 
-      </button>
-
-      <button
-
-        type="button"
-
-        class="payment-card"
-
-        data-method="M-PESA"
-
-      >
-
-        <div class="payment-name">
-
-          M-PESA
-
-        </div>
-
-        <div
-
-          class="payment-owner"
-
-          id="mpesaOwner"
-
-        >
-
-          Gemechu
-
-        </div>
-
-        <div
-
-          class="payment-number"
-
-          id="mpesaNumber"
-
-        >
-
-          0786192665
-
-        </div>
-
-      </button>
-
     </div>
 
     <div class="wallet-balance">
@@ -10015,27 +9821,27 @@ button{
 
     </div>
 
-    <div
+    <div class="field" id="walletTransactionLinkField">
 
-      class="field"
+      <label for="walletTransactionLink">
 
-      id="walletScreenshotField"
-
-    >
-
-      <label>
-
-        የክፍያ Screenshot
+        የክፍያ Transaction Link
 
       </label>
 
       <input
 
-        id="walletScreenshot"
+        id="walletTransactionLink"
 
-        type="file"
+        type="url"
 
-        accept="image/jpeg,image/png,image/webp"
+        inputmode="url"
+
+        autocomplete="url"
+
+        placeholder="የክፍያ SMS ሊንኩን እዚህ ያስገቡ"
+
+        maxlength="2000"
 
       >
 
@@ -10045,19 +9851,19 @@ button{
 
           color:#8993a4;
 
-          font-size:8px;
+          font-size:10px;
 
           margin-top:5px;
 
-          line-height:13px;
+          line-height:15px;
 
         "
 
       >
 
-        Deposit ሲያደርጉ የክፍያ Screenshot ያስገቡ።
+        ክፍያውን ከፈጸሙ በኋላ ከSMS የቀዱትን Link ያስገቡ።
 
-        Maximum 300 KB.
+        Admin እስኪያረጋግጥ ድረስ ባላንስዎ አይጨምርም።
 
       </div>
 
@@ -14239,17 +14045,11 @@ function checkLoginStatus(){
 
      ======================================================= */
 
-  function setWalletType(type){
+  function setWalletType(type) {
 
-    walletType =
+    walletType = type;
 
-      type;
-
-    document.getElementById(
-
-      "depositBtn"
-
-    ).classList.toggle(
+    document.getElementById("depositBtn").classList.toggle(
 
       "active",
 
@@ -14257,11 +14057,7 @@ function checkLoginStatus(){
 
     );
 
-    document.getElementById(
-
-      "withdrawBtn"
-
-    ).classList.toggle(
+    document.getElementById("withdrawBtn").classList.toggle(
 
       "active",
 
@@ -14269,11 +14065,7 @@ function checkLoginStatus(){
 
     );
 
-    document.getElementById(
-
-      "walletSubmit"
-
-    ).textContent =
+    document.getElementById("walletSubmit").textContent =
 
       type === "deposit"
 
@@ -14281,17 +14073,19 @@ function checkLoginStatus(){
 
         : t("withdrawAction");
 
-    document.getElementById(
+    const transactionField = document.getElementById(
 
-      "walletScreenshotField"
+      "walletTransactionLinkField"
 
-    ).style.display =
+    );
 
-      type === "deposit"
+    if (transactionField) {
 
-        ? "block"
+      transactionField.style.display =
 
-        : "none";
+        type === "deposit" ? "block" : "none";
+
+    }
 
   }
 
@@ -14301,33 +14095,19 @@ function checkLoginStatus(){
 
      ======================================================= */
 
-  function walletRequest(){
+  function walletRequest() {
 
-    var amount =
+    const amount = Number(
 
-      Number(
+      document.getElementById("walletAmount").value
 
-        document.getElementById(
+    );
 
-          "walletAmount"
-
-        ).value
-
-      );
-
-    if(
-
-      !Number.isFinite(amount) ||
-
-      amount < 50
-
-    ){
+    if (!Number.isFinite(amount) || amount < 50) {
 
       showToast(
 
-        Number.isFinite(amount) &&
-
-        amount > 0
+        Number.isFinite(amount) && amount > 0
 
           ? t("minimum")
 
@@ -14339,231 +14119,303 @@ function checkLoginStatus(){
 
     }
 
-    var formData =
+    // Only Telebirr and eBirr are allowed.
 
-      new FormData();
+    const normalizedMethod = String(
 
-    formData.append(
+      selectedPaymentMethod || ""
 
-      "method",
+    ).trim().toLowerCase();
 
-      selectedPaymentMethod
+    if (
 
-    );
+      normalizedMethod !== "telebirr" &&
 
-    formData.append(
+      normalizedMethod !== "ebirr"
 
-      "type",
-
-      walletType
-
-    );
-
-    formData.append(
-
-      "amount",
-
-      String(amount)
-
-    );
-
-    if(
-
-      walletType ===
-
-      "deposit"
-
-    ){
-
-      var screenshot =
-
-        document.getElementById(
-
-          "walletScreenshot"
-
-        ).files[0];
-
-      if(!screenshot){
-
-        showToast(
-
-          language === "am"
-
-            ? "የክፍያ Screenshot ያስገቡ።"
-
-            : "Please upload your payment screenshot."
-
-        );
-
-        return;
-
-      }
-
-      if(
-
-        screenshot.size >
-
-        300 * 1024
-
-      ){
-
-        showToast(
-
-          language === "am"
-
-            ? "Screenshot ከ300 KB መብለጥ የለበትም።"
-
-            : "Screenshot must be 300 KB or smaller."
-
-        );
-
-        return;
-
-      }
-
-      formData.append(
-
-        "screenshot",
-
-        screenshot
-
-      );
-
-    }
-
-    api(
-
-      "/api/wallet",
-
-      {
-
-        method:"POST",
-
-        body:formData
-
-      }
-
-    ).then(function(data){
-
-      if(data.ok){
-
-        document.getElementById(
-
-          "walletAmount"
-
-        ).value = "";
-
-        var screenshotInput =
-
-          document.getElementById(
-
-            "walletScreenshot"
-
-          );
-
-        if(screenshotInput){
-
-          screenshotInput.value =
-
-            "";
-
-        }
-
-        loadBalance();
-
-        showToast(
-
-          walletType ===
-
-          "deposit"
-
-            ? (
-
-                language === "am"
-
-                  ? "Deposit ተልኳል። እባክዎ የAdmin ማረጋገጫ ይጠብቁ።"
-
-                  : "Deposit submitted. Please wait for admin confirmation."
-
-              )
-
-            : (
-
-                language === "am"
-
-                  ? "Withdrawal ጥያቄ ተልኳል።"
-
-                  : "Withdrawal request submitted."
-
-              )
-
-        );
-
-      }else if(
-
-        data.error ===
-
-        "MINIMUM_AMOUNT"
-
-      ){
-
-        showToast(
-
-          t("minimum")
-
-        );
-
-      }else if(
-
-        data.error ===
-
-        "INSUFFICIENT_BALANCE"
-
-      ){
-
-        showToast(
-
-          t("insufficient")
-
-        );
-
-      }else if(
-
-        data.error ===
-
-        "SCREENSHOT_REQUIRED"
-
-      ){
-
-        showToast(
-
-          language === "am"
-
-            ? "የክፍያ Screenshot ያስገቡ።"
-
-            : "Payment screenshot is required."
-
-        );
-
-      }else{
-
-        showToast(
-
-          "Error"
-
-        );
-
-      }
-
-    }).catch(function(){
+    ) {
 
       showToast(
 
-        "Connection error"
+        language === "am"
+
+          ? "Telebirr ወይም eBirr ብቻ ይምረጡ።"
+
+          : "Please select Telebirr or eBirr."
 
       );
 
-    });
+      return;
+
+    }
+
+    const method =
+
+      normalizedMethod === "telebirr"
+
+        ? "Telebirr"
+
+        : "eBirr";
+
+    const formData = new FormData();
+
+    formData.append("method", method);
+
+    formData.append("type", walletType);
+
+    formData.append("amount", String(amount));
+
+    if (walletType === "deposit") {
+
+      const linkInput = document.getElementById(
+
+        "walletTransactionLink"
+
+      );
+
+      const transactionLink = String(
+
+        linkInput ? linkInput.value : ""
+
+      ).trim();
+
+      if (!transactionLink) {
+
+        showToast(
+
+          language === "am"
+
+            ? "የክፍያ SMS Transaction Link ያስገቡ።"
+
+            : "Please enter your payment SMS transaction link."
+
+        );
+
+        return;
+
+      }
+
+      let parsedLink;
+
+      try {
+
+        parsedLink = new URL(transactionLink);
+
+      } catch (_) {
+
+        showToast(
+
+          language === "am"
+
+            ? "ትክክለኛ Link ያስገቡ።"
+
+            : "Please enter a valid link."
+
+        );
+
+        return;
+
+      }
+
+      if (
+
+        parsedLink.protocol !== "https:" &&
+
+        parsedLink.protocol !== "http:"
+
+      ) {
+
+        showToast(
+
+          language === "am"
+
+            ? "ትክክለኛ Link ያስገቡ።"
+
+            : "Please enter a valid link."
+
+        );
+
+        return;
+
+      }
+
+      formData.append("transactionLink", transactionLink);
+
+    }
+
+    const submitButton = document.getElementById("walletSubmit");
+
+    if (submitButton) {
+
+      submitButton.disabled = true;
+
+    }
+
+    api("/api/wallet", {
+
+      method: "POST",
+
+      body: formData
+
+    })
+
+      .then(function(data) {
+
+        if (data && data.ok) {
+
+          document.getElementById("walletAmount").value = "";
+
+          const linkInput = document.getElementById(
+
+            "walletTransactionLink"
+
+          );
+
+          if (linkInput) {
+
+            linkInput.value = "";
+
+          }
+
+          loadBalance();
+
+          showToast(
+
+            walletType === "deposit"
+
+              ? (
+
+                  language === "am"
+
+                    ? "Deposit ጥያቄ ተልኳል። Admin ማረጋገጫ ይጠብቁ።"
+
+                    : "Deposit submitted. Please wait for admin confirmation."
+
+                )
+
+              : (
+
+                  language === "am"
+
+                    ? "Withdrawal ጥያቄ ተልኳል።"
+
+                    : "Withdrawal request submitted."
+
+                )
+
+          );
+
+          return;
+
+        }
+
+        if (data && data.error === "MINIMUM_AMOUNT") {
+
+          showToast(t("minimum"));
+
+        } else if (
+
+          data &&
+
+          data.error === "INSUFFICIENT_BALANCE"
+
+        ) {
+
+          showToast(t("insufficient"));
+
+        } else if (
+
+          data &&
+
+          data.error === "TRANSACTION_LINK_REQUIRED"
+
+        ) {
+
+          showToast(
+
+            language === "am"
+
+              ? "የክፍያ Transaction Link ያስገቡ።"
+
+              : "Transaction link is required."
+
+          );
+
+        } else if (
+
+          data &&
+
+          data.error === "INVALID_TRANSACTION_LINK"
+
+        ) {
+
+          showToast(
+
+            language === "am"
+
+              ? "ትክክለኛ Transaction Link ያስገቡ።"
+
+              : "Please enter a valid transaction link."
+
+          );
+
+        } else if (
+
+          data &&
+
+          data.error === "INVALID_PAYMENT_METHOD"
+
+        ) {
+
+          showToast(
+
+            language === "am"
+
+              ? "Telebirr ወይም eBirr ብቻ ይጠቀሙ።"
+
+              : "Only Telebirr and eBirr are supported."
+
+          );
+
+        } else {
+
+          showToast(
+
+            language === "am"
+
+              ? "ጥያቄው አልተሳካም። እንደገና ይሞክሩ።"
+
+              : "Request failed. Please try again."
+
+          );
+
+        }
+
+      })
+
+      .catch(function() {
+
+        showToast(
+
+          language === "am"
+
+            ? "የConnection ችግር አለ።"
+
+            : "Connection error."
+
+        );
+
+      })
+
+      .finally(function() {
+
+        if (submitButton) {
+
+          submitButton.disabled = false;
+
+        }
+
+      });
 
   }
 
@@ -16515,107 +16367,71 @@ function loadRequests(){
 
             '</div>';
 
-        if(
+        if (
 
           item.type === "deposit" &&
 
-          item.screenshot
+          item.transactionLink
 
-        ){
+        ) {
 
-          html +=
+          var transactionUrl = "";
 
-            '<img class="screenshot" ' +
+          try {
 
-            'src="' +
+            var parsedTransactionUrl = new URL(
 
-            escapeHtml(
+              item.transactionLink
 
-              item.screenshot
+            );
 
-            ) +
+            if (
 
-            '" ' +
+              parsedTransactionUrl.protocol === "https:" ||
 
-            'alt="Payment screenshot">';
+              parsedTransactionUrl.protocol === "http:"
+
+            ) {
+
+              transactionUrl = parsedTransactionUrl.href;
+
+            }
+
+          } catch (_) {}
+
+          if (transactionUrl) {
+
+            html +=
+
+              '<div class="request-info">' +
+
+                '<strong>Transaction Link:</strong><br>' +
+
+                '<a href="' + escapeHtml(transactionUrl) + '" ' +
+
+                'target="_blank" rel="noopener noreferrer" ' +
+
+                'style="color:#ffc857;overflow-wrap:anywhere;">' +
+
+                  'Open payment transaction' +
+
+                '</a>' +
+
+              '</div>';
+
+          } else {
+
+            html +=
+
+              '<div class="request-info">' +
+
+                'Invalid transaction link.' +
+
+              '</div>';
+
+          }
 
         }
-
-        html +=
-
-          '<div class="request-actions">' +
-
-            '<button ' +
-
-              'class="green" ' +
-
-              'type="button" ' +
-
-              'onclick="requestAction(' +
-
-                Number(item.id) +
-
-                ',&quot;confirm&quot;)' +
-
-            '>' +
-
-              'Confirm' +
-
-            '</button>' +
-
-            '<button ' +
-
-              'class="danger" ' +
-
-              'type="button" ' +
-
-              'onclick="requestAction(' +
-
-                Number(item.id) +
-
-                ',&quot;reject&quot;)' +
-
-            '>' +
-
-              'Reject' +
-
-            '</button>' +
-
-          '</div>' +
-
-        '</div>';
-
-      }
-
-    );
-
-    document.getElementById(
-
-      "requests"
-
-    ).innerHTML =
-
-      html;
-
-  })
-
-  .catch(function(){
-
-    document.getElementById(
-
-      "requests"
-
-    ).innerHTML =
-
-      '<div class="status error">' +
-
-      'Failed to load requests.' +
-
-      '</div>';
-
-  });
-
-}
 
 /* =========================================================
 
