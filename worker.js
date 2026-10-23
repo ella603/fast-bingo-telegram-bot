@@ -45,14 +45,6 @@ const PAYMENT_DISPLAY = {
 
     number: "0999960421"
 
-  },
-
-  mpesa: {
-
-    name: "Gemechu",
-
-    number: "0786192665"
-
   }
 
 };
@@ -5263,6 +5255,8 @@ async registerNewUser(user) {
 
     const sql = this.ctx.storage.sql;
 
+    const cleanUserId = String(userId || "");
+
     const type = String(body?.type || "deposit")
 
       .trim()
@@ -5282,6 +5276,12 @@ async registerNewUser(user) {
       ebirr: "eBirr"
 
     };
+
+    if (!cleanUserId) {
+
+      throw new Error("USER_REQUIRED");
+
+    }
 
     if (!["deposit", "withdraw"].includes(type)) {
 
@@ -5311,7 +5311,17 @@ async registerNewUser(user) {
 
     }
 
-    ensureBalanceRow(String(userId));
+    await this.ensureBalanceRow(cleanUserId);
+
+    /*
+
+     * DEPOSIT
+
+     * Create a pending request.
+
+     * Do not credit main_balance until admin confirms.
+
+     */
 
     if (type === "deposit") {
 
@@ -5357,7 +5367,7 @@ async registerNewUser(user) {
 
       }
 
-      const result = sql.exec(
+      const requestResult = sql.exec(
 
         `
 
@@ -5387,7 +5397,7 @@ async registerNewUser(user) {
 
         `,
 
-        String(userId),
+        cleanUserId,
 
         method,
 
@@ -5399,95 +5409,97 @@ async registerNewUser(user) {
 
       );
 
-      sql.exec(
+      const requestId = Number(requestResult.lastInsertRowId);
 
-        `
+      try {
 
-          INSERT INTO transactions (
+        sql.exec(
 
-            user_id,
+          `
 
-            type,
+            INSERT INTO transactions (
 
-            amount,
+              user_id,
 
-            description,
+              type,
 
-            created_at
+              method,
 
-          )
+              amount,
 
-          VALUES (?, 'deposit_request', ?, ?, ?)
+              simulated,
 
-        `,
+              created_at
 
-        String(userId),
+            )
 
-        amount,
+            VALUES (?, 'deposit_request', ?, ?, 1, ?)
 
-        `${method} deposit request`,
+          `,
 
-        Date.now()
+          cleanUserId,
 
-      );
+          method,
+
+          amount,
+
+          Date.now()
+
+        );
+
+      } catch (error) {
+
+        sql.exec(
+
+          `DELETE FROM wallet_requests WHERE id = ? AND status = 'pending'`,
+
+          requestId
+
+        );
+
+        throw error;
+
+      }
 
       return {
 
         ok: true,
 
-        requestId: Number(result.lastInsertRowId),
+        requestId,
 
         status: "pending",
 
         message: "DEPOSIT_REQUEST_SUBMITTED",
 
-        balances: getBalances(String(userId))
+        ...this.getBalances(cleanUserId)
 
       };
 
     }
 
-    const balances = getBalances(String(userId));
+    /*
 
-    const playBalance = Number(balances?.play_balance || 0);
+     * WITHDRAWAL
 
-    if (amount > playBalance) {
+     * Deduct from play balance while the request is pending.
+
+     * If saving the request or transaction log fails,
+
+     * restore the balance and remove the unfinished request.
+
+     */
+
+    const balancesBefore = this.getBalances(cleanUserId);
+
+    const playBalanceBefore = Number(balancesBefore.playBalance || 0);
+
+    if (amount > playBalanceBefore) {
 
       throw new Error("INSUFFICIENT_PLAY_BALANCE");
 
     }
 
-    sql.exec(
-
-      `
-
-        UPDATE balances
-
-        SET play_balance = play_balance - ?
-
-        WHERE user_id = ?
-
-          AND play_balance >= ?
-
-      `,
-
-      amount,
-
-      String(userId),
-
-      amount
-
-    );
-
-    const updatedBalances = getBalances(String(userId));
-
-    if (Number(updatedBalances?.play_balance || 0) > playBalance - amount + 0.000001) {
-
-      throw new Error("WITHDRAWAL_DEDUCTION_FAILED");
-
-    }
-
-    const result = sql.exec(
+    const requestResult = sql.exec(
 
       `
 
@@ -5517,7 +5529,7 @@ async registerNewUser(user) {
 
       `,
 
-      String(userId),
+      cleanUserId,
 
       method,
 
@@ -5527,51 +5539,145 @@ async registerNewUser(user) {
 
     );
 
-    sql.exec(
+    const requestId = Number(requestResult.lastInsertRowId);
 
-      `
+    let deducted = false;
 
-        INSERT INTO transactions (
+    try {
 
-          user_id,
+      sql.exec(
 
-          type,
+        `
+
+          UPDATE balances
+
+          SET
+
+            balance = COALESCE(play_balance, balance) - ?,
+
+            play_balance = COALESCE(play_balance, balance) - ?
+
+          WHERE user_id = ?
+
+            AND COALESCE(play_balance, balance) >= ?
+
+        `,
+
+        amount,
+
+        amount,
+
+        cleanUserId,
+
+        amount
+
+      );
+
+      const balancesAfter = this.getBalances(cleanUserId);
+
+      if (
+
+        Number(balancesAfter.playBalance || 0) >
+
+        playBalanceBefore - amount + 0.000001
+
+      ) {
+
+        throw new Error("WITHDRAWAL_DEDUCTION_FAILED");
+
+      }
+
+      deducted = true;
+
+      sql.exec(
+
+        `
+
+          INSERT INTO transactions (
+
+            user_id,
+
+            type,
+
+            method,
+
+            amount,
+
+            simulated,
+
+            created_at
+
+          )
+
+          VALUES (?, 'withdraw_request', ?, ?, 1, ?)
+
+        `,
+
+        cleanUserId,
+
+        method,
+
+        amount,
+
+        Date.now()
+
+      );
+
+      return {
+
+        ok: true,
+
+        requestId,
+
+        status: "pending",
+
+        message: "WITHDRAWAL_REQUEST_SUBMITTED",
+
+        ...this.getBalances(cleanUserId)
+
+      };
+
+    } catch (error) {
+
+      if (deducted) {
+
+        sql.exec(
+
+          `
+
+            UPDATE balances
+
+            SET
+
+              balance = COALESCE(play_balance, balance) + ?,
+
+              play_balance = COALESCE(play_balance, balance) + ?
+
+            WHERE user_id = ?
+
+          `,
 
           amount,
 
-          description,
+          amount,
 
-          created_at
+          cleanUserId
 
-        )
+        );
 
-        VALUES (?, 'withdraw_request', ?, ?, ?)
+      }
 
-      `,
+      sql.exec(
 
-      String(userId),
+        `DELETE FROM wallet_requests WHERE id = ? AND status = 'pending'`,
 
-      amount,
+        requestId
 
-      `${method} withdrawal request`,
+      );
 
-      Date.now()
+      throw error;
 
-    );
-
-    return {
-
-      ok: true,
-
-      requestId: Number(result.lastInsertRowId),
-
-      status: "pending",
-
-      message: "WITHDRAWAL_REQUEST_SUBMITTED",
-
-      balances: updatedBalances
-
-    };
+    }
 
   }
 
@@ -5843,7 +5949,9 @@ isAdmin(request) {
 
   getAdminRequests() {
 
-    const rows = this.ctx.storage.sql.exec(`
+    const sql = this.ctx.storage.sql;
+
+    const rows = sql.exec(`
 
       SELECT
 
@@ -5907,21 +6015,19 @@ isAdmin(request) {
 
       username: String(row.username || ""),
 
-      type: String(row.type),
+      type: String(row.type || ""),
 
       method: String(row.method || ""),
 
       amount: Number(row.amount || 0),
 
-      status: String(row.status),
+      status: String(row.status || ""),
 
       transactionLink: row.transaction_link
 
         ? String(row.transaction_link)
 
         : null,
-
-      // Keep old fields so existing records do not break.
 
       screenshot: row.screenshot_data
 
@@ -5959,203 +6065,217 @@ isAdmin(request) {
 
      ========================================================= */
 
-  async adminRequestAction(
-
-    requestId,
-
-    action,
-
-    adminKey
-
-  ) {
+  async adminRequestAction(requestId, action, adminKey) {
 
     const sql = this.ctx.storage.sql;
 
-    const row =
+    const id = Number(requestId);
 
-      sql.exec(`
+    if (
 
-        SELECT *
+      !Number.isInteger(id) ||
 
-        FROM wallet_requests
+      id <= 0 ||
 
-        WHERE id = ?
+      !["confirm", "reject"].includes(action)
 
-      `, requestId).toArray()[0];
+    ) {
 
-    if (!row) {
-
-      return {
-
-        ok: false,
-
-        error: "REQUEST_NOT_FOUND"
-
-      };
+      return { ok: false, error: "INVALID_ACTION" };
 
     }
 
-    if (row.status !== "pending") {
+    const initialRow = sql.exec(
 
-      return {
+      `SELECT user_id FROM wallet_requests WHERE id = ?`,
 
-        ok: false,
+      id
 
-        error: "REQUEST_ALREADY_REVIEWED",
+    ).toArray()[0];
 
-        status: row.status
+    if (!initialRow) {
 
-      };
+      return { ok: false, error: "REQUEST_NOT_FOUND" };
 
     }
 
-    const userId =
-
-      String(row.user_id);
-
-    const amount =
-
-      Number(row.amount || 0);
-
-    const type =
-
-      String(row.type);
-
-    const finalStatus =
-
-      action === "confirm"
-
-        ? "confirmed"
-
-        : "rejected";
+    const userId = String(initialRow.user_id);
 
     await this.ensureBalanceRow(userId);
 
-    const balances =
+    const result = this.ctx.storage.transactionSync(() => {
 
-      this.getBalances(userId);
+      const row = sql.exec(
 
-    /* =====================================================
+        `SELECT * FROM wallet_requests WHERE id = ?`,
 
-       CONFIRM DEPOSIT
+        id
 
-       → Main Balance
+      ).toArray()[0];
 
-       ===================================================== */
+      if (!row) {
 
-    if (
+        throw new Error("REQUEST_NOT_FOUND");
 
-      type === "deposit" &&
+      }
 
-      action === "confirm"
+      if (row.status !== "pending") {
 
-    ) {
+        throw new Error("REQUEST_ALREADY_REVIEWED");
 
-      const nextMain =
+      }
 
-        balances.mainBalance + amount;
+      const amount = Number(row.amount);
 
-      sql.exec(`
+      const type = String(row.type || "");
 
-        UPDATE balances
+      if (
 
-        SET main_balance = ?
+        !["deposit", "withdraw"].includes(type) ||
 
-        WHERE user_id = ?
+        !Number.isFinite(amount) ||
 
-      `,
+        amount <= 0
 
-        nextMain,
+      ) {
 
-        userId
+        throw new Error("INVALID_REQUEST_DATA");
 
-      );
+      }
 
-    }
+      const balanceRow = sql.exec(
 
-    /* =====================================================
+        `
 
-       REJECT WITHDRAW
+          SELECT balance, main_balance, play_balance
 
-       → refund Play Balance
+          FROM balances
 
-       ===================================================== */
+          WHERE user_id = ?
 
-    if (
-
-      type === "withdraw" &&
-
-      action === "reject"
-
-    ) {
-
-      const nextPlay =
-
-        balances.playBalance + amount;
-
-      sql.exec(`
-
-        UPDATE balances
-
-        SET
-
-          balance = ?,
-
-          play_balance = ?
-
-        WHERE user_id = ?
-
-      `,
-
-        nextPlay,
-
-        nextPlay,
+        `,
 
         userId
 
+      ).toArray()[0];
+
+      if (!balanceRow) {
+
+        throw new Error("BALANCE_NOT_FOUND");
+
+      }
+
+      const mainBalance = Number(balanceRow.main_balance || 0);
+
+      const playBalance =
+
+        balanceRow.play_balance === null ||
+
+        balanceRow.play_balance === undefined
+
+          ? Number(balanceRow.balance || 0)
+
+          : Number(balanceRow.play_balance || 0);
+
+      const finalStatus =
+
+        action === "confirm" ? "confirmed" : "rejected";
+
+      const statusUpdate = sql.exec(
+
+        `
+
+          UPDATE wallet_requests
+
+          SET status = ?, reviewed_at = ?, reviewed_by = ?
+
+          WHERE id = ? AND status = 'pending'
+
+        `,
+
+        finalStatus,
+
+        Date.now(),
+
+        String(adminKey || "admin"),
+
+        id
+
       );
 
-    }
+      if (statusUpdate.rowsWritten !== 1) {
 
-    sql.exec(`
+        throw new Error("REQUEST_ALREADY_REVIEWED");
 
-      UPDATE wallet_requests
+      }
 
-      SET
+      if (type === "deposit" && action === "confirm") {
 
-        status = ?,
+        sql.exec(
 
-        reviewed_at = ?,
+          `
 
-        reviewed_by = ?
+            UPDATE balances
 
-      WHERE id = ?
+            SET main_balance = ?
 
-    `,
+            WHERE user_id = ?
 
-      finalStatus,
+          `,
 
-      Date.now(),
+          mainBalance + amount,
 
-      adminKey,
+          userId
 
-      requestId
+        );
 
-    );
+      }
+
+      if (type === "withdraw" && action === "reject") {
+
+        sql.exec(
+
+          `
+
+            UPDATE balances
+
+            SET balance = ?, play_balance = ?
+
+            WHERE user_id = ?
+
+          `,
+
+          playBalance + amount,
+
+          playBalance + amount,
+
+          userId
+
+        );
+
+      }
+
+      return {
+
+        requestId: id,
+
+        status: finalStatus,
+
+        type,
+
+        amount
+
+      };
+
+    });
 
     return {
 
       ok: true,
 
-      requestId: Number(requestId),
+      ...result,
 
-      status: finalStatus,
-
-      type,
-
-      amount,
-
-      balance: this.getBalances(userId)
+      ...this.getBalances(userId)
 
     };
 
