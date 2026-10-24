@@ -16331,85 +16331,49 @@ function stat(
 
    ========================================================= */
 
-function loadRequests(){
+function loadRequests() {
 
-  api(
+  api("/do/admin/requests")
 
-    "/do/admin/requests"
+    .then(function(data) {
 
-  )
+      var container = document.getElementById("requests");
 
-  .then(function(data){
+      if (!data || !data.ok) {
 
-    if(!data || !data.ok){
+        container.innerHTML =
 
-      return;
+          '<div class="status error">Failed to load requests.</div>';
 
-    }
+        return;
 
-    var list =
+      }
 
-      data.requests ||
+      var list = data.requests || [];
 
-      [];
+      var pending = list.filter(function(item) {
 
-    var pending =
+        return item.status === "pending";
 
-      list.filter(
+      });
 
-        function(item){
+      if (!pending.length) {
 
-          return (
+        container.innerHTML =
 
-            item.status ===
+          '<div class="status">No pending requests.</div>';
 
-            "pending"
+        return;
 
-          );
+      }
 
-        }
+      var html = "";
 
-      );
-
-    if(!pending.length){
-
-      document.getElementById(
-
-        "requests"
-
-      ).innerHTML =
-
-        '<div class="status">' +
-
-        'No pending requests.' +
-
-        '</div>';
-
-      return;
-
-    }
-
-    var html =
-
-      "";
-
-    pending.forEach(
-
-      function(item){
+      pending.forEach(function(item) {
 
         var typeLabel =
 
-          item.type === "deposit"
-
-            ? "DEPOSIT"
-
-            : "WITHDRAWAL";
-
-        var userId =
-
-          item.userId ||
-
-          "-";
+          item.type === "deposit" ? "DEPOSIT" : "WITHDRAWAL";
 
         html +=
 
@@ -16417,19 +16381,11 @@ function loadRequests(){
 
             '<div class="request-top">' +
 
-              '<span class="badge">' +
-
-                typeLabel +
-
-              '</span>' +
+              '<span class="badge">' + typeLabel + '</span>' +
 
               '<strong>' +
 
-                Number(
-
-                  item.amount || 0
-
-                ).toFixed(2) +
+                Number(item.amount || 0).toFixed(2) +
 
                 ' ETB' +
 
@@ -16439,81 +16395,37 @@ function loadRequests(){
 
             '<div class="request-info">' +
 
-              'User: ' +
+              'User: ' + escapeHtml(item.userId || "-") + '<br>' +
 
-              escapeHtml(
+              'Name: ' + escapeHtml(
 
-                userId
+                item.firstName || item.username || "-"
 
-              ) +
+              ) + '<br>' +
 
-              '<br>' +
+              'Method: ' + escapeHtml(item.method || "-") + '<br>' +
 
-              'Name: ' +
-
-              escapeHtml(
-
-                item.firstName ||
-
-                item.username ||
-
-                "-"
-
-              ) +
-
-              '<br>' +
-
-              'Method: ' +
-
-              escapeHtml(
-
-                item.method ||
-
-                "-"
-
-              ) +
-
-              '<br>' +
-
-              'Status: ' +
-
-              escapeHtml(
-
-                item.status ||
-
-                "-"
-
-              ) +
+              'Status: ' + escapeHtml(item.status || "-") +
 
             '</div>';
 
-        if (
-
-          item.type === "deposit" &&
-
-          item.transactionLink
-
-        ) {
+        if (item.type === "deposit") {
 
           var transactionUrl = "";
 
           try {
 
-            var parsedTransactionUrl = new URL(
-
-              item.transactionLink
-
-            );
+            var parsedUrl = new URL(item.transactionLink || "");
 
             if (
 
-              parsedTransactionUrl.protocol === "https:" ||
+              parsedUrl.protocol === "https:" ||
 
-              parsedTransactionUrl.protocol === "http:"
+              parsedUrl.protocol === "http:"
 
             ) {
 
-              transactionUrl = parsedTransactionUrl.href;
+              transactionUrl = parsedUrl.href;
 
             }
 
@@ -16543,15 +16455,115 @@ function loadRequests(){
 
             html +=
 
-              '<div class="request-info">' +
-
-                'Invalid transaction link.' +
-
-              '</div>';
+              '<div class="request-info">Transaction link is missing or invalid.</div>';
 
           }
 
         }
+
+        html +=
+
+          '<div class="request-actions">' +
+
+            '<button class="green" type="button" ' +
+
+              'onclick="requestAction(' + Number(item.id) + ', \'confirm\')">' +
+
+              'Confirm' +
+
+            '</button>' +
+
+            '<button class="danger" type="button" ' +
+
+              'onclick="requestAction(' + Number(item.id) + ', \'reject\')">' +
+
+              'Reject' +
+
+            '</button>' +
+
+          '</div>' +
+
+          '</div>';
+
+      });
+
+      container.innerHTML = html;
+
+    })
+
+    .catch(function() {
+
+      document.getElementById("requests").innerHTML =
+
+        '<div class="status error">Connection error loading requests.</div>';
+
+    });
+
+}
+
+/* =========================================================
+
+   REQUEST ACTION
+
+   ========================================================= */
+
+function requestAction(id, action) {
+
+  if (!confirm("Are you sure you want to " + action + " this request?")) {
+
+    return;
+
+  }
+
+  api("/do/admin/request-action", {
+
+    method: "POST",
+
+    headers: {
+
+      "content-type": "application/json"
+
+    },
+
+    body: JSON.stringify({
+
+      requestId: Number(id),
+
+      action: action
+
+    })
+
+  })
+
+    .then(function(data) {
+
+      if (data && data.ok) {
+
+        loadAll();
+
+      } else {
+
+        alert(
+
+          data && data.error
+
+            ? data.error
+
+            : "Action failed."
+
+        );
+
+      }
+
+    })
+
+    .catch(function() {
+
+      alert("Connection error.");
+
+    });
+
+}
 
 /* =========================================================
 
