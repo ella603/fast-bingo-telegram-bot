@@ -16333,11 +16333,11 @@ function stat(
 
 function loadRequests() {
 
+  var container = document.getElementById("requests");
+
   api("/do/admin/requests")
 
     .then(function(data) {
-
-      var container = document.getElementById("requests");
 
       if (!data || !data.ok) {
 
@@ -16367,7 +16367,7 @@ function loadRequests() {
 
       }
 
-      var html = "";
+      var output = "";
 
       pending.forEach(function(item) {
 
@@ -16375,7 +16375,7 @@ function loadRequests() {
 
           item.type === "deposit" ? "DEPOSIT" : "WITHDRAWAL";
 
-        html +=
+        output +=
 
           '<div class="request">' +
 
@@ -16433,7 +16433,7 @@ function loadRequests() {
 
           if (transactionUrl) {
 
-            html +=
+            output +=
 
               '<div class="request-info">' +
 
@@ -16453,15 +16453,19 @@ function loadRequests() {
 
           } else {
 
-            html +=
+            output +=
 
-              '<div class="request-info">Transaction link is missing or invalid.</div>';
+              '<div class="request-info">' +
+
+                'Transaction link is missing or invalid.' +
+
+              '</div>';
 
           }
 
         }
 
-        html +=
+        output +=
 
           '<div class="request-actions">' +
 
@@ -16487,13 +16491,13 @@ function loadRequests() {
 
       });
 
-      container.innerHTML = html;
+      container.innerHTML = output;
 
     })
 
     .catch(function() {
 
-      document.getElementById("requests").innerHTML =
+      container.innerHTML =
 
         '<div class="status error">Connection error loading requests.</div>';
 
@@ -16562,100 +16566,6 @@ function requestAction(id, action) {
       alert("Connection error.");
 
     });
-
-}
-
-/* =========================================================
-
-   REQUEST ACTION
-
-   ========================================================= */
-
-function requestAction(
-
-  id,
-
-  action
-
-){
-
-  if(
-
-    !confirm(
-
-      "Are you sure?"
-
-    )
-
-  ){
-
-    return;
-
-  }
-
-  api(
-
-    "/do/admin/request-action",
-
-    {
-
-      method:"POST",
-
-      headers:{
-
-        "content-type":
-
-          "application/json"
-
-      },
-
-      body:
-
-        JSON.stringify({
-
-          requestId:id,
-
-          action:action
-
-        })
-
-    }
-
-  )
-
-  .then(function(data){
-
-    if(data && data.ok){
-
-      loadAll();
-
-    }else{
-
-      alert(
-
-        data &&
-
-        data.error
-
-          ? data.error
-
-          : "Action failed."
-
-      );
-
-    }
-
-  })
-
-  .catch(function(){
-
-    alert(
-
-      "Connection error."
-
-    );
-
-  });
 
 }
 
