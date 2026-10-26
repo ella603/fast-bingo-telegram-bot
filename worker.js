@@ -1279,6 +1279,24 @@ sql.exec(`
 
 `);
 
+const transactionColumns = sql.exec(`
+
+  PRAGMA table_info(transactions)
+
+`).toArray();
+
+if (!transactionColumns.some((column) => column.name === "simulated")) {
+
+  sql.exec(`
+
+    ALTER TABLE transactions
+
+    ADD COLUMN simulated INTEGER NOT NULL DEFAULT 1
+
+  `);
+
+}
+     
     let existing = sql
 
       .exec(
