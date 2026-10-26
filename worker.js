@@ -7147,13 +7147,87 @@ if (
 
       } catch (error) {
 
-        console.error(
+        const errorCode = String(
 
-          "WALLET_REQUEST_ERROR:",
-
-          error?.message || String(error)
+          error?.message || error || "WALLET_SERVER_ERROR"
 
         );
+
+        console.error("WALLET_REQUEST_ERROR:", errorCode);
+
+        const knownErrors = {
+
+          INVALID_AMOUNT: {
+
+            error: "MINIMUM_AMOUNT",
+
+            status: 400
+
+          },
+
+          AMOUNT_TOO_LARGE: {
+
+            error: "AMOUNT_TOO_LARGE",
+
+            status: 400
+
+          },
+
+          TRANSACTION_LINK_REQUIRED: {
+
+            error: "TRANSACTION_LINK_REQUIRED",
+
+            status: 400
+
+          },
+
+          INVALID_TRANSACTION_LINK: {
+
+            error: "INVALID_TRANSACTION_LINK",
+
+            status: 400
+
+          },
+
+          INVALID_PAYMENT_METHOD: {
+
+            error: "INVALID_PAYMENT_METHOD",
+
+            status: 400
+
+          },
+
+          INSUFFICIENT_PLAY_BALANCE: {
+
+            error: "INSUFFICIENT_BALANCE",
+
+            status: 400
+
+          },
+
+          USER_REQUIRED: {
+
+            error: "USER_REQUIRED",
+
+            status: 400
+
+          }
+
+        };
+
+        const mapped = knownErrors[errorCode];
+
+        if (mapped) {
+
+          return json({
+
+            ok: false,
+
+            error: mapped.error
+
+          }, mapped.status);
+
+        }
 
         return json({
 
@@ -7164,8 +7238,6 @@ if (
         }, 500);
 
       }
-
-    }
 
     /* =====================================================
 
@@ -8781,45 +8853,51 @@ button{
 
 }
 
-.payment-methods{
+.payment-methods {
 
-  display:grid;
+  display: grid;
 
-  grid-template-columns:repeat(3,1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 
-  gap:8px;
+  gap: 8px;
 
-  margin-top:12px;
-
-}
-
-.payment-card{
-
-  border:1px solid var(--line);
-
-  border-radius:12px;
-
-  background:#0d1219;
-
-  padding:10px;
-
-  text-align:left;
+  margin-top: 12px;
 
 }
 
-.payment-card.active{
+.payment-card {
 
-  border-color:var(--red2);
+  width: 100%;
 
-  background:#17141a;
+  border: 1px solid var(--line);
+
+  border-radius: 12px;
+
+  background: #0d1219;
+
+  color: #fff;
+
+  padding: 12px;
+
+  text-align: center;
+
+  cursor: pointer;
 
 }
 
-.payment-name{
+.payment-card.active {
 
-  font-size:11px;
+  border-color: var(--red2);
 
-  font-weight:950;
+  background: #17141a;
+
+}
+
+.payment-name {
+
+  font-size: 12px;
+
+  font-weight: 950;
 
 }
 
@@ -9777,41 +9855,15 @@ button{
 
         type="button"
 
-        class="payment-card active"
+        class="payment-card"
 
         data-method="Telebirr"
 
+        aria-pressed="false"
+
       >
 
-        <div class="payment-name">
-
-          Telebirr
-
-        </div>
-
-        <div
-
-          class="payment-owner"
-
-          id="telebirrOwner"
-
-        >
-
-          Hanza
-
-        </div>
-
-        <div
-
-          class="payment-number"
-
-          id="telebirrNumber"
-
-        >
-
-          0999960421
-
-        </div>
+        <div class="payment-name">Telebirr</div>
 
       </button>
 
@@ -9823,37 +9875,51 @@ button{
 
         data-method="eBirr"
 
+        aria-pressed="false"
+
       >
 
-        <div class="payment-name">
+        <div class="payment-name">eBirr</div>
 
-          E-Birr
+      </button>
 
-        </div>
+    </div>
 
-        <div
+    <div
 
-          class="payment-owner"
+      id="paymentMethodDetails"
 
-          id="ebirrOwner"
+      class="panel"
 
-        >
+      style="display:none; margin-top:10px; padding:12px;"
 
-          Belay
+      aria-live="polite"
 
-        </div>
+    >
 
-        <div
+      <div
 
-          class="payment-number"
+        id="paymentDetailsMethod"
 
-          id="ebirrNumber"
+        style="font-weight:900; margin-bottom:6px;"
 
-        >
+      ></div>
 
-          0999960421
+      <div
 
-        </div>
+        id="paymentDetailsOwner"
+
+        style="font-size:13px; margin-bottom:4px;"
+
+      ></div>
+
+      <div
+
+        id="paymentDetailsNumber"
+
+        style="font-size:15px; font-weight:900;"
+
+      ></div>
 
     </div>
 
@@ -9982,8 +10048,6 @@ button{
       >
 
         ክፍያውን ከፈጸሙ በኋላ ከSMS የቀዱትን Link ያስገቡ።
-
-        Admin እስኪያረጋግጥ ድረስ ባላንስዎ አይጨምርም።
 
       </div>
 
@@ -10315,7 +10379,7 @@ refreshTelegramUser();
 
   var selectedPaymentMethod =
 
-    "Telebirr";
+    "";
 
   var language = "am";
 
@@ -12043,41 +12107,97 @@ function checkLoginStatus(){
 
     .querySelectorAll(".payment-card")
 
-    .forEach(function(card){
+    .forEach(function (card) {
 
-      card.addEventListener(
+      card.addEventListener("click", function () {
 
-        "click",
+        document
 
-        function(){
+          .querySelectorAll(".payment-card")
 
-          document
+          .forEach(function (item) {
 
-            .querySelectorAll(".payment-card")
+            item.classList.remove("active");
 
-            .forEach(function(item){
+            item.setAttribute("aria-pressed", "false");
 
-              item.classList.remove(
+          });
 
-                "active"
+        card.classList.add("active");
 
-              );
+        card.setAttribute("aria-pressed", "true");
 
-            });
+        selectedPaymentMethod = card.dataset.method || "";
 
-          card.classList.add(
+        const details = document.getElementById("paymentMethodDetails");
 
-            "active"
+        const methodLabel = document.getElementById("paymentDetailsMethod");
 
-          );
+        const ownerLabel = document.getElementById("paymentDetailsOwner");
 
-          selectedPaymentMethod =
+        const numberLabel = document.getElementById("paymentDetailsNumber");
 
-            card.dataset.method;
+        if (
+
+          !details ||
+
+          !methodLabel ||
+
+          !ownerLabel ||
+
+          !numberLabel
+
+        ) {
+
+          return;
 
         }
 
-      );
+        const method = String(selectedPaymentMethod).toLowerCase();
+
+        const paymentDetails = {
+
+          telebirr: {
+
+            name: "Telebirr",
+
+            owner: "Hanza",
+
+            number: "0999960421"
+
+          },
+
+          ebirr: {
+
+            name: "eBirr",
+
+            owner: "Belay",
+
+            number: "0999960421"
+
+          }
+
+        };
+
+        const selectedDetails = paymentDetails[method];
+
+        if (!selectedDetails) {
+
+          details.style.display = "none";
+
+          return;
+
+        }
+
+        methodLabel.textContent = selectedDetails.name;
+
+        ownerLabel.textContent = "ስም / Name: " + selectedDetails.owner;
+
+        numberLabel.textContent = "ቁጥር / Number: " + selectedDetails.number;
+
+        details.style.display = "block";
+
+      });
 
     });
 
