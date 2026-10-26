@@ -1,5 +1,5 @@
 
-import { DurableObject } from "cloudflare:workers";
+import { DurableObject } from "cloudflare:workers"; 
 
 const APP_NAME = "Fast Bingo";
 
