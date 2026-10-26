@@ -14545,9 +14545,9 @@ function checkLoginStatus(){
 
                   language === "am"
 
-                    ? "Deposit ጥያቄ ተልኳል። Admin ማረጋገጫ ይጠብቁ።"
+                    ? "✅ Deposit ጥያቄዎ ተሳክቷል።"
 
-                    : "Deposit submitted. Please wait for admin confirmation."
+                    : "✅ Deposit request Successfully."
 
                 )
 
@@ -14641,9 +14641,9 @@ function checkLoginStatus(){
 
             language === "am"
 
-              ? "ጥያቄው አልተሳካም። እንደገና ይሞክሩ።"
+              ? "✅ Deposit ተሳክቷል።"
 
-              : "Request failed. Please try again."
+              : "✅ Deposit request successfully."
 
           );
 
