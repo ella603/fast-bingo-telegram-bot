@@ -1,5 +1,4 @@
-
-import { DurableObject } from "cloudflare:workers"; 
+import { DurableObject } from "cloudflare:workers";
 
 const APP_NAME = "Fast Bingo";
 
@@ -18,36 +17,6 @@ const CARD_PRICE = 10;
 const JACKPOT_PER_CARD = 8;
 
 const PLAY_BALANCE_START = 0;
-
-/* =========================================================
-
-   FAST BINGO — PAYMENT DISPLAY SETTINGS
-
-   CHANGE ONLY THE VALUES BELOW.
-
-   These are display/demo settings only.
-
-   ========================================================= */
-
-const PAYMENT_DISPLAY = {
-
-  telebirr: {
-
-    name: "Hanza",
-
-    number: "0999960421"
-
-  },
-
-  ebirr: {
-
-    name: "Belay",
-
-    number: "0999960421"
-
-  }
-
-};
 
 function json(data, status = 200) {
 
@@ -375,192 +344,6 @@ function getTelegramUser(request) {
 
 }
 
-/* =========================================================
-
-   LOGIN / REGISTRATION AUTH
-
-   ========================================================= */
-
-const LOGIN_CODE_MIN = 100000;
-
-const LOGIN_CODE_MAX = 999999;
-
-const LOGIN_CODE_TTL = 5 * 60 * 1000;
-
-const FIRST_REGISTRATION_BONUS = 20;
-
-async function hashLoginCode(code) {
-
-  const data =
-
-    new TextEncoder().encode(
-
-      String(code)
-
-    );
-
-  const digest =
-
-    await crypto.subtle.digest(
-
-      "SHA-256",
-
-      data
-
-    );
-
-  return Array.from(
-
-    new Uint8Array(digest)
-
-  )
-
-    .map(
-
-      b =>
-
-        b.toString(16).padStart(2, "0")
-
-    )
-
-    .join("");
-
-}
-
-async function sendLoginCode(
-
-  userId,
-
-  code,
-
-  env
-
-) {
-
-  const apiKey =
-
-    String(
-
-      env.LOGIN_API_KEY || ""
-
-    );
-
-  if (!apiKey) {
-
-    throw new Error(
-
-      "LOGIN_API_KEY is not configured"
-
-    );
-
-  }
-
-  const response =
-
-    await fetch(
-
-      "https://fast-bingo-telegram-bot.dagnaeli21.workers.dev/send-login-password",
-
-      {
-
-        method: "POST",
-
-        headers: {
-
-          "content-type":
-
-            "application/json",
-
-          "x-login-api-key":
-
-            apiKey
-
-        },
-
-        body: JSON.stringify({
-
-          userId: String(userId),
-
-          password: String(code)
-
-        })
-
-      }
-
-    );
-
-  const responseText =
-
-    await response.text();
-
-  let result = null;
-
-  try {
-
-    result =
-
-      JSON.parse(
-
-        responseText
-
-      );
-
-  } catch (_) {
-
-    result = {
-
-      ok: false,
-
-      error:
-
-        responseText ||
-
-        "INVALID_RESPONSE"
-
-    };
-
-  }
-
-  if (
-
-    !response.ok ||
-
-    !result ||
-
-    result.ok !== true
-
-  ) {
-
-    console.error(
-
-      "LOGIN_CODE_API_ERROR:",
-
-      JSON.stringify({
-
-        httpStatus: response.status,
-
-        result
-
-      })
-
-    );
-
-    throw new Error(
-
-      result?.message ||
-
-      result?.error ||
-
-      `Login API failed with HTTP ${response.status}`
-
-    );
-
-  }
-
-  return result;
-
-}
-
 class GameScheduler extends DurableObject {
 
   constructor(ctx, env) {
@@ -621,561 +404,9 @@ class GameScheduler extends DurableObject {
 
     `);
 
-    /* STATE TABLE MIGRATION */
-
-    const stateColumns =
-
-      sql.exec(`
-
-        PRAGMA table_info(state)
-
-      `).toArray();
-
-    const hasGameNumber =
-
-      stateColumns.some(
-
-        c => c.name === "game_number"
-
-      );
-
-    const hasStatus =
-
-      stateColumns.some(
-
-        c => c.name === "status"
-
-      );
-
-    const hasLobbyEndsAt =
-
-      stateColumns.some(
-
-        c => c.name === "lobby_ends_at"
-
-      );
-
-    const hasStartedAt =
-
-      stateColumns.some(
-
-        c => c.name === "started_at"
-
-      );
-
-    const hasBallIndex =
-
-      stateColumns.some(
-
-        c => c.name === "ball_index"
-
-      );
-
-    const hasBallOrder =
-
-      stateColumns.some(
-
-        c => c.name === "ball_order"
-
-      );
-
-    if (!hasGameNumber) {
-
-      sql.exec(`
-
-        ALTER TABLE state
-
-        ADD COLUMN game_number INTEGER
-
-      `);
-
-    }
-
-    if (!hasStatus) {
-
-      sql.exec(`
-
-        ALTER TABLE state
-
-        ADD COLUMN status TEXT
-
-      `);
-
-    }
-
-    if (!hasLobbyEndsAt) {
-
-      sql.exec(`
-
-        ALTER TABLE state
-
-        ADD COLUMN lobby_ends_at INTEGER
-
-      `);
-
-    }
-
-    if (!hasStartedAt) {
-
-      sql.exec(`
-
-        ALTER TABLE state
-
-        ADD COLUMN started_at INTEGER
-
-      `);
-
-    }
-
-    if (!hasBallIndex) {
-
-      sql.exec(`
-
-        ALTER TABLE state
-
-        ADD COLUMN ball_index INTEGER
-
-      `);
-
-    }
-
-    if (!hasBallOrder) {
-
-      sql.exec(`
-
-        ALTER TABLE state
-
-        ADD COLUMN ball_order TEXT
-
-      `);
-
-    }
-     
-sql.exec(`
-
-  CREATE TABLE IF NOT EXISTS users (
-
-    user_id TEXT PRIMARY KEY,
-
-    first_name TEXT,
-
-    username TEXT,
-
-    created_at INTEGER NOT NULL,
-
-    updated_at INTEGER NOT NULL
-
-  )
-
-`);
-
-/* =========================================================
-
-   WINNER / RESULT STATE MIGRATION
-
-   ========================================================= */
-
-const winnerStateColumns =
-
-  sql.exec(`
-
-    PRAGMA table_info(state)
-
-  `).toArray();
-
-const winnerColumnsToAdd = [
-
-  ["winner_user_id", "TEXT"],
-
-  ["winner_card", "INTEGER"],
-
-  ["winner_name", "TEXT"],
-
-  ["winner_amount", "REAL"],
-
-  ["winner_expires_at", "INTEGER"]
-
-];
-
-for (const [columnName, columnType] of winnerColumnsToAdd) {
-
-  const exists =
-
-    winnerStateColumns.some(
-
-      c => c.name === columnName
-
-    );
-
-  if (!exists) {
-
     sql.exec(`
 
-      ALTER TABLE state
-
-      ADD COLUMN ${columnName} ${columnType}
-
-    `);
-
-  }
-
-}
-     
-/* =========================================================
-
-   USER AUTH TABLE
-
-   ========================================================= */
-
-sql.exec(`
-
-  CREATE TABLE IF NOT EXISTS user_auth (
-
-    user_id TEXT PRIMARY KEY,
-
-    login_code_hash TEXT,
-
-    login_code_expires_at INTEGER,
-
-    created_at INTEGER NOT NULL,
-
-    last_login_at INTEGER,
-
-    bonus_given INTEGER NOT NULL DEFAULT 0
-
-  )
-
-`);
-     
-sql.exec(`
-
-  CREATE TABLE IF NOT EXISTS wallet_requests (
-
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-    user_id TEXT NOT NULL,
-
-    type TEXT NOT NULL,
-
-    method TEXT,
-
-    amount REAL NOT NULL,
-
-    status TEXT NOT NULL DEFAULT 'pending',
-
-    screenshot_data TEXT,
-
-    screenshot_mime TEXT,
-
-    created_at INTEGER NOT NULL,
-
-    reviewed_at INTEGER,
-
-    reviewed_by TEXT
-
-  )
-
-`);
-
-/* Add transaction link support without deleting old data. */
-
-const walletRequestColumns = sql.exec(`
-
-  PRAGMA table_info(wallet_requests)
-
-`).toArray();
-
-if (!walletRequestColumns.some(c => c.name === "transaction_link")) {
-
-  sql.exec(`
-
-    ALTER TABLE wallet_requests
-
-    ADD COLUMN transaction_link TEXT
-
-  `);
-
-}
-     
-sql.exec(`
-
-  CREATE INDEX IF NOT EXISTS idx_wallet_requests_status
-
-  ON wallet_requests(status)
-
-`);
-
-sql.exec(`
-
-  CREATE INDEX IF NOT EXISTS idx_wallet_requests_user
-
-  ON wallet_requests(user_id)
-
-`);
-
-sql.exec(`
-
-  CREATE TABLE IF NOT EXISTS app_control (
-
-    id INTEGER PRIMARY KEY,
-
-    paused INTEGER NOT NULL DEFAULT 0
-
-  )
-
-`);
-
-sql.exec(`
-
-  INSERT OR IGNORE INTO app_control
-
-  (id, paused)
-
-  VALUES (1, 0)
-
-`);
-
-/* =========================================================
-
-   BALANCES TABLE
-
-   ========================================================= */
-
-const balanceTableInfo =
-
-  sql.exec(`
-
-    PRAGMA table_info(balances)
-
-  `).toArray();
-
-if (balanceTableInfo.length === 0) {
-
-  sql.exec(`
-
-    CREATE TABLE IF NOT EXISTS balances (
-
-      user_id TEXT PRIMARY KEY,
-
-      balance REAL NOT NULL,
-
-      main_balance REAL NOT NULL DEFAULT 0,
-
-      play_balance REAL
-
-    )
-
-  `);
-
-} else {
-
-  const hasUserId =
-
-    balanceTableInfo.some(
-
-      c => c.name === "user_id"
-
-    );
-
-  const hasBalance =
-
-    balanceTableInfo.some(
-
-      c => c.name === "balance"
-
-    );
-
-  const hasMainBalance =
-
-    balanceTableInfo.some(
-
-      c => c.name === "main_balance"
-
-    );
-
-  const hasPlayBalance =
-
-    balanceTableInfo.some(
-
-      c => c.name === "play_balance"
-
-    );
-
-  /*
-
-   * Existing database is missing user_id.
-
-   *
-
-   * Rebuild the table while preserving
-
-   * existing balance values where possible.
-
-   */
-
-  if (!hasUserId) {
-
-    sql.exec(`
-
-      ALTER TABLE balances
-
-      RENAME TO balances_old
-
-    `);
-
-    sql.exec(`
-
-      CREATE TABLE balances (
-
-        user_id TEXT PRIMARY KEY,
-
-        balance REAL NOT NULL,
-
-        main_balance REAL NOT NULL DEFAULT 0,
-
-        play_balance REAL
-
-      )
-
-    `);
-
-    /*
-
-     * Old table has no user_id, so old rows
-
-     * cannot safely be mapped to Telegram users.
-
-     *
-
-     * Keep the old table temporarily instead
-
-     * of deleting data automatically.
-
-     */
-
-  } else {
-
-    if (!hasMainBalance) {
-
-      sql.exec(`
-
-        ALTER TABLE balances
-
-        ADD COLUMN main_balance
-
-        REAL NOT NULL DEFAULT 0
-
-      `);
-
-    }
-
-    if (!hasPlayBalance) {
-
-      sql.exec(`
-
-        ALTER TABLE balances
-
-        ADD COLUMN play_balance REAL
-
-      `);
-
-      sql.exec(`
-
-        UPDATE balances
-
-        SET play_balance = balance
-
-        WHERE play_balance IS NULL
-
-      `);
-
-    }
-
-  }
-
-}
-
-/* =========================================================
-
-   SELECTED CARDS
-
-   ========================================================= */
-
-const selectedCardsTableInfo =
-
-  sql.exec(`
-
-    PRAGMA table_info(selected_cards)
-
-  `).toArray();
-
-if (selectedCardsTableInfo.length === 0) {
-
-  sql.exec(`
-
-    CREATE TABLE selected_cards (
-
-      game_number INTEGER NOT NULL,
-
-      user_id TEXT NOT NULL,
-
-      card_number INTEGER NOT NULL,
-
-      selected_at INTEGER NOT NULL,
-
-      payment_source TEXT NOT NULL DEFAULT 'play',
-
-      PRIMARY KEY (
-
-        game_number,
-
-        user_id,
-
-        card_number
-
-      )
-
-    )
-
-  `);
-
-} else {
-
-  const hasSelectedCardsUserId =
-
-    selectedCardsTableInfo.some(
-
-      c => c.name === "user_id"
-
-    );
-
-  /*
-
-   * Existing selected_cards table from the
-
-   * previous version may not contain user_id.
-
-   *
-
-   * Preserve the old table and create the
-
-   * correct user-aware schema.
-
-   */
-
-  if (!hasSelectedCardsUserId) {
-
-    sql.exec(`
-
-      ALTER TABLE selected_cards
-
-      RENAME TO selected_cards_old
-
-    `);
-
-    sql.exec(`
-
-      CREATE TABLE selected_cards (
+      CREATE TABLE IF NOT EXISTS selected_cards (
 
         game_number INTEGER NOT NULL,
 
@@ -1184,8 +415,6 @@ if (selectedCardsTableInfo.length === 0) {
         card_number INTEGER NOT NULL,
 
         selected_at INTEGER NOT NULL,
-
-        payment_source TEXT NOT NULL DEFAULT 'play',
 
         PRIMARY KEY (
 
@@ -1201,102 +430,40 @@ if (selectedCardsTableInfo.length === 0) {
 
     `);
 
-  } else {
+    sql.exec(`
 
-    /*
+      CREATE TABLE IF NOT EXISTS balances (
 
-     * IMPORTANT:
+        user_id TEXT PRIMARY KEY,
 
-     *
+        balance REAL NOT NULL
 
-     * The current card-payment system stores
+      )
 
-     * whether each card was paid from PLAY
+    `);
 
-     * or MAIN balance.
+    sql.exec(`
 
-     *
+      CREATE TABLE IF NOT EXISTS transactions (
 
-     * Add this column to existing databases
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-     * that were created before payment_source
+        user_id TEXT NOT NULL,
 
-     * was introduced.
+        type TEXT NOT NULL,
 
-     */
+        method TEXT,
 
-    const hasPaymentSource =
+        amount REAL NOT NULL,
 
-      selectedCardsTableInfo.some(
+        simulated INTEGER NOT NULL,
 
-        c => c.name === "payment_source"
+        created_at INTEGER NOT NULL
 
-      );
+      )
 
-    if (!hasPaymentSource) {
+    `);
 
-      sql.exec(`
-
-        ALTER TABLE selected_cards
-
-        ADD COLUMN payment_source
-
-        TEXT NOT NULL DEFAULT 'play'
-
-      `);
-
-    }
-
-  }
-
-}
-
-/* =========================================================
-
-   TRANSACTIONS
-
-   ========================================================= */
-
-sql.exec(`
-
-  CREATE TABLE IF NOT EXISTS transactions (
-
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-    user_id TEXT NOT NULL,
-
-    type TEXT NOT NULL,
-
-    method TEXT,
-
-    amount REAL NOT NULL,
-
-    simulated INTEGER NOT NULL,
-
-    created_at INTEGER NOT NULL
-
-  )
-
-`);
-
-const transactionColumns = sql.exec(`
-
-  PRAGMA table_info(transactions)
-
-`).toArray();
-
-if (!transactionColumns.some((column) => column.name === "simulated")) {
-
-  sql.exec(`
-
-    ALTER TABLE transactions
-
-    ADD COLUMN simulated INTEGER NOT NULL DEFAULT 1
-
-  `);
-
-}
-     
     let existing = sql
 
       .exec(
@@ -1377,10 +544,8 @@ if (!transactionColumns.some((column) => column.name === "simulated")) {
 
       state.status !== "lobby" &&
 
-      state.status !== "live" &&
+      state.status !== "live"
 
-      state.status !== "result"
-       
     ) {
 
       const nextGame =
@@ -1609,13 +774,7 @@ if (!transactionColumns.some((column) => column.name === "simulated")) {
 
     if (
 
-      (
-
-        state.status !== "live" &&
-
-        state.status !== "result"
-
-      ) ||
+      state.status !== "live" ||
 
       Number(state.ball_index) < 0
 
@@ -1901,373 +1060,259 @@ if (!transactionColumns.some((column) => column.name === "simulated")) {
 
   }
 
-  /*
+  async alarm(alarmInfo) {
 
-   * =========================================================
+    try {
 
-   * FAST BINGO — SINGLE SOURCE OF TRUTH GAME ENGINE
+      const state =
 
-   * =========================================================
+        this.getState();
 
-   */
+      if (!state) {
 
-  async advanceGameState() {
-
-    let state =
-
-      this.getState();
-
-    if (!state) {
-
-      await this.createFreshLobby(1);
-
-      return;
-
-    }
-
-    const now =
-
-      Date.now();
-
-    /*
-
-     * =======================================================
-
-     * RESULT -> NEW LOBBY
-
-     * =======================================================
-
-     */
-
-    if (
-
-      state.status === "result"
-
-    ) {
-
-      const expiresAt =
-
-        Number(
-
-          state.winner_expires_at || 0
-
-        );
-
-      /*
-
-       * Keep the 3-second RESULT alive.
-
-       */
-
-      if (
-
-        expiresAt > now
-
-      ) {
-
-        await this.ctx.storage.setAlarm(
-
-          expiresAt
-
-        );
+        await this.createFreshLobby(1);
 
         return;
 
       }
 
+      const now = Date.now();
+
       /*
 
-       * RESULT finished.
+       * LOBBY -> LIVE
 
        *
 
-       * Start a completely new game.
+       * The first ball is called immediately.
+
+       * Therefore the UI goes directly to 1 / 75
+
+       * instead of staying at 0 / 75.
 
        */
 
-      const nextGame =
+      if (state.status === "lobby") {
 
-        Number(
+        const ends =
 
-          state.game_number || 0
+          Number(
 
-        ) + 1;
+            state.lobby_ends_at || 0
 
-      const lobbyEndsAt =
+          );
 
-        now +
+        if (now < ends) {
 
-        LOBBY_SECONDS * 1000;
+          await this.scheduleNext(
 
-      const nextOrder =
+            ends - now
 
-        makeBallOrder(
+          );
 
-          nextGame
-
-        );
-
-      this.ctx.storage.sql.exec(
-
-        `
-
-        DELETE FROM selected_cards
-
-        WHERE game_number < ?
-
-        `,
-
-        nextGame
-
-      );
-
-      this.ctx.storage.sql.exec(
-
-        `
-
-        UPDATE state
-
-        SET
-
-          game_number = ?,
-
-          status = 'lobby',
-
-          lobby_ends_at = ?,
-
-          started_at = NULL,
-
-          ball_index = -1,
-
-          ball_order = ?,
-
-          winner_user_id = NULL,
-
-          winner_card = NULL,
-
-          winner_name = NULL,
-
-          winner_amount = NULL,
-
-          winner_expires_at = NULL
-
-        WHERE id = 1
-
-        `,
-
-        nextGame,
-
-        lobbyEndsAt,
-
-        JSON.stringify(
-
-          nextOrder
-
-        )
-
-      );
-
-      /*
-
-       * Exact 45-second lobby alarm.
-
-       */
-
-      await this.ctx.storage.setAlarm(
-
-        lobbyEndsAt
-
-      );
-
-      console.log(
-
-        "FAST BINGO: RESULT -> LOBBY",
-
-        {
-
-          gameNumber: nextGame
+          return;
 
         }
 
-      );
+        let order = [];
 
-      return;
+        if (
 
-    }
-
-    /*
-
-     * =======================================================
-
-     * LOBBY -> LIVE
-
-     * =======================================================
-
-     */
-
-    if (
-
-      state.status === "lobby"
-
-    ) {
-
-      const lobbyEndsAt =
-
-        Number(
-
-          state.lobby_ends_at || 0
-
-        );
-
-      /*
-
-       * Lobby is still running.
-
-       */
-
-      if (
-
-        lobbyEndsAt > now
-
-      ) {
-
-        await this.ctx.storage.setAlarm(
-
-          lobbyEndsAt
-
-        );
-
-        return;
-
-      }
-
-      /*
-
-       * Lobby finished.
-
-       *
-
-       * Start LIVE.
-
-       */
-
-      let order = [];
-
-      if (
-
-        isValidBallOrder(
-
-          state.ball_order
-
-        )
-
-      ) {
-
-        order =
-
-          JSON.parse(
+          isValidBallOrder(
 
             state.ball_order
 
-          );
+          )
 
-      } else {
+        ) {
 
-        order =
+          order =
 
-          makeBallOrder(
+            JSON.parse(
 
-            Number(
+              state.ball_order
 
-              state.game_number || 1
+            );
 
-            )
+        } else {
 
-          );
+          order =
 
-      }
+            makeBallOrder(
 
-      this.ctx.storage.sql.exec(
+              Number(
 
-        `
+                state.game_number || 1
 
-        UPDATE state
+              )
 
-        SET
-
-          status = 'live',
-
-          started_at = ?,
-
-          ball_index = 0,
-
-          lobby_ends_at = NULL,
-
-          ball_order = ?
-
-        WHERE id = 1
-
-        `,
-
-        now,
-
-        JSON.stringify(order)
-
-      );
-
-      /*
-
-       * Next scheduled check.
-
-       */
-
-      await this.ctx.storage.setAlarm(
-
-        now + BALL_INTERVAL
-
-      );
-
-      console.log(
-
-        "FAST BINGO: LOBBY -> LIVE",
-
-        {
-
-          gameNumber:
-
-            Number(
-
-              state.game_number
-
-            )
+            );
 
         }
 
-      );
+        this.ctx.storage.sql.exec(
 
-      return;
+          `
 
-    }
+          UPDATE state
 
-    /*
+          SET
 
-     * =======================================================
+            status = 'live',
 
-     * LIVE GAME
+            started_at = ?,
 
-     * =======================================================
+            ball_index = 0,
 
-     */
+            lobby_ends_at = NULL,
 
-    if (
+            ball_order = ?
 
-      state.status !== "live"
+          WHERE id = 1
 
-    ) {
+          `,
+
+          now,
+
+          JSON.stringify(order)
+
+        );
+
+        await this.scheduleNext(
+
+          BALL_INTERVAL
+
+        );
+
+        return;
+
+      }
 
       /*
 
-       * Unknown state.
+       * LIVE GAME
+
+       */
+
+      if (state.status === "live") {
+
+        let currentIndex =
+
+          Number(state.ball_index);
+
+        if (
+
+          !Number.isInteger(
+
+            currentIndex
+
+          ) ||
+
+          currentIndex < 0
+
+        ) {
+
+          this.ctx.storage.sql.exec(
+
+            `
+
+            UPDATE state
+
+            SET
+
+              ball_index = 0,
+
+              started_at = COALESCE(
+
+                started_at,
+
+                ?
+
+              ),
+
+              lobby_ends_at = NULL
+
+            WHERE id = 1
+
+            `,
+
+            now
+
+          );
+
+          await this.scheduleNext(
+
+            BALL_INTERVAL
+
+          );
+
+          return;
+
+        }
+
+        /*
+
+         * After ball 75, immediately create the
+
+         * next 45-second lobby.
+
+         */
+
+        if (
+
+          currentIndex >=
+
+          TOTAL_BALLS - 1
+
+        ) {
+
+          await this.startNextGame();
+
+          return;
+
+        }
+
+        /*
+
+         * Call next ball.
+
+         */
+
+        const nextIndex =
+
+          currentIndex + 1;
+
+        this.ctx.storage.sql.exec(
+
+          `
+
+          UPDATE state
+
+          SET ball_index = ?
+
+          WHERE id = 1
+
+          `,
+
+          nextIndex
+
+        );
+
+        await this.scheduleNext(
+
+          BALL_INTERVAL
+
+        );
+
+        return;
+
+      }
+
+      /*
+
+       * Unknown status:
+
+       * recover into a fresh lobby.
 
        */
 
@@ -2281,739 +1326,13 @@ if (!transactionColumns.some((column) => column.name === "simulated")) {
 
       );
 
-      return;
-
-    }
-
-    /*
-
-     * =======================================================
-
-     * CALCULATE CURRENT BALL FROM REAL TIME
-
-     * =======================================================
-
-     */
-
-    state =
-
-      this.getState();
-
-    const startedAt =
-
-      Number(
-
-        state.started_at || now
-
-      );
-
-    const elapsed =
-
-      Math.max(
-
-        0,
-
-        now - startedAt
-
-      );
-
-    let targetIndex =
-
-      Math.floor(
-
-        elapsed /
-
-        BALL_INTERVAL
-
-      );
-
-    targetIndex =
-
-      Math.min(
-
-        targetIndex,
-
-        TOTAL_BALLS - 1
-
-      );
-
-    const currentIndex =
-
-      Number(
-
-        state.ball_index
-
-      );
-
-    /*
-
-     * Advance ball index.
-
-     */
-
-    if (
-
-      !Number.isInteger(
-
-        currentIndex
-
-      ) ||
-
-      targetIndex >
-
-      currentIndex
-
-    ) {
-
-      this.ctx.storage.sql.exec(
-
-        `
-
-        UPDATE state
-
-        SET ball_index = ?
-
-        WHERE id = 1
-
-        `,
-
-        targetIndex
-
-      );
-
-      state =
-
-        this.getState();
-
-    }
-
-    /*
-
-     * =======================================================
-
-     * BALL 75 HAS BEEN REACHED
-
-     *
-
-     * IMPORTANT:
-
-     *
-
-     * We do NOT wait for another alarm.
-
-     * We finish the game NOW.
-
-     * =======================================================
-
-     */
-
-    if (
-
-      targetIndex >=
-
-      TOTAL_BALLS - 1
-
-    ) {
-
-      const gameNumber =
-
-        Number(
-
-          state.game_number
-
-        );
-
-      const called =
-
-        this.getCalledBalls(
-
-          state
-
-        );
-
-      /*
-
-       * Find the first winning card.
-
-       */
-
-      const selectedRows =
-
-        this.ctx.storage.sql
-
-          .exec(
-
-            `
-
-            SELECT
-
-              sc.user_id,
-
-              sc.card_number,
-
-              sc.selected_at,
-
-              COALESCE(
-
-                u.first_name,
-
-                'Player'
-
-              ) AS first_name,
-
-              COALESCE(
-
-                u.username,
-
-                ''
-
-              ) AS username
-
-            FROM selected_cards sc
-
-            LEFT JOIN users u
-
-              ON u.user_id =
-
-                 sc.user_id
-
-            WHERE sc.game_number = ?
-
-            ORDER BY
-
-              sc.selected_at ASC,
-
-              sc.card_number ASC
-
-            `,
-
-            gameNumber
-
-          )
-
-          .toArray();
-
-      let winner =
-
-        null;
-
-      for (
-
-        const row of selectedRows
-
-      ) {
-
-        const card =
-
-          makeCard(
-
-            Number(
-
-              row.card_number
-
-            )
-
-          );
-
-        if (
-
-          hasTwoLines(
-
-            card,
-
-            called
-
-          )
-
-        ) {
-
-          winner = {
-
-            userId:
-
-              String(
-
-                row.user_id
-
-              ),
-
-            card:
-
-              Number(
-
-                row.card_number
-
-              ),
-
-            name:
-
-              String(
-
-                row.first_name ||
-
-                row.username ||
-
-                "Player"
-
-              )
-
-          };
-
-          break;
-
-        }
-
-      }
-
-      /*
-
-       * =====================================================
-
-       * WINNER FOUND
-
-       * =====================================================
-
-       */
-
-      if (winner) {
-
-        const jackpot =
-
-          this.getJackpot(
-
-            gameNumber
-
-          );
-
-        const winningAmount =
-
-          Number(
-
-            jackpot.jackpot || 0
-
-          );
-
-        const resultExpiresAt =
-
-          now + 3000;
-
-        /*
-
-         * FIRST:
-
-         *
-
-         * Change LIVE -> RESULT.
-
-         *
-
-         * This prevents 75/75 from ever remaining
-
-         * the permanent state.
-
-         */
-
-        this.ctx.storage.sql.exec(
-
-          `
-
-          UPDATE state
-
-          SET
-
-            status = 'result',
-
-            winner_user_id = ?,
-
-            winner_card = ?,
-
-            winner_name = ?,
-
-            winner_amount = ?,
-
-            winner_expires_at = ?
-
-          WHERE id = 1
-
-          `,
-
-          winner.userId,
-
-          winner.card,
-
-          winner.name,
-
-          winningAmount,
-
-          resultExpiresAt
-
-        );
-
-        /*
-
-         * Pay the winner.
-
-         *
-
-         * A payout problem must NEVER stop
-
-         * the game engine.
-
-         */
-
-        try {
-
-          await this.ensureBalanceRow(
-
-            winner.userId
-
-          );
-
-          const balances =
-
-            this.getBalances(
-
-              winner.userId
-
-            );
-
-          const oldPlay =
-
-            Number(
-
-              balances.playBalance || 0
-
-            );
-
-          const newPlay =
-
-            oldPlay +
-
-            winningAmount;
-
-          this.ctx.storage.sql.exec(
-
-            `
-
-            UPDATE balances
-
-            SET
-
-              balance = ?,
-
-              play_balance = ?
-
-            WHERE user_id = ?
-
-            `,
-
-            newPlay,
-
-            newPlay,
-
-            winner.userId
-
-          );
-
-          this.ctx.storage.sql.exec(
-
-            `
-
-            INSERT INTO transactions
-
-            (
-
-              user_id,
-
-              type,
-
-              method,
-
-              amount,
-
-              simulated,
-
-              created_at
-
-            )
-
-            VALUES
-
-            (
-
-              ?,
-
-              'bingo_win',
-
-              NULL,
-
-              ?,
-
-              1,
-
-              ?
-
-            )
-
-            `,
-
-            winner.userId,
-
-            winningAmount,
-
-            Date.now()
-
-          );
-
-        } catch (
-
-          payoutError
-
-        ) {
-
-          console.error(
-
-            "FAST BINGO PAYOUT ERROR:",
-
-            payoutError?.message ||
-
-            String(
-
-              payoutError
-
-            )
-
-          );
-
-        }
-
-        /*
-
-         * RESULT screen = exactly 3 seconds.
-
-         */
-
-        await this.ctx.storage.setAlarm(
-
-          resultExpiresAt
-
-        );
-
-        console.log(
-
-          "FAST BINGO: 75 -> RESULT",
-
-          {
-
-            gameNumber,
-
-            winner:
-
-              winner.name,
-
-            card:
-
-              winner.card,
-
-            amount:
-
-              winningAmount
-
-          }
-
-        );
-
-        return;
-
-      }
-
-      /*
-
-       * =====================================================
-
-       * NO WINNER
-
-       *
-
-       * 75/75 -> DIRECT NEW LOBBY
-
-       * =====================================================
-
-       */
-
-      const nextGame =
-
-        gameNumber + 1;
-
-      const lobbyEndsAt =
-
-        now +
-
-        LOBBY_SECONDS * 1000;
-
-      const nextOrder =
-
-        makeBallOrder(
-
-          nextGame
-
-        );
-
-      this.ctx.storage.sql.exec(
-
-        `
-
-        DELETE FROM selected_cards
-
-        WHERE game_number < ?
-
-        `,
-
-        nextGame
-
-      );
-
-      this.ctx.storage.sql.exec(
-
-        `
-
-        UPDATE state
-
-        SET
-
-          game_number = ?,
-
-          status = 'lobby',
-
-          lobby_ends_at = ?,
-
-          started_at = NULL,
-
-          ball_index = -1,
-
-          ball_order = ?,
-
-          winner_user_id = NULL,
-
-          winner_card = NULL,
-
-          winner_name = NULL,
-
-          winner_amount = NULL,
-
-          winner_expires_at = NULL
-
-        WHERE id = 1
-
-        `,
-
-        nextGame,
-
-        lobbyEndsAt,
-
-        JSON.stringify(
-
-          nextOrder
-
-        )
-
-      );
-
-      await this.ctx.storage.setAlarm(
-
-        lobbyEndsAt
-
-      );
-
-      console.log(
-
-        "FAST BINGO: 75 -> NEW LOBBY",
-
-        {
-
-          previousGame:
-
-            gameNumber,
-
-          nextGame
-
-        }
-
-      );
-
-      return;
-
-    }
-
-    /*
-
-     * =======================================================
-
-     * NEXT BALL
-
-     * =======================================================
-
-     */
-
-    const nextBallTime =
-
-      startedAt +
-
-      (
-
-        targetIndex + 1
-
-      ) *
-
-      BALL_INTERVAL;
-
-    await this.ctx.storage.setAlarm(
-
-      Math.max(
-
-        Date.now() + 500,
-
-        nextBallTime
-
-      )
-
-    );
-
-  }
-
-  /*
-
-   * =========================================================
-
-   * ALARM
-
-   *
-
-   * Alarm is now ONLY a backup trigger.
-
-   * The actual game engine is advanceGameState().
-
-   * =========================================================
-
-   */
-
-  async alarm(alarmInfo) {
-
-    try {
-
-      await this.advanceGameState();
-
     } catch (error) {
 
       console.error(
 
-        "FAST BINGO ALARM ERROR:",
+        "Fast Bingo alarm error:",
 
-        error?.message ||
-
-        String(error),
-
-        error?.stack || "",
+        error,
 
         "retry:",
 
@@ -3023,23 +1342,17 @@ if (!transactionColumns.some((column) => column.name === "simulated")) {
 
       /*
 
-       * Never allow the scheduler to permanently die.
+       * Do not let Cloudflare's limited alarm retries
+
+       * permanently stop the 24/7 game loop.
 
        */
 
-      try {
-
-        await this.ctx.storage.setAlarm(
-
-          Date.now() + 1000
-
-        );
-
-      } catch (_) {}
+      await this.recoverScheduler();
 
     }
 
-  } 
+  }
 
   async startNextGame() {
 
@@ -3055,27 +1368,21 @@ if (!transactionColumns.some((column) => column.name === "simulated")) {
 
       ) + 1;
 
-    const now =
-
-      Date.now();
+    const now = Date.now();
 
     const lobbyEnds =
 
-      now +
-
-      LOBBY_SECONDS * 1000;
+      now + LOBBY_SECONDS * 1000;
 
     const order =
 
-      makeBallOrder(
-
-        nextGame
-
-      );
+      makeBallOrder(nextGame);
 
     /*
 
      * Remove old card selections.
+
+     * Current/new game selections remain available.
 
      */
 
@@ -3092,16 +1399,6 @@ if (!transactionColumns.some((column) => column.name === "simulated")) {
       nextGame
 
     );
-
-    /*
-
-     * Start the new 45-second lobby.
-
-     *
-
-     * Clear the previous winner/result.
-
-     */
 
     this.ctx.storage.sql.exec(
 
@@ -3121,17 +1418,7 @@ if (!transactionColumns.some((column) => column.name === "simulated")) {
 
         ball_index = -1,
 
-        ball_order = ?,
-
-        winner_user_id = NULL,
-
-        winner_card = NULL,
-
-        winner_name = NULL,
-
-        winner_amount = NULL,
-
-        winner_expires_at = NULL
+        ball_order = ?
 
       WHERE id = 1
 
@@ -3141,11 +1428,7 @@ if (!transactionColumns.some((column) => column.name === "simulated")) {
 
       lobbyEnds,
 
-      JSON.stringify(
-
-        order
-
-      )
+      JSON.stringify(order)
 
     );
 
@@ -3157,60 +1440,6 @@ if (!transactionColumns.some((column) => column.name === "simulated")) {
 
   }
 
-    getUserCards(userId) {
-
-    const state =
-
-      this.getState();
-
-    if (!state) {
-
-      return [];
-
-    }
-
-    const rows =
-
-      this.ctx.storage.sql
-
-        .exec(
-
-          `
-
-          SELECT card_number
-
-          FROM selected_cards
-
-          WHERE game_number = ?
-
-          AND user_id = ?
-
-          ORDER BY card_number
-
-          `,
-
-          state.game_number,
-
-          userId
-
-        )
-
-        .toArray();
-
-    return rows.map(
-
-      row =>
-
-        Number(
-
-          row.card_number
-
-        )
-
-    );
-
-  }
-   
   getJackpot(gameNumber) {
 
     const row =
@@ -3279,19 +1508,7 @@ if (!transactionColumns.some((column) => column.name === "simulated")) {
 
         selectedCount: 0,
 
-        jackpot: 0,
-
-        takenCards: [],
-
-        winnerUserId: null,
-
-        winnerCard: null,
-
-        winnerName: null,
-
-        winnerAmount: 0,
-
-        winnerExpiresAt: 0
+        jackpot: 0
 
       };
 
@@ -3299,11 +1516,7 @@ if (!transactionColumns.some((column) => column.name === "simulated")) {
 
     const calledBalls =
 
-      this.getCalledBalls(
-
-        state
-
-      );
+      this.getCalledBalls(state);
 
     let order = [];
 
@@ -3333,45 +1546,19 @@ if (!transactionColumns.some((column) => column.name === "simulated")) {
 
     }
 
-    /*
-
-     * Current ball.
-
-     */
-
     const currentBall =
 
-      (
+      state.status === "live" &&
 
-        state.status === "live" ||
-
-        state.status === "result"
-
-      ) &&
-
-      Number(
-
-        state.ball_index
-
-      ) >= 0
+      Number(state.ball_index) >= 0
 
         ? order[
 
-            Number(
-
-              state.ball_index
-
-            )
+            Number(state.ball_index)
 
           ]
 
         : null;
-
-    /*
-
-     * Lobby countdown.
-
-     */
 
     const lobbyRemaining =
 
@@ -3389,9 +1576,7 @@ if (!transactionColumns.some((column) => column.name === "simulated")) {
 
                   state.lobby_ends_at || 0
 
-                ) -
-
-                Date.now()
+                ) - Date.now()
 
               ) / 1000
 
@@ -3401,12 +1586,6 @@ if (!transactionColumns.some((column) => column.name === "simulated")) {
 
         : 0;
 
-    /*
-
-     * Jackpot.
-
-     */
-
     const jackpot =
 
       this.getJackpot(
@@ -3415,71 +1594,13 @@ if (!transactionColumns.some((column) => column.name === "simulated")) {
 
       );
 
-    /*
-
-     * All cards already taken
-
-     * in this game.
-
-     */
-
-    const takenRows =
-
-      this.ctx.storage.sql
-
-        .exec(
-
-          `
-
-          SELECT card_number
-
-          FROM selected_cards
-
-          WHERE game_number = ?
-
-          ORDER BY card_number
-
-          `,
-
-          state.game_number
-
-        )
-
-        .toArray();
-
-    const takenCards =
-
-      takenRows.map(
-
-        row =>
-
-          Number(
-
-            row.card_number
-
-          )
-
-      );
-
-    /*
-
-     * Return complete game state.
-
-     */
-
     return {
 
-      status:
-
-        state.status,
+      status: state.status,
 
       gameNumber:
 
-        Number(
-
-          state.game_number
-
-        ),
+        Number(state.game_number),
 
       lobbyRemaining,
 
@@ -3495,11 +1616,7 @@ if (!transactionColumns.some((column) => column.name === "simulated")) {
 
         currentBall
 
-          ? ballLetter(
-
-              currentBall
-
-            )
+          ? ballLetter(currentBall)
 
           : null,
 
@@ -3509,70 +1626,16 @@ if (!transactionColumns.some((column) => column.name === "simulated")) {
 
       jackpot:
 
-        jackpot.jackpot,
-
-      takenCards,
-
-      winnerUserId:
-
-        state.winner_user_id ||
-
-        null,
-
-      winnerCard:
-
-        state.winner_card === null ||
-
-        state.winner_card === undefined
-
-          ? null
-
-          : Number(
-
-              state.winner_card
-
-            ),
-
-      winnerName:
-
-        state.winner_name ||
-
-        null,
-
-      winnerAmount:
-
-        Number(
-
-          state.winner_amount ||
-
-          0
-
-        ),
-
-      winnerExpiresAt:
-
-        Number(
-
-          state.winner_expires_at ||
-
-          0
-
-        )
+        jackpot.jackpot
 
     };
 
   }
 
-  async unselectCard(
-
-    userId,
-
-    cardNumber
-
-  ) {
+  async selectCards(userId, cards) {
 
     const state =
-  
+
       this.getState();
 
     if (!state) {
@@ -3603,17 +1666,39 @@ if (!transactionColumns.some((column) => column.name === "simulated")) {
 
     }
 
-    const card =
+    let clean =
 
-      Number(cardNumber);
+      Array.isArray(cards)
+
+        ? cards
+
+            .map(Number)
+
+            .filter(
+
+              (n) =>
+
+                Number.isInteger(n) &&
+
+                n >= 1 &&
+
+                n <= CARD_COUNT
+
+            )
+
+        : [];
+
+    clean = [
+
+      ...new Set(clean)
+
+    ];
 
     if (
 
-      !Number.isInteger(card) ||
+      clean.length >
 
-      card < 1 ||
-
-      card > CARD_COUNT
+      MAX_CARDS_PER_PLAYER
 
     ) {
 
@@ -3621,167 +1706,13 @@ if (!transactionColumns.some((column) => column.name === "simulated")) {
 
         ok: false,
 
-        error: "INVALID_CARD"
+        error: "MAX_CARDS"
 
       };
 
     }
 
-    const sql =
-
-      this.ctx.storage.sql;
-
-    /*
-
-     * Find THIS user's selected card
-
-     * and remember exactly where the
-
-     * 10 ETB originally came from.
-
-     */
-
-    const row =
-
-      sql.exec(
-
-        `
-
-        SELECT
-
-          card_number,
-
-          payment_source
-
-        FROM selected_cards
-
-        WHERE game_number = ?
-
-        AND user_id = ?
-
-        AND card_number = ?
-
-        LIMIT 1
-
-        `,
-
-        state.game_number,
-
-        userId,
-
-        card
-
-      ).toArray()[0];
-
-    /*
-
-     * Nothing to refund if the card is
-
-     * not currently selected by this user.
-
-     */
-
-    if (!row) {
-
-      return {
-
-        ok: true,
-
-        selected:
-
-          this.getUserCards(userId),
-
-        ...this.getJackpot(
-
-          state.game_number
-
-        ),
-
-        ...this.getBalances(
-
-          userId
-
-        )
-
-      };
-
-    }
-
-    await this.ensureBalanceRow(
-
-      userId
-
-    );
-
-    const balances =
-
-      this.getBalances(
-  
-        userId
-
-      );
-
-    let nextPlay =
-
-      Number(
-
-        balances.playBalance || 0
-
-      );
-
-    let nextMain =
-
-      Number(
-
-        balances.mainBalance || 0
-
-      );
-
-    const source =
-
-      String(
-
-        row.payment_source || "play"
-
-      ).toLowerCase();
-
-    /*
-
-     * Refund the exact balance source.
-
-     */
-
-    if (
-
-      source === "main"
-
-    ) {
-
-      nextMain +=
-
-        CARD_PRICE;
-
-    } else {
-
-      nextPlay +=
-
-        CARD_PRICE;
-
-    }
-
-    /*
-
-     * Delete the selected card FIRST.
-
-     *
-
-     * This makes the unselect operation
-
-     * safe against duplicate clicks.
-
-     */
-
-    sql.exec(
+    this.ctx.storage.sql.exec(
 
       `
 
@@ -3791,2555 +1722,209 @@ if (!transactionColumns.some((column) => column.name === "simulated")) {
 
       AND user_id = ?
 
-      AND card_number = ?
-
-      `,
-
-      state.game_number,
-
-      userId,
-
-      card
-
-    );
-
-    /*
-
-     * Save refunded balances.
-
-     */
-
-    sql.exec(
- 
-      `
-
-      UPDATE balances
-
-      SET
-
-        balance = ?,
-
-        play_balance = ?,
-
-        main_balance = ?
-
-      WHERE user_id = ?
-
-      `,
-
-      nextPlay,
-
-      nextPlay,
-
-      nextMain,
-
-      userId
-
-    );
-
-    /*
-
-     * Record refund transaction.
-
-     */
-
-    sql.exec(
-
-      `
-
-      INSERT INTO transactions
-
-      (
-
-        user_id,
-
-        type,
-
-        method,
-
-        amount,
-
-        simulated,
- 
-        created_at
-
-      )
-
-      VALUES (
-
-        ?,
-
-        'card_refund',
- 
-        NULL,
-
-        ?,
-
-        1,
-
-        ?
-
-      )
-
-      `,
-
-      userId,
-
-      CARD_PRICE,
-
-      Date.now()
-
-    );
-
-    const jackpot =
-
-      this.getJackpot(
-
-        state.game_number
-
-      );
-
-    return {
-
-      ok: true,
-
-      selected:
-
-        this.getUserCards(
-
-          userId
-
-        ),
-
-      selectedCount:
-
-        jackpot.selectedCount,
-
-      jackpot:
-
-        jackpot.jackpot,
-
-      playBalance:
-
-        nextPlay,
-
-      mainBalance:
-
-        nextMain
-
-    };
-
-  }
-   
-  async selectCards(userId, cards) {
-
-  const state =
-
-    this.getState();
-
-  if (!state) {
-
-    return {
-
-      ok: false,
-
-      error: "NO_GAME"
-
-    };
-
-  }
-
-  if (
-
-    state.status !== "lobby"
-
-  ) {
-
-    return {
-
-      ok: false,
-
-      error: "GAME_IN_PROGRESS"
-
-    };
-
-  }
-
-  let clean =
-
-    Array.isArray(cards)
-
-      ? cards
-
-          .map(Number)
-
-          .filter(
-
-            n =>
-
-              Number.isInteger(n) &&
-
-              n >= 1 &&
-
-              n <= CARD_COUNT
-
-          )
-
-      : [];
-
-  clean = [
-
-    ...new Set(clean)
-
-  ];
-
-  if (
-
-    clean.length >
-
-    MAX_CARDS_PER_PLAYER
-
-  ) {
-
-    return {
-
-      ok: false,
-
-      error: "MAX_CARDS"
-
-    };
-
-  }
-
-  const sql =
-
-    this.ctx.storage.sql;
-
-  /*
-
-   * =======================================================
-
-   * GET USER'S CURRENT CARDS
-
-   * =======================================================
-
-   */
-
-  const oldRows =
-
-    sql.exec(
-
-      `
-
-      SELECT
-
-        card_number,
-
-        payment_source
-
-      FROM selected_cards
-
-      WHERE game_number = ?
-
-      AND user_id = ?
-
-      ORDER BY card_number
-
       `,
 
       state.game_number,
 
       userId
 
-    ).toArray();
-
-  const oldCards =
-
-    oldRows.map(
-
-      row =>
-
-        Number(
-
-          row.card_number
-
-        )
-
     );
 
-  /*
+    const now = Date.now();
 
-   * =======================================================
+    for (const card of clean) {
 
-   * FIND ADDED / REMOVED CARDS
-
-   * =======================================================
-
-   */
-
-  const addedCards =
-
-    clean.filter(
-
-      card =>
-
-        oldCards.indexOf(card) === -1
-
-    );
-
-  const removedCards =
-
-    oldRows.filter(
-
-      row =>
-
-        clean.indexOf(
-
-          Number(row.card_number)
-
-        ) === -1
-
-    );
-
-  /*
-
-   * =======================================================
-
-   * CHECK WHETHER NEW CARDS ARE ALREADY TAKEN
-
-   * =======================================================
-
-   */
-
-  if (addedCards.length) {
-
-    const placeholders =
-
-      addedCards
-
-        .map(() => "?")
-
-        .join(",");
-
-    const occupiedRows =
-
-      sql.exec(
+      this.ctx.storage.sql.exec(
 
         `
 
-        SELECT
+        INSERT OR IGNORE INTO
+
+        selected_cards
+
+        (
+
+          game_number,
+
+          user_id,
 
           card_number,
 
-          user_id
+          selected_at
 
-        FROM selected_cards
+        )
 
-        WHERE game_number = ?
-
-        AND card_number IN (${placeholders})
+        VALUES (?, ?, ?, ?)
 
         `,
 
         state.game_number,
 
-        ...addedCards
-
-      ).toArray();
-
-    if (occupiedRows.length) {
-
-      const takenCard =
-
-        Number(
-
-          occupiedRows[0].card_number
-
-        );
-
-      return {
-
-        ok: false,
-
-        error: "CARD_TAKEN",
-
-        card: takenCard,
-
-        selected: oldCards,
-
-        ...this.getJackpot(
-
-          state.game_number
-
-        )
-
-      };
-
-    }
-
-  }
-
-  /*
-
-   * =======================================================
-
-   * BALANCE
-
-   * =======================================================
-
-   */
-
-  await this.ensureBalanceRow(
-
-    userId
-
-  );
-
-  const balances =
-
-    this.getBalances(
-
-      userId
-
-    );
-
-  let nextPlay =
-
-    Number(
-
-      balances.playBalance || 0
-
-    );
-
-  let nextMain =
-
-    Number(
-
-      balances.mainBalance || 0
-
-    );
-
-  /*
-
-   * =======================================================
-
-   * REFUND REMOVED CARDS FIRST
-
-   *
-
-   * Every unselected card returns its 10 ETB.
-
-   *
-
-   * If it was originally paid from PLAY,
-
-   * refund to PLAY.
-
-   *
-
-   * If it was originally paid from MAIN,
-
-   * refund to MAIN.
-
-   *
-
-   * Older cards with no payment_source are
-
-   * safely refunded to PLAY.
-
-   * =======================================================
-
-   */
-
-  for (
-
-    const row of removedCards
-
-  ) {
-
-    const source =
-
-      String(
-
-        row.payment_source || "play"
-
-      ).toLowerCase();
-
-    if (
-
-      source === "main"
-
-    ) {
-
-      nextMain +=
-
-        CARD_PRICE;
-
-    } else {
-
-      nextPlay +=
-
-        CARD_PRICE;
-
-    }
-
-  }
-
-  /*
-
-   * =======================================================
-
-   * CHARGE NEW CARDS
-
-   *
-
-   * Priority:
-
-   * 1. PLAY BALANCE
-
-   * 2. MAIN BALANCE
-
-   *
-
-   * Keep the payment source for every card
-
-   * so an unselect can refund the exact balance.
-
-   * =======================================================
-
-   */
-
-  const paymentSources =
-
-    new Map();
-
-  for (
-
-    const row of oldRows
-
-  ) {
-
-    const card =
-
-      Number(
-
-        row.card_number
-
-      );
-
-    if (
-
-      clean.indexOf(card) !== -1
-
-    ) {
-
-      paymentSources.set(
-
-        card,
-
-        String(
-
-          row.payment_source ||
-
-          "play"
-
-        ).toLowerCase()
-
-      );
-
-    }
-
-  }
-
-  for (
-
-    const card of addedCards
-
-  ) {
-
-    if (
-
-      nextPlay >= CARD_PRICE
-
-    ) {
-
-      nextPlay -=
-
-        CARD_PRICE;
-
-      paymentSources.set(
-
-        card,
-
-        "play"
-
-      );
-
-    } else if (
-
-      nextMain >= CARD_PRICE
-
-    ) {
-
-      nextMain -=
-
-        CARD_PRICE;
-
-      paymentSources.set(
-
-        card,
-
-        "main"
-
-      );
-
-    } else {
-
-      return {
-
-        ok: false,
-
-        error: "INSUFFICIENT_BALANCE",
-
-        selected: oldCards,
-
-        ...this.getJackpot(
-
-          state.game_number
-
-        )
-
-      };
-
-    }
-
-  }
-
-  /*
-
-   * =======================================================
-
-   * SAVE BALANCES
-
-   * =======================================================
-
-   */
-
-  if (
-
-    addedCards.length ||
-
-    removedCards.length
-
-  ) {
-
-    sql.exec(
-
-      `
-
-      UPDATE balances
-
-      SET
-
-        balance = ?,
-
-        play_balance = ?,
-
-        main_balance = ?
-
-      WHERE user_id = ?
-
-      `,
-
-      nextPlay,
-
-      nextPlay,
-
-      nextMain,
-
-      userId
-
-    );
-
-  }
-
-  /*
-
-   * =======================================================
-
-   * TRANSACTIONS
-
-   * =======================================================
-
-   */
-
-  const now =
-
-    Date.now();
-
-  /*
-
-   * Purchase transactions.
-
-   */
-
-  for (
-
-    const card of addedCards
-
-  ) {
-
-    sql.exec(
-
-      `
-
-      INSERT INTO transactions
-
-      (
-
-        user_id,
-
-        type,
-
-        method,
-
-        amount,
-
-        simulated,
-
-        created_at
-
-      )
-
-      VALUES (
-
-        ?,
-
-        'card_purchase',
-
-        NULL,
-
-        ?,
-
-        1,
-
-        ?
-
-      )
-
-      `,
-
-      userId,
-
-      CARD_PRICE,
-
-      now
-
-    );
-
-  }
-
-  /*
-
-   * Refund transactions.
-
-   */
-
-  for (
-
-    const row of removedCards
-
-  ) {
-
-    sql.exec(
-
-      `
-
-      INSERT INTO transactions
-
-      (
-
-        user_id,
-
-        type,
-
-        method,
-
-        amount,
-
-        simulated,
-
-        created_at
-
-      )
-
-      VALUES (
-
-        ?,
-
-        'card_refund',
-
-        NULL,
-
-        ?,
-
-        1,
-
-        ?
-
-      )
-
-      `,
-
-      userId,
-
-      CARD_PRICE,
-
-      now
-
-    );
-
-  }
-
-  /*
-
-   * =======================================================
-
-   * REPLACE USER'S CURRENT SELECTION
-
-   * =======================================================
-
-   */
-
-  sql.exec(
-
-    `
-
-    DELETE FROM selected_cards
-
-    WHERE game_number = ?
-
-    AND user_id = ?
-
-    `,
-
-    state.game_number,
-
-    userId
-
-  );
-
-  for (
-
-    const card of clean
-
-  ) {
-
-    const source =
-
-      paymentSources.get(
-
-        card
-
-      ) || "play";
-
-    sql.exec(
-
-      `
-
-      INSERT INTO selected_cards
-
-      (
-
-        game_number,
-
-        user_id,
-
-        card_number,
-
-        selected_at,
-
-        payment_source
-
-      )
-
-      VALUES (?, ?, ?, ?, ?)
-
-      `,
-
-      state.game_number,
-
-      userId,
-
-      card,
-
-      now,
-
-      source
-
-    );
-
-  }
-
-  /*
-
-   * =======================================================
-
-   * RETURN UPDATED GLOBAL JACKPOT + BALANCES
-
-   * =======================================================
-
-   */
-
-  const jackpot =
-
-    this.getJackpot(
-
-      state.game_number
-
-    );
-
-  return {
-
-    ok: true,
-
-    selected:
-
-      clean,
-
-    selectedCount:
-
-      jackpot.selectedCount,
-
-    jackpot:
-
-      jackpot.jackpot,
-
-    playBalance:
-
-      nextPlay,
-
-    mainBalance:
-
-      nextMain
-
-  };
-
-}
-   
-  /* =========================================================
-
-     BALANCES
-
-     ========================================================= */
-
-  async ensureBalanceRow(userId) {
-
-    const sql = this.ctx.storage.sql;
-
-    let row = sql.exec(`
-
-      SELECT user_id, balance, main_balance, play_balance
-
-      FROM balances
-
-      WHERE user_id = ?
-
-    `, userId).toArray()[0];
-
-    if (!row) {
-
-      sql.exec(`
-
-        INSERT INTO balances
-
-        (
-
-          user_id,
-
-          balance,
-
-          main_balance,
-
-          play_balance
-
-        )
-
-        VALUES (?, ?, ?, ?)
-
-      `,
-
         userId,
 
-        PLAY_BALANCE_START,
+        card,
 
-        0,
-
-        PLAY_BALANCE_START
+        now
 
       );
 
-      row = {
-
-        user_id: userId,
-
-        balance: PLAY_BALANCE_START,
-
-        main_balance: 0,
-
-        play_balance: PLAY_BALANCE_START
-
-      };
-
     }
-
-    return row;
-
-  }
-
-  getBalances(userId) {
-
-    const sql = this.ctx.storage.sql;
-
-    let row = sql.exec(`
-
-      SELECT
-
-        user_id,
-
-        balance,
-
-        main_balance,
-
-        play_balance
-
-      FROM balances
-
-      WHERE user_id = ?
-
-    `, userId).toArray()[0];
-
-    if (!row) {
-
-      sql.exec(`
-
-        INSERT INTO balances
-
-        (
-
-          user_id,
-
-          balance,
-
-          main_balance,
-
-          play_balance
-
-        )
-
-        VALUES (?, ?, ?, ?)
-
-      `,
-
-        userId,
-
-        PLAY_BALANCE_START,
-
-        0,
-
-        PLAY_BALANCE_START
-
-      );
-
-      return {
-
-        mainBalance: 0,
-
-        playBalance: PLAY_BALANCE_START
-
-      };
-
-    }
-
-    return {
-
-      mainBalance: Number(row.main_balance || 0),
-
-      playBalance:
-
-        row.play_balance === null ||
-
-        row.play_balance === undefined
-
-          ? Number(row.balance || 0)
-
-          : Number(row.play_balance || 0)
-
-    };
-
-  }
-
-  getBalance(userId) {
-
-    return this.getBalances(userId).playBalance;
-
-  }
-
-/* =========================================================
-
-   LOGIN STATUS
-
-   ========================================================= */
-
-getAuth(userId) {
-
-  return this.ctx.storage.sql
-
-    .exec(`
-
-      SELECT
-
-        user_id,
-
-        login_code_hash,
-
-        login_code_expires_at,
-
-        created_at,
-
-        last_login_at,
-
-        bonus_given
-
-      FROM user_auth
-
-      WHERE user_id = ?
-
-    `, String(userId))
-
-    .toArray()[0] || null;
-
-}
-
-isRegistered(userId) {
-
-  return !!this.getAuth(userId);
-
-}
-   
-  async saveTelegramUser(user) {
-
-    if (!user || !user.id) return;
-
-    const sql = this.ctx.storage.sql;
-
-    const now = Date.now();
-
-    sql.exec(`
-
-      INSERT INTO users
-
-      (
-
-        user_id,
-
-        first_name,
-
-        username,
-
-        created_at,
-
-        updated_at
-
-      )
-
-      VALUES (?, ?, ?, ?, ?)
-
-      ON CONFLICT(user_id)
-
-      DO UPDATE SET
-
-        first_name = excluded.first_name,
-
-        username = excluded.username,
-
-        updated_at = excluded.updated_at
-
-    `,
-
-      String(user.id),
-
-      String(user.first_name || "Player"),
-
-      String(user.username || ""),
-
-      now,
-
-      now
-
-    );
-
-  }
-
-/* =========================================================
-
-   LOGIN REQUEST / VERIFY
-
-   ========================================================= */
-
-async registerNewUser(user) {
-
-  if (
-
-    !user ||
-
-    !user.id ||
-
-    user.id === "guest"
-
-  ) {
-
-    return {
-
-      ok: false,
-
-      error: "TELEGRAM_USER_REQUIRED"
-
-    };
-
-  }
-
-  const userId =
-
-    String(user.id);
-
-  const now =
-
-    Date.now();
-
-  /*
-
-   * Check whether this Telegram user
-
-   * has already completed registration.
-
-   */
-
-  const existing =
-
-    this.getAuth(userId);
-
-  if (
-
-    existing &&
-
-    Number(existing.bonus_given || 0) === 1
-
-  ) {
-
-    const balances =
-
-      await this.ensureBalanceRow(userId);
 
     return {
 
       ok: true,
 
-      authenticated: true,
+      selected: clean,
 
-      registered: true,
+      ...this.getJackpot(
 
-      alreadyRegistered: true,
+        state.game_number
 
-      mainBalance:
-
-        Number(balances.main_balance || 0),
-
-      playBalance:
-
-        Number(balances.play_balance || 0)
+      )
 
     };
 
   }
 
-  /*
-
-   * Save Telegram user.
-
-   */
-
-  await this.saveTelegramUser(user);
-
-  /*
-
-   * Make sure balance row exists.
-
-   */
-
-  await this.ensureBalanceRow(userId);
-
-  /*
-
-   * Read current balance.
-
-   */
-
-  const balances =
-
-    this.getBalances(userId);
-
-  const currentPlay =
-
-    Number(
-
-      balances.playBalance || 0
-
-    );
-
-  const bonus =
-
-    FIRST_REGISTRATION_BONUS;
-
-  const nextPlay =
-
-    currentPlay + bonus;
-
-  /*
-
-   * Put the 20 ETB bonus into
-
-   * PLAY BALANCE only.
-
-   */
-
-  this.ctx.storage.sql.exec(`
-
-    UPDATE balances
-
-    SET
-
-      balance = ?,
-
-      play_balance = ?
-
-    WHERE user_id = ?
-
-  `,
-
-    nextPlay,
-
-    nextPlay,
-
-    userId
-
-  );
-
-  /*
-
-   * Create / complete registration.
-
-   */
-
-  this.ctx.storage.sql.exec(`
-
-    INSERT INTO user_auth
-
-    (
-
-      user_id,
-
-      login_code_hash,
-
-      login_code_expires_at,
-
-      created_at,
-
-      last_login_at,
-
-      bonus_given
-
-    )
-
-    VALUES (?, NULL, NULL, ?, ?, 1)
-
-    ON CONFLICT(user_id)
-
-    DO UPDATE SET
-
-      bonus_given = 1,
-
-      last_login_at = excluded.last_login_at,
-
-      login_code_hash = NULL,
-
-      login_code_expires_at = NULL
-
-  `,
-
-    userId,
-
-    now,
-
-    now
-
-  );
-
-  /*
-
-   * Record the one-time registration bonus.
-
-   */
-
-  this.ctx.storage.sql.exec(`
-
-    INSERT INTO transactions
-
-    (
-
-      user_id,
-
-      type,
-
-      method,
-
-      amount,
-
-      simulated,
-
-      created_at
-
-    )
-
-    VALUES (
-
-      ?,
-
-      'registration_bonus',
-
-      NULL,
-
-      ?,
-
-      1,
-
-      ?
-
-    )
-
-  `,
-
-    userId,
-
-    bonus,
-
-    now
-
-  );
-
-  const finalBalances =
-
-    this.getBalances(userId);
-
-  return {
-
-    ok: true,
-
-    authenticated: true,
-
-    registered: true,
-
-    firstRegistrationBonus: bonus,
-
-    mainBalance:
-
-      finalBalances.mainBalance,
-
-    playBalance:
-
-      finalBalances.playBalance
-
-  };
-
-}
-   
-  /* =========================================================
-
-     WALLET — DEMO / PLAY-MONEY ONLY
-
-     ========================================================= */
-
-  async walletRequest(userId, body) {
-
-    const sql = this.ctx.storage.sql;
-
-    const cleanUserId = String(userId || "");
-
-    const type = String(body?.type || "deposit")
-
-      .trim()
-
-      .toLowerCase();
-
-    const methodInput = String(body?.method || "")
-
-      .trim()
-
-      .toLowerCase();
-
-    const methodMap = {
-
-      telebirr: "Telebirr",
-
-      ebirr: "eBirr"
-
-    };
-
-    if (!cleanUserId) {
-
-      throw new Error("USER_REQUIRED");
-
-    }
-
-    if (!["deposit", "withdraw"].includes(type)) {
-
-      throw new Error("INVALID_WALLET_REQUEST_TYPE");
-
-    }
-
-    if (!Object.prototype.hasOwnProperty.call(methodMap, methodInput)) {
-
-      throw new Error("INVALID_PAYMENT_METHOD");
-
-    }
-
-    const method = methodMap[methodInput];
-
-    const amount = Number(body?.amount);
-
-    if (!Number.isFinite(amount) || amount < 50) {
-
-      throw new Error("INVALID_AMOUNT");
-
-    }
-
-    if (amount > 1000000) {
-
-      throw new Error("AMOUNT_TOO_LARGE");
-
-    }
-
-    await this.ensureBalanceRow(cleanUserId);
-
-    /*
-
-     * DEPOSIT
-
-     * Create a pending request.
-
-     * Do not credit main_balance until admin confirms.
-
-     */
-
-    if (type === "deposit") {
-
-      const rawLink = String(
-
-        body?.transactionLink ||
-
-        body?.transaction_link ||
-
-        ""
-
-      ).trim();
-
-      if (!rawLink || rawLink.length > 2000) {
-
-        throw new Error("TRANSACTION_LINK_REQUIRED");
-
-      }
-
-      let transactionLink;
-
-      try {
-
-        const parsedUrl = new URL(rawLink);
-
-        if (
-
-          parsedUrl.protocol !== "https:" &&
-
-          parsedUrl.protocol !== "http:"
-
-        ) {
-
-          throw new Error("INVALID_TRANSACTION_LINK");
-
-        }
-
-        transactionLink = parsedUrl.href;
-
-      } catch (_) {
-
-        throw new Error("INVALID_TRANSACTION_LINK");
-
-      }
-
-      const requestResult = sql.exec(
-
-        `
-
-          INSERT INTO wallet_requests (
-
-            user_id,
-
-            type,
-
-            method,
-
-            amount,
-
-            status,
-
-            transaction_link,
-
-            screenshot_data,
-
-            screenshot_mime,
-
-            created_at
-
-          )
-
-          VALUES (?, 'deposit', ?, ?, 'pending', ?, NULL, NULL, ?)
-
-        `,
-
-        cleanUserId,
-
-        method,
-
-        amount,
-
-        transactionLink,
-
-        Date.now()
-
-      );
-
-      const requestId = Number(requestResult.lastInsertRowId);
-
-      try {
-
-        sql.exec(
-
-          `
-
-            INSERT INTO transactions (
-
-              user_id,
-
-              type,
-
-              method,
-
-              amount,
-
-              simulated,
-
-              created_at
-
-            )
-
-            VALUES (?, 'deposit_request', ?, ?, 1, ?)
-
-          `,
-
-          cleanUserId,
-
-          method,
-
-          amount,
-
-          Date.now()
-
-        );
-
-      } catch (error) {
-
-        sql.exec(
-
-          `DELETE FROM wallet_requests WHERE id = ? AND status = 'pending'`,
-
-          requestId
-
-        );
-
-        throw error;
-
-      }
-
-      return {
-
-        ok: true,
-
-        requestId,
-
-        status: "pending",
-
-        message: "DEPOSIT_REQUEST_SUBMITTED",
-
-        ...this.getBalances(cleanUserId)
-
-      };
-
-    }
-
-    /*
-
-     * WITHDRAWAL
-
-     * Deduct from play balance while the request is pending.
-
-     * If saving the request or transaction log fails,
-
-     * restore the balance and remove the unfinished request.
-
-     */
-
-    const balancesBefore = this.getBalances(cleanUserId);
-
-    const playBalanceBefore = Number(balancesBefore.playBalance || 0);
-
-    if (amount > playBalanceBefore) {
-
-      throw new Error("INSUFFICIENT_PLAY_BALANCE");
-
-    }
-
-    const requestResult = sql.exec(
-
-      `
-
-        INSERT INTO wallet_requests (
-
-          user_id,
-
-          type,
-
-          method,
-
-          amount,
-
-          status,
-
-          transaction_link,
-
-          screenshot_data,
-
-          screenshot_mime,
-
-          created_at
-
-        )
-
-        VALUES (?, 'withdraw', ?, ?, 'pending', NULL, NULL, NULL, ?)
-
-      `,
-
-      cleanUserId,
-
-      method,
-
-      amount,
-
-      Date.now()
-
-    );
-
-    const requestId = Number(requestResult.lastInsertRowId);
-
-    let deducted = false;
-
-    try {
-
-      sql.exec(
-
-        `
-
-          UPDATE balances
-
-          SET
-
-            balance = COALESCE(play_balance, balance) - ?,
-
-            play_balance = COALESCE(play_balance, balance) - ?
-
-          WHERE user_id = ?
-
-            AND COALESCE(play_balance, balance) >= ?
-
-        `,
-
-        amount,
-
-        amount,
-
-        cleanUserId,
-
-        amount
-
-      );
-
-      const balancesAfter = this.getBalances(cleanUserId);
-
-      if (
-
-        Number(balancesAfter.playBalance || 0) >
-
-        playBalanceBefore - amount + 0.000001
-
-      ) {
-
-        throw new Error("WITHDRAWAL_DEDUCTION_FAILED");
-
-      }
-
-      deducted = true;
-
-      sql.exec(
-
-        `
-
-          INSERT INTO transactions (
-
-            user_id,
-
-            type,
-
-            method,
-
-            amount,
-
-            simulated,
-
-            created_at
-
-          )
-
-          VALUES (?, 'withdraw_request', ?, ?, 1, ?)
-
-        `,
-
-        cleanUserId,
-
-        method,
-
-        amount,
-
-        Date.now()
-
-      );
-
-      return {
-
-        ok: true,
-
-        requestId,
-
-        status: "pending",
-
-        message: "WITHDRAWAL_REQUEST_SUBMITTED",
-
-        ...this.getBalances(cleanUserId)
-
-      };
-
-    } catch (error) {
-
-      if (deducted) {
-
-        sql.exec(
-
-          `
-
-            UPDATE balances
-
-            SET
-
-              balance = COALESCE(play_balance, balance) + ?,
-
-              play_balance = COALESCE(play_balance, balance) + ?
-
-            WHERE user_id = ?
-
-          `,
-
-          amount,
-
-          amount,
-
-          cleanUserId
-
-        );
-
-      }
-
-      sql.exec(
-
-        `DELETE FROM wallet_requests WHERE id = ? AND status = 'pending'`,
-
-        requestId
-
-      );
-
-      throw error;
-
-    }
-
-  }
-
-/* =========================================================
-
-   ADMIN AUTH
-
-   ========================================================= */
-
-isAdmin(request) {
-
-  const expected =
-
-    String(this.env.ADMIN_KEY || "");
-
-  if (!expected) {
-
-    return false;
-
-  }
-
-  const adminHeader =
-
-    request.headers.get(
-
-      "x-admin-key"
-
-    ) || "";
-
-  if (
-
-    adminHeader === expected
-
-  ) {
-
-    return true;
-
-  }
-
-  const auth =
-
-    request.headers.get(
-
-      "authorization"
-
-    ) || "";
-
-  if (
-
-    auth.startsWith("Bearer ")
-
-  ) {
-
-    return (
-
-      auth.slice(7) === expected
-
-    );
-
-  }
-
-  return false;
-
-}
-   
-  /* =========================================================
-
-     ADMIN SUMMARY
-
-     ========================================================= */
-
-  getAdminSummary() {
-
-    const sql = this.ctx.storage.sql;
-
-    const users =
-
-      Number(
-
-        sql.exec(`
-
-          SELECT COUNT(*) AS count
-
-          FROM users
-
-        `).toArray()[0]?.count || 0
-
-      );
-
-    const pendingDeposits =
-
-      Number(
-
-        sql.exec(`
-
-          SELECT COUNT(*) AS count
-
-          FROM wallet_requests
-
-          WHERE type = 'deposit'
-
-          AND status = 'pending'
-
-        `).toArray()[0]?.count || 0
-
-      );
-
-    const pendingWithdrawals =
-
-      Number(
-
-        sql.exec(`
-
-          SELECT COUNT(*) AS count
-
-          FROM wallet_requests
-
-          WHERE type = 'withdraw'
-
-          AND status = 'pending'
-
-        `).toArray()[0]?.count || 0
-
-      );
-
-    const depositTotal =
-
-      Number(
-
-        sql.exec(`
-
-          SELECT COALESCE(SUM(amount),0) AS total
-
-          FROM wallet_requests
-
-          WHERE type = 'deposit'
-
-          AND status = 'pending'
-
-        `).toArray()[0]?.total || 0
-
-      );
-
-    const withdrawalTotal =
-
-      Number(
-
-        sql.exec(`
-
-          SELECT COALESCE(SUM(amount),0) AS total
-
-          FROM wallet_requests
-
-          WHERE type = 'withdraw'
-
-          AND status = 'pending'
-
-        `).toArray()[0]?.total || 0
-
-      );
+  getUserCards(userId) {
 
     const state =
 
       this.getState();
 
-    return {
-
-      ok: true,
-
-      users,
-
-      pendingDeposits,
-
-      pendingWithdrawals,
-
-      pendingDepositAmount: depositTotal,
-
-      pendingWithdrawalAmount: withdrawalTotal,
-
-      game: state
-
-        ? {
-
-            gameNumber: Number(state.game_number),
-
-            status: state.status,
-
-            ballIndex: Number(state.ball_index)
-
-          }
-
-        : null
-
-    };
-
-  }
-
-  /* =========================================================
-
-     ADMIN USERS
-
-     ========================================================= */
-
-  getAdminUsers() {
+    if (!state) return [];
 
     const rows =
 
-      this.ctx.storage.sql.exec(`
+      this.ctx.storage.sql
 
-        SELECT
+        .exec(
 
-          u.user_id,
+          `
 
-          u.first_name,
+          SELECT card_number
 
-          u.username,
+          FROM selected_cards
 
-          u.created_at,
+          WHERE game_number = ?
 
-          u.updated_at,
+          AND user_id = ?
 
-          COALESCE(b.main_balance,0) AS main_balance,
+          ORDER BY card_number
 
-          COALESCE(
+          `,
 
-            b.play_balance,
+          state.game_number,
 
-            b.balance,
+          userId
 
-            0
+        )
 
-          ) AS play_balance
+        .toArray();
 
-        FROM users u
+    return rows.map(
 
-        LEFT JOIN balances b
+      (row) =>
 
-          ON b.user_id = u.user_id
+        Number(row.card_number)
 
-        ORDER BY u.updated_at DESC
-
-      `).toArray();
-
-    return rows.map(row => ({
-
-      userId: String(row.user_id),
-
-      firstName: String(row.first_name || "Player"),
-
-      username: String(row.username || ""),
-
-      mainBalance: Number(row.main_balance || 0),
-
-      playBalance: Number(row.play_balance || 0),
-
-      createdAt: Number(row.created_at || 0),
-
-      updatedAt: Number(row.updated_at || 0)
-
-    }));
+    );
 
   }
 
-  /* =========================================================
+  getBalance(userId) {
 
-     ADMIN WALLET REQUESTS
+    let row =
 
-     ========================================================= */
+      this.ctx.storage.sql
 
-  getAdminRequests() {
+        .exec(
 
-    const sql = this.ctx.storage.sql;
+          `
 
-    const rows = sql.exec(`
-
-      SELECT
-
-        wr.id,
-
-        wr.user_id,
-
-        wr.type,
-
-        wr.method,
-
-        wr.amount,
-
-        wr.status,
-
-        wr.transaction_link,
-
-        wr.screenshot_data,
-
-        wr.screenshot_mime,
-
-        wr.created_at,
-
-        wr.reviewed_at,
-
-        wr.reviewed_by,
-
-        COALESCE(u.first_name, 'Player') AS first_name,
-
-        COALESCE(u.username, '') AS username
-
-      FROM wallet_requests wr
-
-      LEFT JOIN users u
-
-        ON u.user_id = wr.user_id
-
-      ORDER BY
-
-        CASE
-
-          WHEN wr.status = 'pending' THEN 0
-
-          ELSE 1
-
-        END,
-
-        wr.created_at DESC
-
-      LIMIT 200
-
-    `).toArray();
-
-    return rows.map(row => ({
-
-      id: Number(row.id),
-
-      userId: String(row.user_id),
-
-      firstName: String(row.first_name || "Player"),
-
-      username: String(row.username || ""),
-
-      type: String(row.type || ""),
-
-      method: String(row.method || ""),
-
-      amount: Number(row.amount || 0),
-
-      status: String(row.status || ""),
-
-      transactionLink: row.transaction_link
-
-        ? String(row.transaction_link)
-
-        : null,
-
-      screenshot: row.screenshot_data
-
-        ? String(row.screenshot_data)
-
-        : null,
-
-      screenshotMime: row.screenshot_mime
-
-        ? String(row.screenshot_mime)
-
-        : null,
-
-      createdAt: Number(row.created_at || 0),
-
-      reviewedAt: row.reviewed_at
-
-        ? Number(row.reviewed_at)
-
-        : null,
-
-      reviewedBy: row.reviewed_by
-
-        ? String(row.reviewed_by)
-
-        : null
-
-    }));
-
-  }
-
-  /* =========================================================
-
-     ADMIN CONFIRM / REJECT
-
-     ========================================================= */
-
-  async adminRequestAction(requestId, action, adminKey) {
-
-    const sql = this.ctx.storage.sql;
-
-    const id = Number(requestId);
-
-    if (
-
-      !Number.isInteger(id) ||
-
-      id <= 0 ||
-
-      !["confirm", "reject"].includes(action)
-
-    ) {
-
-      return { ok: false, error: "INVALID_ACTION" };
-
-    }
-
-    const initialRow = sql.exec(
-
-      `SELECT user_id FROM wallet_requests WHERE id = ?`,
-
-      id
-
-    ).toArray()[0];
-
-    if (!initialRow) {
-
-      return { ok: false, error: "REQUEST_NOT_FOUND" };
-
-    }
-
-    const userId = String(initialRow.user_id);
-
-    await this.ensureBalanceRow(userId);
-
-    const result = this.ctx.storage.transactionSync(() => {
-
-      const row = sql.exec(
-
-        `SELECT * FROM wallet_requests WHERE id = ?`,
-
-        id
-
-      ).toArray()[0];
-
-      if (!row) {
-
-        throw new Error("REQUEST_NOT_FOUND");
-
-      }
-
-      if (row.status !== "pending") {
-
-        throw new Error("REQUEST_ALREADY_REVIEWED");
-
-      }
-
-      const amount = Number(row.amount);
-
-      const type = String(row.type || "");
-
-      if (
-
-        !["deposit", "withdraw"].includes(type) ||
-
-        !Number.isFinite(amount) ||
-
-        amount <= 0
-
-      ) {
-
-        throw new Error("INVALID_REQUEST_DATA");
-
-      }
-
-      const balanceRow = sql.exec(
-
-        `
-
-          SELECT balance, main_balance, play_balance
+          SELECT balance
 
           FROM balances
 
           WHERE user_id = ?
 
-        `,
+          `,
 
-        userId
+          userId
 
-      ).toArray()[0];
+        )
 
-      if (!balanceRow) {
+        .toArray()[0];
 
-        throw new Error("BALANCE_NOT_FOUND");
+    if (!row) {
 
-      }
-
-      const mainBalance = Number(balanceRow.main_balance || 0);
-
-      const playBalance =
-
-        balanceRow.play_balance === null ||
-
-        balanceRow.play_balance === undefined
-
-          ? Number(balanceRow.balance || 0)
-
-          : Number(balanceRow.play_balance || 0);
-
-      const finalStatus =
-
-        action === "confirm" ? "confirmed" : "rejected";
-
-      const statusUpdate = sql.exec(
+      this.ctx.storage.sql.exec(
 
         `
 
-          UPDATE wallet_requests
+        INSERT INTO balances
 
-          SET status = ?, reviewed_at = ?, reviewed_by = ?
+        (user_id, balance)
 
-          WHERE id = ? AND status = 'pending'
+        VALUES (?, ?)
 
         `,
 
-        finalStatus,
+        userId,
 
-        Date.now(),
-
-        String(adminKey || "admin"),
-
-        id
+        PLAY_BALANCE_START
 
       );
 
-      if (statusUpdate.rowsWritten !== 1) {
-
-        throw new Error("REQUEST_ALREADY_REVIEWED");
-
-      }
-
-      if (type === "deposit" && action === "confirm") {
-
-        sql.exec(
-
-          `
-
-            UPDATE balances
-
-            SET main_balance = ?
-
-            WHERE user_id = ?
-
-          `,
-
-          mainBalance + amount,
-
-          userId
-
-        );
-
-      }
-
-      if (type === "withdraw" && action === "reject") {
-
-        sql.exec(
-
-          `
-
-            UPDATE balances
-
-            SET balance = ?, play_balance = ?
-
-            WHERE user_id = ?
-
-          `,
-
-          playBalance + amount,
-
-          playBalance + amount,
-
-          userId
-
-        );
-
-      }
-
-      return {
-
-        requestId: id,
-
-        status: finalStatus,
-
-        type,
-
-        amount
-
-      };
-
-    });
-
-    return {
-
-      ok: true,
-
-      ...result,
-
-      ...this.getBalances(userId)
-
-    };
-
-  }
-
-  /* =========================================================
-
-     ADMIN — DEMO BALANCE MANAGEMENT
-
-     ========================================================= */
-
-  async adminSetBalance(
-
-    userId,
-
-    balanceType,
-
-    amount
-
-  ) {
-
-    const cleanUser =
-
-      String(userId || "");
-
-    const value =
-
-      Number(amount);
-
-    if (!cleanUser) {
-
-      return {
-
-        ok: false,
-
-        error: "USER_REQUIRED"
-
-      };
+      return PLAY_BALANCE_START;
 
     }
 
+    return Number(
+
+      row.balance || 0
+
+    );
+
+  }
+
+  async walletRequest(
+
+    userId,
+
+    body
+
+  ) {
+
+    const amount =
+
+      Number(
+
+        body?.amount || 0
+
+      );
+
+    const type =
+
+      body?.type === "withdraw"
+
+        ? "withdraw"
+
+        : "deposit";
+
+    const method =
+
+      String(
+
+        body?.method || "Demo"
+
+      );
+
     if (
 
-      !Number.isFinite(value) ||
+      !Number.isFinite(amount) ||
 
-      value < 0
+      amount <= 0
 
     ) {
 
@@ -6353,17 +1938,15 @@ isAdmin(request) {
 
     }
 
-    await this.ensureBalanceRow(
+    const current =
 
-      cleanUser
-
-    );
+      this.getBalance(userId);
 
     if (
 
-      balanceType !== "main" &&
+      type === "withdraw" &&
 
-      balanceType !== "play"
+      amount > current
 
     ) {
 
@@ -6371,243 +1954,87 @@ isAdmin(request) {
 
         ok: false,
 
-        error: "INVALID_BALANCE_TYPE"
+        error: "INSUFFICIENT_BALANCE"
 
       };
 
     }
 
-    if (balanceType === "main") {
+    const next =
 
-      this.ctx.storage.sql.exec(`
+      type === "deposit"
 
-        UPDATE balances
+        ? current + amount
 
-        SET main_balance = ?
+        : current - amount;
 
-        WHERE user_id = ?
+    this.ctx.storage.sql.exec(
 
-      `,
+      `
 
-        value,
+      UPDATE balances
 
-        cleanUser
+      SET balance = ?
 
-      );
-
-    } else {
-
-      this.ctx.storage.sql.exec(`
-
-        UPDATE balances
-
-        SET
-
-          balance = ?,
-
-          play_balance = ?
-
-        WHERE user_id = ?
+      WHERE user_id = ?
 
       `,
 
-        value,
+      next,
 
-        value,
+      userId
 
-        cleanUser
+    );
 
-      );
+    this.ctx.storage.sql.exec(
 
-    }
+      `
+
+      INSERT INTO transactions
+
+      (
+
+        user_id,
+
+        type,
+
+        method,
+
+        amount,
+
+        simulated,
+
+        created_at
+
+      )
+
+      VALUES (?, ?, ?, ?, 1, ?)
+
+      `,
+
+      userId,
+
+      type,
+
+      method,
+
+      amount,
+
+      Date.now()
+
+    );
 
     return {
 
       ok: true,
 
-      userId: cleanUser,
+      simulated: true,
 
-      ...this.getBalances(cleanUser)
+      balance: next
 
     };
 
   }
-
-  /* =========================================================
-
-     ADMIN — GAME CONTROL
-
-     ========================================================= */
-
-  getAppPaused() {
-
-    const row =
-
-      this.ctx.storage.sql.exec(`
-
-        SELECT paused
-
-        FROM app_control
-
-        WHERE id = 1
-
-      `).toArray()[0];
-
-    return Number(row?.paused || 0) === 1;
-
-  }
-
-  async adminGameControl(action) {
-
-    const sql =
-
-      this.ctx.storage.sql;
-
-    if (action === "pause") {
-
-      sql.exec(`
-
-        UPDATE app_control
-
-        SET paused = 1
-
-        WHERE id = 1
-
-      `);
-
-      try {
-
-        await this.ctx.storage.deleteAlarm();
-
-      } catch (_) {}
-
-      return {
-
-        ok: true,
-
-        paused: true
-
-      };
-
-    }
-
-    if (action === "resume") {
-
-      sql.exec(`
-
-        UPDATE app_control
-
-        SET paused = 0
-
-        WHERE id = 1
-
-      `);
-
-      const state =
-
-        this.getState();
-
-      if (!state) {
-
-        await this.createFreshLobby(1);
-
-      } else if (
-
-        state.status === "lobby"
-
-      ) {
-
-        const remaining =
-
-          Math.max(
-
-            1000,
-
-            Number(state.lobby_ends_at || 0)
-
-              - Date.now()
-
-          );
-
-        await this.scheduleNext(
-
-          remaining
-
-        );
-
-      } else {
-
-        await this.scheduleNext(
-
-          BALL_INTERVAL
-
-        );
-
-      }
-
-      return {
-
-        ok: true,
-
-        paused: false
-
-      };
-
-    }
-
-    if (action === "reset") {
-
-      const current =
-
-        this.getState();
-
-      const nextGame =
-
-        Number(
-
-          current?.game_number || 0
-
-        ) + 1;
-
-      sql.exec(`
-
-        DELETE FROM selected_cards
-
-      `);
-
-      await this.createFreshLobby(
-
-        nextGame
-
-      );
-
-      return {
-
-        ok: true,
-
-        paused: this.getAppPaused(),
-
-        gameNumber: nextGame
-
-      };
-
-    }
-
-    return {
-
-      ok: false,
-
-      error: "INVALID_ACTION"
-
-    };
-
-  }
-
-  /* =========================================================
-
-     CLAIM
-
-     ========================================================= */
 
   async claim(userId) {
 
@@ -6677,12 +2104,6 @@ isAdmin(request) {
 
   }
 
-  /* =========================================================
-
-     DURABLE OBJECT FETCH
-
-     ========================================================= */
-
   async fetch(request) {
 
     const url =
@@ -6693,151 +2114,13 @@ isAdmin(request) {
 
       getTelegramUser(request);
 
-    /*
-
-     * Register every Telegram user who
-
-     * interacts with the Mini App.
-
-     */
-
-    await this.saveTelegramUser(
-
-      user
-
-    );
-
-    /* =========================================================
-
-   LOGIN API
-
-   ========================================================= */
-
-if (
-
-  url.pathname === "/do/auth/status" &&
-
-  request.method === "GET"
-
-) {
-
-  const auth =
-
-    this.getAuth(user.id);
-
-  const registered =
-
-    !!auth &&
-
-    Number(auth.bonus_given || 0) === 1;
-
-  return json({
-
-    ok: true,
-
-    authenticated: registered,
-
-    registered
-
-  });
-
-}
-
-if (
-
-  url.pathname === "/do/auth/register" &&
-
-  request.method === "POST"
-
-) {
-
-  return json(
-
-    await this.registerNewUser(user)
-
-  );
-
-}
-     
-    /* =====================================================
-
-       GAME
-
-       ===================================================== */
-
     if (
 
-      url.pathname === "/do/game"
+      url.pathname ===
+
+      "/do/game"
 
     ) {
-
-      /*
-
-       * IMPORTANT:
-
-       *
-
-       * Every game request also guarantees that
-
-       * this Telegram user is registered.
-
-       *
-
-       * This gives a brand-new user the
-
-       * one-time 20 ETB Play Balance bonus
-
-       * before the game response is returned.
-
-       */
-
-      try {
-
-        await this.registerNewUser(user);
-
-      } catch (registrationError) {
-
-        console.error(
-
-          "FAST BINGO GAME REGISTRATION ERROR:",
-
-          registrationError?.message ||
-
-          String(registrationError),
-
-          registrationError?.stack || ""
-
-        );
-
-      }
-
-      /*
-
-       * Always synchronize with the REAL shared
-
-       * GameScheduler state.
-
-       */
-
-      try {
-
-        await this.advanceGameState();
-
-      } catch (gameSyncError) {
-
-        console.error(
-
-          "FAST BINGO GAME SYNC ERROR:",
-
-          gameSyncError?.message ||
-
-          String(gameSyncError),
-
-          gameSyncError?.stack || ""
-
-        );
-
-      }
 
       return json(
 
@@ -6845,11 +2128,13 @@ if (
 
       );
 
-    } 
+    }
 
     if (
 
-      url.pathname === "/do/cards"
+      url.pathname ===
+
+      "/do/cards"
 
     ) {
 
@@ -6859,25 +2144,19 @@ if (
 
         count: CARD_COUNT,
 
-        cards:
+        cards: Array.from(
 
-          Array.from(
+          { length: CARD_COUNT },
 
-            {
+          (_, i) => ({
 
-              length: CARD_COUNT
+            number: i + 1,
 
-            },
+            available: true
 
-            (_, i) => ({
+          })
 
-              number: i + 1,
-
-              available: true
-
-            })
-
-          )
+        )
 
       });
 
@@ -6885,7 +2164,9 @@ if (
 
     if (
 
-      url.pathname === "/do/user-cards"
+      url.pathname ===
+
+      "/do/user-cards"
 
     ) {
 
@@ -6907,7 +2188,9 @@ if (
 
     if (
 
-      url.pathname === "/do/select-cards" &&
+      url.pathname ===
+
+        "/do/select-cards" &&
 
       request.method === "POST"
 
@@ -6923,40 +2206,6 @@ if (
 
       } catch (_) {}
 
-      /*
-
-       * Dedicated atomic unselect.
-
-       */
-
-      if (
-
-        body &&
-
-        body.action === "unselect"
-
-      ) {
-
-        return json(
-
-          await this.unselectCard(
-
-            user.id,
-
-            body.card
-
-          )
-
-        );
-
-      }
-
-      /*
-
-       * Normal card selection.
-
-       */
-
       return json(
 
         await this.selectCards(
@@ -6971,53 +2220,13 @@ if (
 
     }
 
-    /* =====================================================
-
-       BALANCE
-
-       ===================================================== */
-
     if (
 
-      url.pathname === "/do/balance"
+      url.pathname ===
+
+      "/do/balance"
 
     ) {
-
-      /*
-
-       * Make sure a new Telegram user is
-
-       * registered and receives the one-time
-
-       * 20 ETB Play Balance bonus.
-
-       */
-
-      try {
-
-        await this.registerNewUser(user);
-
-      } catch (registrationError) {
-
-        console.error(
-
-          "FAST BINGO BALANCE REGISTRATION ERROR:",
-
-          registrationError?.message ||
-
-          String(registrationError)
-
-        );
-
-      }
-
-      const balances =
-
-        this.getBalances(
-
-          user.id
-
-        );
 
       return json({
 
@@ -7025,29 +2234,17 @@ if (
 
         balance:
 
-          balances.playBalance,
-
-        mainBalance:
-
-          balances.mainBalance,
-
-        playBalance:
-
-          balances.playBalance
+          this.getBalance(user.id)
 
       });
 
     }
 
-    /* =====================================================
-
-       WALLET
-
-       ===================================================== */
-
     if (
 
-      url.pathname === "/do/wallet" &&
+      url.pathname ===
+
+        "/do/wallet" &&
 
       request.method === "POST"
 
@@ -7055,219 +2252,33 @@ if (
 
       let body = {};
 
-      const contentType =
-
-        request.headers.get("content-type") || "";
-
       try {
 
-        if (contentType.includes("application/json")) {
+        body =
 
-          body = await request.json();
+          await request.json();
 
-        } else if (
+      } catch (_) {}
 
-          contentType.includes("multipart/form-data")
+      return json(
 
-        ) {
-
-          const form = await request.formData();
-
-          body = {
-
-            type: String(form.get("type") || "deposit"),
-
-            method: String(form.get("method") || ""),
-
-            amount: Number(form.get("amount") || 0),
-
-            transactionLink: String(
-
-              form.get("transactionLink") ||
-
-              form.get("transaction_link") ||
-
-              ""
-
-            ).trim()
-
-          };
-
-        } else {
-
-          return json({
-
-            ok: false,
-
-            error: "INVALID_REQUEST_FORMAT"
-
-          }, 400);
-
-        }
-
-      } catch (_) {
-
-        return json({
-
-          ok: false,
-
-          error: "INVALID_REQUEST"
-
-        }, 400);
-
-      }
-
-      const type =
-
-        body.type === "withdraw" ? "withdraw" : "deposit";
-
-      const method = String(body.method || "")
-
-        .trim()
-
-        .toLowerCase();
-
-      // M-PESA is not allowed for deposits or withdrawals.
-
-      const allowedMethods = ["telebirr", "ebirr"];
-
-      if (!allowedMethods.includes(method)) {
-
-        return json({
-
-          ok: false,
-
-          error: "INVALID_PAYMENT_METHOD",
-
-          allowedMethods: ["Telebirr", "eBirr"]
-
-        }, 400);
-
-      }
-
-      body.type = type;
-
-      body.method =
-
-        method === "telebirr" ? "Telebirr" : "eBirr";
-
-      try {
-
-        const result = await this.walletRequest(
+        await this.walletRequest(
 
           user.id,
 
           body
 
-        );
+        )
 
-        return json(result);
-
-      } catch (error) {
-
-        const errorCode = String(
-
-          error?.message || error || "WALLET_SERVER_ERROR"
-
-        );
-
-        console.error("WALLET_REQUEST_ERROR:", errorCode);
-
-        const knownErrors = {
-
-          INVALID_AMOUNT: {
-
-            error: "MINIMUM_AMOUNT",
-
-            status: 400
-
-          },
-
-          AMOUNT_TOO_LARGE: {
-
-            error: "AMOUNT_TOO_LARGE",
-
-            status: 400
-
-          },
-
-          TRANSACTION_LINK_REQUIRED: {
-
-            error: "TRANSACTION_LINK_REQUIRED",
-
-            status: 400
-
-          },
-
-          INVALID_TRANSACTION_LINK: {
-
-            error: "INVALID_TRANSACTION_LINK",
-
-            status: 400
-
-          },
-
-          INVALID_PAYMENT_METHOD: {
-
-            error: "INVALID_PAYMENT_METHOD",
-
-            status: 400
-
-          },
-
-          INSUFFICIENT_PLAY_BALANCE: {
-
-            error: "INSUFFICIENT_BALANCE",
-
-            status: 400
-
-          },
-
-          USER_REQUIRED: {
-
-            error: "USER_REQUIRED",
-
-            status: 400
-
-          }
-
-        };
-
-        const mapped = knownErrors[errorCode];
-
-        if (mapped) {
-
-          return json({
-
-            ok: false,
-
-            error: mapped.error
-
-          }, mapped.status);
-
-        }
-
-        return json({
-
-          ok: false,
-
-          error: "WALLET_SERVER_ERROR"
-
-        }, 500);
-
-      }
+      );
 
     }
-       
-    /* =====================================================
-
-       CLAIM
-
-       ===================================================== */
 
     if (
 
-      url.pathname === "/do/claim"
+      url.pathname ===
+
+      "/do/claim"
 
     ) {
 
@@ -7283,293 +2294,23 @@ if (
 
     }
 
-    /* =====================================================
+    return json(
 
-       ADMIN AUTH
+      {
 
-       ===================================================== */
+        ok: false,
 
-    if (
+        error: "NOT_FOUND"
 
-      url.pathname.startsWith(
+      },
 
-        "/do/admin/"
+      404
 
-      )
-
-    ) {
-
-      if (
-
-        !this.isAdmin(request)
-
-      ) {
-
-        return json(
-
-          {
-
-            ok: false,
-
-            error: "UNAUTHORIZED"
-
-          },
-
-          401
-
-        );
-
-      }
-
-      const adminKey =
-
-        request.headers.get(
-
-          "x-admin-key"
-
-        ) || "admin";
-
-      /* SUMMARY */
-
-      if (
-
-        url.pathname ===
-
-        "/do/admin/summary"
-
-      ) {
-
-        return json(
-
-          this.getAdminSummary()
-
-        );
-
-      }
-
-      /* USERS */
-
-      if (
-
-        url.pathname ===
-
-        "/do/admin/users"
-
-      ) {
-
-        return json({
-
-          ok: true,
-
-          users:
-
-            this.getAdminUsers()
-
-        });
-
-      }
-
-      /* REQUESTS */
-
-      if (
-
-        url.pathname ===
-
-        "/do/admin/requests"
-
-      ) {
-
-        return json({
-
-          ok: true,
-
-          requests:
-
-            this.getAdminRequests()
-
-        });
-
-      }
-
-      /* CONFIRM / REJECT */
-
-      if (
-
-        url.pathname ===
-
-          "/do/admin/request-action" &&
-
-        request.method === "POST"
-
-      ) {
-
-        let body = {};
-
-        try {
-
-          body =
-
-            await request.json();
-
-        } catch (_) {}
-
-        const requestId =
-
-          Number(
-
-            body.requestId
-
-          );
-
-        const action =
-
-          body.action === "confirm"
-
-            ? "confirm"
-
-            : body.action === "reject"
-
-              ? "reject"
-
-              : "";
-
-        if (
-
-          !Number.isInteger(
-
-            requestId
-
-          ) ||
-
-          !action
-
-        ) {
-
-          return json({
-
-            ok: false,
-
-            error: "INVALID_ACTION"
-
-          });
-
-        }
-
-        return json(
-
-          await this.adminRequestAction(
-
-            requestId,
-
-            action,
-
-            adminKey
-
-          )
-
-        );
-
-      }
-
-      /* SET DEMO BALANCE */
-
-      if (
-
-        url.pathname ===
-
-          "/do/admin/set-balance" &&
-
-        request.method === "POST"
-
-      ) {
-
-        let body = {};
-
-        try {
-
-          body =
-
-            await request.json();
-
-        } catch (_) {}
-
-        return json(
-
-          await this.adminSetBalance(
-
-            String(
-
-              body.userId || ""
-
-            ),
-
-            String(
-
-              body.balanceType || ""
-
-            ),
-
-            Number(
-
-              body.amount
-
-            )
-
-          )
-
-        );
-
-      }
-
-      /* GAME CONTROL */
-
-      if (
-
-        url.pathname ===
-
-          "/do/admin/control" &&
-
-        request.method === "POST"
-
-      ) {
-
-        let body = {};
-
-        try {
-
-          body =
-
-            await request.json();
-
-        } catch (_) {}
-
-        return json(
-
-          await this.adminGameControl(
-
-            String(
-
-              body.action || ""
-
-            )
-
-          )
-
-        );
-
-      }
-
-    }
+    );
 
   }
 
 }
-
-/* =========================================================
-
-   MINI APP HTML
-
-   ========================================================= */
 
 function pageHtml() {
 
@@ -8257,31 +2998,21 @@ button{
 
   min-width:0;
 
-  height:34px;
+  height:31px;
 
   padding:0;
 
-  border-radius:9px;
+  border-radius:7px;
 
-  border:1px solid #303a4c;
+  border:1px solid #2a3444;
 
-  background:linear-gradient(145deg,#151d2a,#0e141e);
+  background:#141a23;
 
-  color:#cbd5e1;
+  color:#aeb8c8;
 
-  font-size:10px;
+  font-size:9px;
 
-  font-weight:900;
-
-  transition:
-
-    transform .15s ease,
-
-    background .15s ease,
-
-    border-color .15s ease,
-
-    box-shadow .15s ease;
+  font-weight:800;
 
 }
 
@@ -8293,123 +3024,31 @@ button{
 
 .card-select.selected{
 
-  background:linear-gradient(145deg,#ff2634,#b40712);
-
-  border-color:#ff6670;
-
-  color:#fff;
-
-  box-shadow:
-
-    0 4px 14px rgba(229,9,20,.35),
-
-    inset 0 1px 0 rgba(255,255,255,.16);
-
-}
-
-.card-select.taken{
-
-  background:linear-gradient(145deg,#ff2634,#8f0710);
+  background:var(--red);
 
   border-color:#ff4b52;
 
   color:#fff;
 
-  opacity:.72;
-
-  cursor:not-allowed;
-
-  box-shadow:
-
-    0 3px 10px rgba(229,9,20,.20);
+  box-shadow:0 4px 12px rgba(229,9,20,.25);
 
 }
 
 .selected-previews{
 
-  position:fixed;
-
-  left:50%;
-
-  bottom:70px;
-
-  transform:translateX(-50%);
-
-  width:min(100%,720px);
-
-  margin:0;
-
-  padding:7px 7px 9px;
-
-  background:rgba(7,11,22,.97);
-
-  border:1px solid rgba(255,255,255,.10);
-
-  border-radius:15px 15px 0 0;
-
-  box-shadow:0 -10px 30px rgba(0,0,0,.35);
-
-  z-index:500;
-
-  max-height:31vh;
-
-  overflow:hidden;
-
-  backdrop-filter:blur(12px);
-
-  -webkit-backdrop-filter:blur(12px);
-
-}
-
-/*
-
- * When the game is LIVE, selected cards move
-
- * into the normal page flow directly below
-
- * the current ball/recent balls.
-
- */
-
-.selected-previews.live-mode{
-
-  position:relative;
-
-  left:auto;
-
-  bottom:auto;
-
-  transform:none;
-
-  width:100%;
-
-  margin-top:10px;
-
-  padding:6px;
-
-  max-height:none;
-
-  overflow:hidden;
-
-  border-radius:13px;
-
-  box-shadow:none;
-
-  z-index:auto;
+  margin-top:13px;
 
 }
 
 .selected-previews-title{
 
-  color:#aeb8c8;
+  color:var(--muted);
 
-  font-size:9px;
+  font-size:10px;
 
-  font-weight:900;
+  font-weight:800;
 
-  margin-bottom:5px;
-
-  text-align:center;
+  margin-bottom:8px;
 
 }
 
@@ -8419,43 +3058,49 @@ button{
 
   grid-template-columns:repeat(2,minmax(0,1fr));
 
-  gap:5px;
-
-  align-items:start;
-
-}
-
-.preview-grid.count-1{
-
-  grid-template-columns:minmax(0,220px);
-
-  justify-content:center;
-
-}
-
-.preview-grid.count-2,
-
-.preview-grid.count-3,
-
-.preview-grid.count-4{
-
-  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
 
 }
 
 .bingo-card{
 
-  min-width:0;
+  background:#0d1118;
 
-  background:linear-gradient(145deg,#151d2b,#0b1019);
+  border:1px solid #303949;
 
-  border:1px solid #3b4658;
+  border-radius:12px;
 
-  border-radius:9px;
+  padding:7px;
 
-  padding:4px;
+}
 
-  box-shadow:0 4px 14px rgba(0,0,0,.25);
+.bingo-card-head{
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:space-between;
+
+  margin-bottom:6px;
+
+}
+
+.card-number-label{
+
+  color:#b7c0ce;
+
+  font-size:9px;
+
+  font-weight:900;
+
+}
+
+.card-state{
+
+  color:var(--green);
+
+  font-size:10px;
 
 }
 
@@ -8465,31 +3110,7 @@ button{
 
   grid-template-columns:repeat(5,1fr);
 
-  gap:2px;
-
-}
-
-.bingo-letter{
-
-  aspect-ratio:1;
-
-  display:flex;
-
-  align-items:center;
-
-  justify-content:center;
-
-  border-radius:3px;
-
-  background:linear-gradient(145deg,#f21b2b,#a90712);
-
-  color:#fff;
-
-  font-size:10px;
-
-  font-weight:950;
-
-  box-shadow:0 2px 5px rgba(229,9,20,.22);
+  gap:3px;
 
 }
 
@@ -8497,7 +3118,7 @@ button{
 
   aspect-ratio:1;
 
-  border-radius:3px;
+  border-radius:4px;
 
   background:#181f2a;
 
@@ -8507,23 +3128,19 @@ button{
 
   justify-content:center;
 
-  font-size:10px;
+  font-size:8px;
 
-  font-weight:900;
+  font-weight:850;
 
-  color:#e2e8f0;
-
-  border:1px solid rgba(255,255,255,.04);
+  color:#c5ccd7;
 
 }
 
 .bingo-cell.called{
 
-  background:rgba(229,9,20,.92);
+  background:rgba(229,9,20,.85);
 
   color:#fff;
-
-  border-color:#ff4b52;
 
 }
 
@@ -8531,97 +3148,9 @@ button{
 
   background:#252d39;
 
-  color:#f4c542;
+  color:var(--gold);
 
   font-size:7px;
-
-  font-weight:950;
-
-}
-
-@media(max-width:420px){
-
-  .selected-previews{
-
-    bottom:64px;
-
-    max-height:28vh;
-
-    padding:6px 5px 7px;
-
-  }
-
-  .selected-previews.live-mode{
-
-    max-height:none;
-
-  }
-
-  .preview-grid{
-
-    gap:4px;
-
-  }
-
-  .bingo-card{
-
-    padding:3px;
-
-    border-radius:7px;
-
-  }
-
-  .bingo-grid{
-
-    gap:2px;
-
-  }
-
-  .bingo-cell{
-
-    font-size:9px;
-
-  }
-
-  .bingo-letter{
-
-    font-size:9px;
-
-  }
-
-}
-
-  .preview-grid{
-
-    gap:4px;
-
-  }
-
-  .bingo-card{
-
-    padding:4px;
-
-    border-radius:8px;
-
-  }
-
-  .bingo-grid{
-
-    gap:2px;
-
-  }
-
-  .bingo-cell{
-
-    font-size:10px;
-
-  }
-
-  .bingo-letter{
-
-    font-size:10px;
-
-  }
 
 }
 
@@ -8873,80 +3402,6 @@ button{
 
 }
 
-.payment-methods {
-
-  display: grid;
-
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-
-  gap: 8px;
-
-  margin-top: 12px;
-
-}
-
-.payment-card {
-
-  width: 100%;
-
-  border: 1px solid var(--line);
-
-  border-radius: 12px;
-
-  background: #0d1219;
-
-  color: #fff;
-
-  padding: 12px;
-
-  text-align: center;
-
-  cursor: pointer;
-
-}
-
-.payment-card.active {
-
-  border-color: var(--red2);
-
-  background: #17141a;
-
-}
-
-.payment-name {
-
-  font-size: 12px;
-
-  font-weight: 950;
-
-}
-
-.payment-owner{
-
-  color:#cbd2dd;
-
-  font-size:9px;
-
-  margin-top:5px;
-
-  white-space:nowrap;
-
-  overflow:hidden;
-
-  text-overflow:ellipsis;
-
-}
-
-.payment-number{
-
-  color:var(--muted);
-
-  font-size:9px;
-
-  margin-top:3px;
-
-}
-
 .field{
 
   margin-top:10px;
@@ -8987,7 +3442,21 @@ button{
 
 .note{
 
-  display:none;
+  margin-top:10px;
+
+  color:#9ca6b5;
+
+  background:#0c1118;
+
+  border:1px solid #252d39;
+
+  border-radius:10px;
+
+  padding:10px;
+
+  font-size:9px;
+
+  line-height:14px;
 
 }
 
@@ -9227,130 +3696,6 @@ button{
 
   }
 
-  .payment-methods{
-
-    grid-template-columns:1fr;
-
-  }
-
-}
-
-/* =========================================================
-
-   FAST BINGO RESULT / WINNER SCREEN
-
-   ========================================================= */
-
-#fastBingoResult{
-
-  position:fixed;
-
-  inset:0;
-
-  z-index:99999;
-
-  display:flex;
-
-  align-items:center;
-
-  justify-content:center;
-
-  padding:20px;
-
-  background:
-
-    rgba(0,0,0,.82);
-
-}
-
-.fast-bingo-result-box{
-
-  width:
-
-    min(340px,90vw);
-
-  padding:
-
-    25px 18px;
-
-  text-align:center;
-
-  border-radius:20px;
-
-  background:#101722;
-
-  border:
-
-    2px solid #e50914;
-
-  box-shadow:
-
-    0 15px 60px
-
-    rgba(0,0,0,.60);
-
-}
-
-.fast-bingo-result-title{
-
-  font-size:40px;
-
-  line-height:1;
-
-  font-weight:1000;
-
-  letter-spacing:4px;
-
-  color:#fff;
-
-}
-
-.fast-bingo-result-message{
-
-  margin-top:12px;
-
-  font-size:17px;
-
-  font-weight:900;
-
-  color:#fff;
-
-}
-
-.fast-bingo-result-card{
-
-  margin-top:18px;
-
-  font-size:15px;
-
-  font-weight:900;
-
-  color:#e2e8f0;
-
-}
-
-.fast-bingo-result-name{
-
-  margin-top:7px;
-
-  font-size:17px;
-
-  font-weight:1000;
-
-  color:#e50914;
-
-}
-
-.fast-bingo-result-money{
-
-  margin-top:13px;
-
-  font-size:27px;
-
-  font-weight:1000;
-
-  color:#22c55e;
-
 }
 
 </style>
@@ -9379,7 +3724,7 @@ button{
 
            id="brandSub">
 
-        75 BALL • LIVE BINGO
+        75 BALL â¢ LIVE BINGO
 
       </div>
 
@@ -9391,7 +3736,7 @@ button{
 
               class="active">
 
-        አማ
+        á á
 
       </button>
 
@@ -9431,7 +3776,7 @@ button{
 
            id="mainBalanceLabel">
 
-        ዋና ሂሳብ
+        áá áá³á¥
 
       </div>
 
@@ -9487,7 +3832,7 @@ button{
 
           <span id="statusText">
 
-            በመጠበቅ ላይ
+            á áá á á áá­
 
           </span>
 
@@ -9515,7 +3860,7 @@ button{
 
       >
 
-        ካርቴላ ይምረጡ
+        á«á­á´á á­áá¨á¡
 
       </div>
 
@@ -9527,7 +3872,7 @@ button{
 
       >
 
-        45 ሰከንድ ውስጥ ቀጣዩ ጨዋታ ይጀምራል።
+        45 á°á¨ááµ ááµá¥ áá£á© á¨áá³ á­ááá«áá¢
 
       </div>
 
@@ -9535,7 +3880,7 @@ button{
 
         <div class="jackpot-label">
 
-          ደራሽ
+          á°á«á½
 
         </div>
 
@@ -9573,9 +3918,9 @@ button{
 
            id="liveMessage">
 
-        ጨዋታው ጀምሯል።
+        á¨áá³á ááá¯áá¢
 
-        ቀጣዩን ዙር ይጠብቁ።
+        áá£á©á áá­ á­á á¥áá¢
 
       </div>
 
@@ -9605,7 +3950,7 @@ button{
 
           >
 
-            —
+            â
 
           </div>
 
@@ -9655,9 +4000,9 @@ button{
 
       <div class="selection-title">
 
-        ካርቴላ ይምረጡ
+        á«á­á´á á­áá¨á¡
 
-        <span>( 10 ብር )</span>
+        <span>( 10 á¥á­ )</span>
 
       </div>
 
@@ -9695,7 +4040,7 @@ button{
 
     <div class="selected-previews-title">
 
-      የመረጡት ካርዶች
+      á¨áá¨á¡áµ á«á­á¶á½
 
     </div>
 
@@ -9733,7 +4078,7 @@ button{
 
     >
 
-      75 Ball Bingo • B 1–15 • I 16–30 • N 31–45 • G 46–60 • O 61–75
+      75 Ball Bingo â¢ B 1â15 â¢ I 16â30 â¢ N 31â45 â¢ G 46â60 â¢ O 61â75
 
     </div>
 
@@ -9753,7 +4098,7 @@ button{
 
     <div class="simple-icon">
 
-      🏆
+      ð
 
     </div>
 
@@ -9761,7 +4106,7 @@ button{
 
          id="rankTitle">
 
-      ደረጃ
+      á°á¨á
 
     </div>
 
@@ -9769,7 +4114,7 @@ button{
 
          id="rankText">
 
-      የFast Bingo ደረጃዎ እዚህ ይታያል።
+      á¨Fast Bingo á°á¨áá á¥áá á­á³á«áá¢
 
     </div>
 
@@ -9789,7 +4134,7 @@ button{
 
     <div class="simple-icon">
 
-      👤
+      ð¤
 
     </div>
 
@@ -9797,7 +4142,7 @@ button{
 
          id="profileTitle">
 
-      ፕሮፋይል
+      áá®áá­á
 
     </div>
 
@@ -9805,7 +4150,7 @@ button{
 
          id="profileText">
 
-      የTelegram መለያዎ መረጃ እዚህ ይታያል።
+      á¨Telegram ááá«á áá¨á á¥áá á­á³á«áá¢
 
     </div>
 
@@ -9865,81 +4210,19 @@ button{
 
     >
 
-      ቦርሳ
-
-    </div>
-
-    <div class="payment-methods">
-
-      <button
-
-        type="button"
-
-        class="payment-card"
-
-        data-method="Telebirr"
-
-        aria-pressed="false"
-
-      >
-
-        <div class="payment-name">Telebirr</div>
-
-      </button>
-
-      <button
-
-        type="button"
-
-        class="payment-card"
-
-        data-method="eBirr"
-
-        aria-pressed="false"
-
-      >
-
-        <div class="payment-name">eBirr</div>
-
-      </button>
+      á¦á­á³
 
     </div>
 
     <div
 
-      id="paymentMethodDetails"
+      class="panel-sub"
 
-      class="panel"
-
-      style="display:none; margin-top:10px; padding:12px;"
-
-      aria-live="polite"
+      id="walletSub"
 
     >
 
-      <div
-
-        id="paymentDetailsMethod"
-
-        style="font-weight:900; margin-bottom:6px;"
-
-      ></div>
-
-      <div
-
-        id="paymentDetailsOwner"
-
-        style="font-size:13px; margin-bottom:4px;"
-
-      ></div>
-
-      <div
-
-        id="paymentDetailsNumber"
-
-        style="font-size:15px; font-weight:900;"
-
-      ></div>
+      á­á á¨áá¨á« áá³á¥ á¥á» ááá¢
 
     </div>
 
@@ -9969,7 +4252,7 @@ button{
 
       <div style="font-size:24px">
 
-        💰
+        ð°
 
       </div>
 
@@ -9985,7 +4268,7 @@ button{
 
       >
 
-        + ገቢ
+        + áá¢
 
       </button>
 
@@ -9997,7 +4280,7 @@ button{
 
       >
 
-        − ወጪ
+        â ááª
 
       </button>
 
@@ -10005,9 +4288,47 @@ button{
 
     <div class="field">
 
+      <label id="methodLabel">
+
+        áá´
+
+      </label>
+
+      <select id="walletMethod">
+
+        <option value="Demo">
+
+          Demo
+
+        </option>
+
+        <option value="Telebirr">
+
+          Telebirr (Demo)
+
+        </option>
+
+        <option value="eBirr">
+
+          eBirr (Demo)
+
+        </option>
+
+        <option value="M-PESA">
+
+          M-PESA (Demo)
+
+        </option>
+
+      </select>
+
+    </div>
+
+    <div class="field">
+
       <label id="amountLabel">
 
-        መጠን
+        áá á
 
       </label>
 
@@ -10017,59 +4338,13 @@ button{
 
         type="number"
 
-        min="50"
+        min="1"
 
         max="100000"
 
-        placeholder="50"
+        placeholder="100"
 
       >
-
-    </div>
-
-    <div class="field" id="walletTransactionLinkField">
-
-      <label for="walletTransactionLink">
-
-        የክፍያ Transaction Link
-
-      </label>
-
-      <input
-
-        id="walletTransactionLink"
-
-        type="url"
-
-        inputmode="url"
-
-        autocomplete="url"
-
-        placeholder="የክፍያ SMS ሊንኩን እዚህ ያስገቡ"
-
-        maxlength="2000"
-
-      >
-
-      <div
-
-        style="
-
-          color:#8993a4;
-
-          font-size:10px;
-
-          margin-top:5px;
-
-          line-height:15px;
-
-        "
-
-      >
-
-        ክፍያውን ከፈጸሙ በኋላ ከSMS የቀዱትን Link ያስገቡ።
-
-      </div>
 
     </div>
 
@@ -10083,9 +4358,23 @@ button{
 
     >
 
-      ገቢ አድርግ
+      áá¢ á áµá­á
 
     </button>
+
+    <div
+
+      class="note"
+
+      id="walletNote"
+
+    >
+
+      â ï¸ á­á á¨áá¨á« áá³á¥ á¥á» ááá¢
+
+      áµá­á­áá áááá¥ á á­áá­á áá­á á á­áá ááá¢
+
+    </div>
 
   </div>
 
@@ -10099,7 +4388,7 @@ button{
 
     >
 
-      ቋንቋ
+      ááá
 
     </div>
 
@@ -10111,7 +4400,7 @@ button{
 
     >
 
-      የመተግበሪያውን ቋንቋ ይምረጡ።
+      á¨áá°áá áªá«áá ááá á­áá¨á¡á¢
 
     </div>
 
@@ -10125,7 +4414,7 @@ button{
 
       >
 
-        አማርኛ
+        á áá­á
 
       </button>
 
@@ -10163,13 +4452,9 @@ button{
 
     >
 
-      <div class="nav-icon">⌂</div>
+      <div class="nav-icon">â</div>
 
-      <span id="navHome">
-
-        መነሻ
-
-      </span>
+      <span id="navHome">ááá»</span>
 
     </button>
 
@@ -10181,13 +4466,9 @@ button{
 
     >
 
-      <div class="nav-icon">♛</div>
+      <div class="nav-icon">â</div>
 
-      <span id="navRank">
-
-        ደረጃ
-
-      </span>
+      <span id="navRank">á°á¨á</span>
 
     </button>
 
@@ -10199,13 +4480,9 @@ button{
 
     >
 
-      <div class="nav-icon">◉</div>
+      <div class="nav-icon">â</div>
 
-      <span id="navProfile">
-
-        ፕሮፋይል
-
-      </span>
+      <span id="navProfile">áá®áá­á</span>
 
     </button>
 
@@ -10217,13 +4494,9 @@ button{
 
     >
 
-      <div class="nav-icon">▣</div>
+      <div class="nav-icon">â£</div>
 
-      <span id="navWallet">
-
-        ቦርሳ
-
-      </span>
+      <span id="navWallet">á¦á­á³</span>
 
     </button>
 
@@ -10238,10 +4511,6 @@ button{
   id="toast"
 
 ></div>
-
-<!-- Telegram WebApp SDK MUST load before the app script -->
-
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <script>
 
@@ -10269,887 +4538,125 @@ button{
 
   }
 
-var telegramUser = {
-
-  id:"guest",
-
-  first_name:"Guest",
-
-  username:""
-
-};
-
-var userHeader = "";
-
-function refreshTelegramUser(){
-
-  var liveUser = null;
-
-  /* 1. Telegram WebApp user */
-
-  if(
+  var telegramUser =
 
     tg &&
 
     tg.initDataUnsafe &&
 
-    tg.initDataUnsafe.user &&
+    tg.initDataUnsafe.user
 
-    tg.initDataUnsafe.user.id
+      ? tg.initDataUnsafe.user
 
-  ){
+      : {
 
-    liveUser =
+          id:"guest",
 
-      tg.initDataUnsafe.user;
+          first_name:"Guest",
 
-  }
+          username:""
 
-  /* 2. Fallback: read user from Telegram initData */
+        };
 
-  if(
+  var userHeader =
 
-    !liveUser &&
-
-    tg &&
-
-    tg.initData
-
-  ){
-
-    try{
-
-      var params =
-
-        new URLSearchParams(
-
-          tg.initData
-
-        );
-
-      var userData =
-
-        params.get("user");
-
-      if(userData){
-
-        liveUser =
-
-          JSON.parse(
-
-            userData
-
-          );
-
-      }
-
-    }catch(e){
-
-      console.error(
-
-        "Telegram user parse error:",
-
-        e
-
-      );
-
-    }
-
-  }
-
-  /* 3. Save Telegram user */
-
-  if(
-
-    liveUser &&
-
-    liveUser.id
-
-  ){
-
-    telegramUser =
-
-      liveUser;
-
-  }
-
-  /* 4. Send current user to API */
-
-  userHeader =
-
-    JSON.stringify(
-
-      telegramUser
-
-    );
-
-  return telegramUser;
-
-}
-
-refreshTelegramUser();
+    JSON.stringify(telegramUser);
 
   var selected = [];
-
-  var takenCards = [];
 
   var currentGame = null;
 
   var walletType = "deposit";
 
-  var selectedPaymentMethod =
-
-    "";
-
   var language = "am";
-
-  var mainBalance = 0;
-
-  var playBalance = 0;
-
-  var lobbyDeadline = 0;
-
-  var lastSpokenBallKey = "";
-
-  var lastSpokenResultGame = "";
-
-  function bingoNumberAmharic(number){
-
-    var words = {
-
-      1:"አንድ",
-
-      2:"ሁለት",
-
-      3:"ሶስት",
-
-      4:"አራት",
-
-      5:"አምስት",
-
-      6:"ስድስት",
-
-      7:"ሰባት",
-
-      8:"ስምንት",
-
-      9:"ዘጠኝ",
-
-      10:"አስር",
-
-      11:"አስራ አንድ",
-
-      12:"አስራ ሁለት",
-
-      13:"አስራ ሶስት",
-
-      14:"አስራ አራት",
-
-      15:"አስራ አምስት",
-
-      16:"አስራ ስድስት",
-
-      17:"አስራ ሰባት",
-
-      18:"አስራ ስምንት",
-
-      19:"አስራ ዘጠኝ",
-
-      20:"ሃያ",
-
-      21:"ሃያ አንድ",
-
-      22:"ሃያ ሁለት",
-
-      23:"ሃያ ሶስት",
-
-      24:"ሃያ አራት",
-
-      25:"ሃያ አምስት",
-
-      26:"ሃያ ስድስት",
-
-      27:"ሃያ ሰባት",
-
-      28:"ሃያ ስምንት",
-
-      29:"ሃያ ዘጠኝ",
-
-      30:"ሰላሳ",
-
-      31:"ሰላሳ አንድ",
-
-      32:"ሰላሳ ሁለት",
-
-      33:"ሰላሳ ሶስት",
-
-      34:"ሰላሳ አራት",
-
-      35:"ሰላሳ አምስት",
-
-      36:"ሰላሳ ስድስት",
-
-      37:"ሰላሳ ሰባት",
-
-      38:"ሰላሳ ስምንት",
-
-      39:"ሰላሳ ዘጠኝ",
-
-      40:"አርባ",
-
-      41:"አርባ አንድ",
-
-      42:"አርባ ሁለት",
-
-      43:"አርባ ሶስት",
-
-      44:"አርባ አራት",
-
-      45:"አርባ አምስት",
-
-      46:"አርባ ስድስት",
-
-      47:"አርባ ሰባት",
-
-      48:"አርባ ስምንት",
-
-      49:"አርባ ዘጠኝ",
-
-      50:"ሃምሳ",
-
-      51:"ሃምሳ አንድ",
-
-      52:"ሃምሳ ሁለት",
-
-      53:"ሃምሳ ሶስት",
-
-      54:"ሃምሳ አራት",
-
-      55:"ሃምሳ አምስት",
-
-      56:"ሃምሳ ስድስት",
-
-      57:"ሃምሳ ሰባት",
-
-      58:"ሃምሳ ስምንት",
-
-      59:"ሃምሳ ዘጠኝ",
-
-      60:"ስልሳ",
-
-      61:"ስልሳ አንድ",
-
-      62:"ስልሳ ሁለት",
-
-      63:"ስልሳ ሶስት",
-
-      64:"ስልሳ አራት",
-
-      65:"ስልሳ አምስት",
-
-      66:"ስልሳ ስድስት",
-
-      67:"ስልሳ ሰባት",
-
-      68:"ስልሳ ስምንት",
-
-      69:"ስልሳ ዘጠኝ",
-
-      70:"ሰባ",
-
-      71:"ሰባ አንድ",
-
-      72:"ሰባ ሁለት",
-
-      73:"ሰባ ሶስት",
-
-      74:"ሰባ አራት",
-
-      75:"ሰባ አምስት"
-
-    };
-
-    return words[number] ||
-
-      String(number);
-
-  }
-
-  function bingoNumberEnglish(number){
-
-    var words = [
-
-      "",
-
-      "one","two","three","four","five",
-
-      "six","seven","eight","nine","ten",
-
-      "eleven","twelve","thirteen","fourteen","fifteen",
-
-      "sixteen","seventeen","eighteen","nineteen","twenty",
-
-      "twenty one","twenty two","twenty three","twenty four","twenty five",
-
-      "twenty six","twenty seven","twenty eight","twenty nine","thirty",
-
-      "thirty one","thirty two","thirty three","thirty four","thirty five",
-
-      "thirty six","thirty seven","thirty eight","thirty nine","forty",
-
-      "forty one","forty two","forty three","forty four","forty five",
-
-      "forty six","forty seven","forty eight","forty nine","fifty",
-
-      "fifty one","fifty two","fifty three","fifty four","fifty five",
-
-      "fifty six","fifty seven","fifty eight","fifty nine","sixty",
-
-      "sixty one","sixty two","sixty three","sixty four","sixty five",
-
-      "sixty six","sixty seven","sixty eight","sixty nine","seventy",
-
-      "seventy one","seventy two","seventy three","seventy four","seventy five"
-
-    ];
-
-    return words[number] ||
-
-      String(number);
-
-  }
-
-  function speakBingoBall(number, letter){
-
-    if(!number){
-
-      return;
-
-    }
-
-    var key =
-
-      String(
-
-        currentGame
-
-          ? currentGame.gameNumber
-
-          : ""
-
-      ) +
-
-      ":" +
-
-      String(number);
-
-    if(key === lastSpokenBallKey){
-
-      return;
-
-    }
-
-    lastSpokenBallKey = key;
-
-    try{
-
-      /*
-
-       * AMHARIC MODE
-
-       *
-
-       * Use the pre-generated real Amharic
-
-       * WAV audio files from Cloudflare Static Assets.
-
-       *
-
-       * Files:
-
-       * 01_B.wav ... 75_O.wav
-
-       */
-
-      if(language === "am"){
-
-        var audioNumber =
-
-          String(
-
-            Number(number)
-
-          ).padStart(2, "0");
-
-        var audioLetter =
-
-          String(letter || "")
-
-            .trim()
-
-            .toUpperCase();
-
-        var audioFile =
-
-          "/" +
-
-          audioNumber +
-
-          "_" +
-
-          audioLetter +
-
-          ".wav";
-
-        if(
-
-          window.fastBingoVoiceAudio
-
-        ){
-
-          window.fastBingoVoiceAudio.pause();
-
-          try{
-
-            window.fastBingoVoiceAudio.currentTime = 0;
-
-          }catch(_){}
-
-        }else{
-
-          window.fastBingoVoiceAudio =
-
-            new Audio();
-
-        }
-
-        var audio =
-
-          window.fastBingoVoiceAudio;
-
-        audio.src =
-
-          new URL(
-
-            audioFile,
-
-            window.location.origin
-
-          ).href;
-
-        audio.preload = "auto";
-
-        audio.volume = 1;
-
-        var playPromise =
-
-          audio.play();
-
-        if(
-
-          playPromise &&
-
-          typeof playPromise.catch === "function"
-
-        ){
-
-          playPromise.catch(
-
-            function(){
-
-              /*
-
-               * iPhone / Telegram may block
-
-               * audio until a user gesture.
-
-               *
-
-               * Do not fall back to English
-
-               * or Latin pronunciation.
-
-               */
-
-              lastSpokenBallKey = "";
-
-            }
-
-          );
-
-        }
-
-        return;
-
-      }
-
-      /*
-
-       * ENGLISH MODE
-
-       *
-
-       * Keep the existing browser English
-
-       * voice behavior unchanged.
-
-       */
-
-      if(
-
-        !window.speechSynthesis
-
-      ){
-
-        return;
-
-      }
-
-      window.speechSynthesis.cancel();
-
-      var text =
-
-        String(letter || "") +
-
-        " " +
-
-        bingoNumberEnglish(
-
-          Number(number)
-
-        );
-
-      var utterance =
-
-        new SpeechSynthesisUtterance(
-
-          text
-
-        );
-
-      var voices =
-
-        window.speechSynthesis.getVoices();
-
-      var englishVoice =
-
-        voices.find(
-
-          function(voice){
-
-            var lang =
-
-              String(
-
-                voice.lang || ""
-
-              ).toLowerCase();
-
-            return (
-
-              lang === "en-us" ||
-
-              lang.indexOf("en-") === 0
-
-            );
-
-          }
-
-        );
-
-      if(englishVoice){
-
-        utterance.voice =
-
-          englishVoice;
-
-        utterance.lang =
-
-          englishVoice.lang;
-
-      }else{
-
-        utterance.lang =
-
-          "en-US";
-
-      }
-
-      utterance.rate =
-
-        0.82;
-
-      utterance.pitch =
-
-        1;
-
-      utterance.volume =
-
-        1;
-
-      window.speechSynthesis.speak(
-
-        utterance
-
-      );
-
-    }catch(error){
-
-      lastSpokenBallKey = "";
-
-    }
-
-  }
-
-  function speakGameFinished(){
-
-    var gameNumber =
-
-      currentGame &&
-
-      currentGame.gameNumber
-
-        ? String(
-
-            currentGame.gameNumber
-
-          )
-
-        : "";
-
-    if(
-
-      gameNumber ===
-
-      lastSpokenResultGame
-
-    ){
-
-      return;
-
-    }
-
-    lastSpokenResultGame =
-
-      gameNumber;
-
-    try{
-
-      /*
-
-       * AMHARIC MODE
-
-       *
-
-       * Use the real generated Amharic
-
-       * game-over audio.
-
-       */
-
-      if(language === "am"){
-
-        if(
-
-          window.fastBingoVoiceAudio
-
-        ){
-
-          window.fastBingoVoiceAudio.pause();
-
-          try{
-
-            window.fastBingoVoiceAudio.currentTime = 0;
-
-          }catch(_){}
-
-        }else{
-
-          window.fastBingoVoiceAudio =
-
-            new Audio();
-
-        }
-
-        var audio =
-
-          window.fastBingoVoiceAudio;
-
-        audio.src =
-
-          new URL(
-
-            "/game_over.wav",
-
-            window.location.origin
-
-          ).href;
-
-        audio.preload = "auto";
-
-        audio.volume = 1;
-
-        var playPromise =
-
-          audio.play();
-
-        if(
-
-          playPromise &&
-
-          typeof playPromise.catch === "function"
-
-        ){
-
-          playPromise.catch(
-
-            function(){}
-
-          );
-
-        }
-
-        return;
-
-      }
-
-      /*
-
-       * ENGLISH MODE
-
-       */
-
-      if(
-
-        !window.speechSynthesis
-
-      ){
-
-        return;
-
-      }
-
-      window.speechSynthesis.cancel();
-
-      var utterance =
-
-        new SpeechSynthesisUtterance(
-
-          "The game is over"
-
-        );
-
-      utterance.lang =
-
-        "en-US";
-
-      utterance.rate =
-
-        0.85;
-
-      utterance.volume =
-
-        1;
-
-      window.speechSynthesis.speak(
-
-        utterance
-
-      );
-
-    }catch(_){}
-
-  }
-
-  var cardCache = {};
-
-  var cardSignatures = {};
 
   var translations = {
 
     am:{
 
-      brandSub:"75 BALL • LIVE BINGO",
+      brandSub:"75 BALL â¢ LIVE BINGO",
 
-      mainBalance:"ዋና ሂሳብ",
+      mainBalance:"áá áá³á¥",
 
-      lobby:"በመጠበቅ ላይ",
+      lobby:"á áá á á áá­",
 
       live:"LIVE",
 
-      lobbyTitle:"ካርቴላ ይምረጡ",
+      lobbyTitle:"á«á­á´á á­áá¨á¡",
 
-      liveTitle:"ጨዋታው ጀምሯል",
+      liveTitle:"á¨áá³á ááá¯á",
 
-      lobbyMessage:"45 ሰከንድ ውስጥ ቀጣዩ ጨዋታ ይጀምራል።",
+      lobbyMessage:"45 á°á¨ááµ ááµá¥ áá£á© á¨áá³ á­ááá«áá¢",
 
-      liveMessage:"ጨዋታው ጀምሯል። ቀጣዩን ዙር ይጠብቁ።",
+      liveMessage:"á¨áá³á ááá¯áá¢ áá£á©á áá­ á­á á¥áá¢",
 
-      jackpot:"ደራሽ",
+      jackpot:"á°á«á½",
 
-      select:"ካርቴላ ይምረጡ",
+      select:"á«á­á´á á­áá¨á¡",
 
-      price:"10 ብር",
+      price:"10 á¥á­",
 
-      selected:"የመረጡት ካርዶች",
+      selected:"á¨áá¨á¡áµ á«á­á¶á½",
 
       rules:"Fast Bingo",
 
-      rulesText:"75 Ball Bingo • B 1–15 • I 16–30 • N 31–45 • G 46–60 • O 61–75",
+      rulesText:"75 Ball Bingo â¢ B 1â15 â¢ I 16â30 â¢ N 31â45 â¢ G 46â60 â¢ O 61â75",
 
-      home:"መነሻ",
+      home:"ááá»",
 
-      rank:"ደረጃ",
+      rank:"á°á¨á",
 
-      profile:"ፕሮፋይል",
+      profile:"áá®áá­á",
 
-      wallet:"ቦርሳ",
+      wallet:"á¦á­á³",
 
-      rankText:"የFast Bingo ደረጃዎ እዚህ ይታያል።",
+      rankText:"á¨Fast Bingo á°á¨áá á¥áá á­á³á«áá¢",
 
-      profileText:"የTelegram መለያዎ መረጃ እዚህ ይታያል።",
+      profileText:"á¨Telegram ááá«á áá¨á á¥áá á­á³á«áá¢",
 
-      method:"ዘዴ",
+      walletSub:"á­á á¨áá¨á« áá³á¥ á¥á» ááá¢",
 
-      amount:"መጠን",
+      method:"áá´",
 
-      deposit:"+ ገቢ",
+      amount:"áá á",
 
-      withdraw:"− ወጪ",
+      deposit:"+ áá¢",
 
-      depositAction:"ገቢ አድርግ",
+      withdraw:"â ááª",
 
-      withdrawAction:"ወጪ አድርግ",
+      depositAction:"áá¢ á áµá­á",
 
-      language:"ቋንቋ",
+      withdrawAction:"ááª á áµá­á",
 
-      languageSub:"የመተግበሪያውን ቋንቋ ይምረጡ።",
+      language:"ááá",
 
-      saved:"ካርዶችዎ ተቀምጠዋል።",
+      languageSub:"á¨áá°áá áªá«áá ááá á­áá¨á¡á¢",
 
-      lobbyOnly:"ካርድ መምረጥ የሚቻለው Lobby ጊዜ ብቻ ነው።",
+      walletNote:"â ï¸ á­á á¨áá¨á« áá³á¥ á¥á» ááá¢ áµá­á­áá áááá¥ á á­áá­á áá­á á á­áá ááá¢",
 
-      maxCards:"እስከ 4 ካርዶች ብቻ መምረጥ ይችላሉ።",
+      saved:"á«á­á¶á½á á°ááá ááá¢",
 
-      gameProgress:"ጨዋታው ጀምሯል። ቀጣዩን ዙር ይጠብቁ።",
+      lobbyOnly:"á«á­áµ ááá¨á¥ á¨áá»áá Lobby áá á¥á» ááá¢",
 
-      invalidAmount:"ትክክለኛ መጠን ያስገቡ።",
+      maxCards:"á¥áµá¨ 4 á«á­á¶á½ á¥á» ááá¨á¥ á­á½ááá¢",
 
-      minimum:"ዝቅተኛው መጠን 50 ብር ነው።",
+      gameProgress:"á¨áá³á ááá¯áá¢ áá£á©á áá­ á­á á¥áá¢",
 
-      insufficient:"❌ ለመጫወት በቂ ሂሳብ የለዎትም። ተቀማጭ ገቢ ያድርጉ እና ጨዋታውን ይቀጥሉ።",
+      invalidAmount:"áµá­á­áá áá á á«áµáá¡á¢",
 
-      balanceUpdated:"ሂሳቡ ተዘምኗል።",
+      insufficient:"á á áá³á¥ á¨áááµáá¢",
 
-      winner:"🎉 Bingo! አሸናፊ ካርድ ተገኝቷል።",
+      balanceUpdated:"áá³á¡ á°ááááá¢",
 
-      notWinner:"እስካሁን 2 መስመር ያሟላ ካርድ የለም።"
+      winner:"ð Bingo! á á¸áá á«á­áµ á°ááá·áá¢",
+
+      notWinner:"á¥áµá«áá 2 ááµáá­ á«áá á«á­áµ á¨ááá¢"
 
     },
 
     en:{
 
-      brandSub:"75 BALL • LIVE BINGO",
+      brandSub:"75 BALL â¢ LIVE BINGO",
 
       mainBalance:"Main Balance",
 
@@ -11175,7 +4682,7 @@ refreshTelegramUser();
 
       rules:"Fast Bingo",
 
-      rulesText:"75 Ball Bingo • B 1–15 • I 16–30 • N 31–45 • G 46–60 • O 61–75",
+      rulesText:"75 Ball Bingo â¢ B 1â15 â¢ I 16â30 â¢ N 31â45 â¢ G 46â60 â¢ O 61â75",
 
       home:"HOME",
 
@@ -11189,13 +4696,15 @@ refreshTelegramUser();
 
       profileText:"Your Telegram profile information appears here.",
 
+      walletSub:"This is a simulated play-money balance only.",
+
       method:"Method",
 
       amount:"Amount",
 
       deposit:"+ DEPOSIT",
 
-      withdraw:"− WITHDRAW",
+      withdraw:"â WITHDRAW",
 
       depositAction:"ADD BALANCE",
 
@@ -11204,6 +4713,8 @@ refreshTelegramUser();
       language:"Language",
 
       languageSub:"Choose your application language.",
+
+      walletNote:"â ï¸ This is simulated play-money only. No real money is sent or received.",
 
       saved:"Your cards have been saved.",
 
@@ -11215,13 +4726,11 @@ refreshTelegramUser();
 
       invalidAmount:"Enter a valid amount.",
 
-      minimum:"Minimum amount is 50 ETB.",
-
-      insufficient:"❌ Insufficient balance. Please deposit funds and continue the game.",
+      insufficient:"Insufficient balance.",
 
       balanceUpdated:"Balance updated.",
 
-      winner:"🎉 Bingo! Winning card found.",
+      winner:"ð Bingo! Winning card found.",
 
       notWinner:"No card has completed 2 lines yet."
 
@@ -11239,729 +4748,47 @@ refreshTelegramUser();
 
   }
 
-  /* =======================================================
-
-   LOGIN / FIRST REGISTRATION SCREEN
-
-   ======================================================= */
-
-var loginReady = false;
-
-var loginBusy = false;
-
-function addLoginStyles(){
-
-  if(
-
-    document.getElementById(
-
-      "fastBingoLoginStyles"
-
-    )
-
-  ){
-
-    return;
-
-  }
-
-  var style =
-
-    document.createElement("style");
-
-  style.id =
-
-    "fastBingoLoginStyles";
-
-  style.textContent = ${String.fromCharCode(96)}
-
-    #fastBingoLogin{
-
-      position:fixed;
-
-      inset:0;
-
-      z-index:999999;
-
-      background:#070b16;
-
-      display:flex;
-
-      align-items:center;
-
-      justify-content:center;
-
-      padding:22px;
-
-    }
-
-    #fastBingoLogin .login-box{
-
-      width:100%;
-
-      max-width:420px;
-
-      background:#101827;
-
-      border:1px solid rgba(255,255,255,.10);
-
-      border-radius:22px;
-
-      padding:30px 22px;
-
-      box-shadow:0 20px 60px rgba(0,0,0,.45);
-
-      text-align:center;
-
-    }
-
-    #fastBingoLogin .login-title{
-
-      font-size:28px;
-
-      font-weight:800;
-
-      color:#fff;
-
-      margin-bottom:12px;
-
-    }
-
-    #fastBingoLogin .login-subtitle{
-
-      color:#cbd5e1;
-
-      font-size:15px;
-
-      line-height:1.8;
-
-      margin-bottom:10px;
-
-    }
-
-    #fastBingoLogin .login-bonus{
-
-      color:#22c55e;
-
-      font-size:18px;
-
-      font-weight:800;
-
-      line-height:1.7;
-
-      margin:14px 0 22px;
-
-    }
-
-    #fastBingoLogin .login-button{
-
-      width:100%;
-
-      border:0;
-
-      border-radius:14px;
-
-      padding:16px;
-
-      background:#e11d48;
-
-      color:#fff;
-
-      font-size:17px;
-
-      font-weight:800;
-
-      cursor:pointer;
-
-      margin-top:4px;
-
-    }
-
-    #fastBingoLogin .login-button:disabled{
-
-      opacity:.55;
-
-      cursor:not-allowed;
-
-    }
-
-    #fastBingoLogin .login-message{
-
-      min-height:22px;
-
-      margin-top:14px;
-
-      color:#cbd5e1;
-
-      font-size:13px;
-
-      line-height:1.5;
-
-    }
-
-  ${String.fromCharCode(96)};
-
-  document.head.appendChild(style);
-
-}
-
-function createLoginScreen(){
-
-  if(
-
-    document.getElementById(
-
-      "fastBingoLogin"
-
-    )
-
-  ){
-
-    return;
-
-  }
-
-  addLoginStyles();
-
-  var overlay =
-
-    document.createElement("div");
-
-  overlay.id =
-
-    "fastBingoLogin";
-
-  overlay.innerHTML =
-
-  ${String.fromCharCode(96)}
-
-    <div class="login-box">
-
-      <div class="login-title">
-
-        Fast Bingo
-
-      </div>
-
-      <div class="login-subtitle">
-
-        🎉 Fast Bingo ቤተሰብ ይሁኑ!
-
-      </div>
-
-      <div class="login-bonus">
-
-        የመጀመሪያ ምዝገባ<br>
-
-        20 ብር ጉርሻ ያግኙ!
-
-      </div>
-
-      <button
-
-        type="button"
-
-        class="login-button"
-
-        id="loginJoinButton"
-
-      >
-
-        🎮 ይቀላቀሉ
-
-      </button>
-
-      <div
-
-        class="login-message"
-
-        id="loginMessage"
-
-      ></div>
-
-    </div>
-
-  ${String.fromCharCode(96)};
-
-  document.body.appendChild(
-
-    overlay
-
-  );
-
-  document
-
-    .getElementById(
-
-      "loginJoinButton"
-
-    )
-
-    .addEventListener(
-
-      "click",
-
-      registerFromLogin
-
-    );
-
-}
-
-function loginMessage(message){
-
-  var el =
-
-    document.getElementById(
-
-      "loginMessage"
-
-    );
-
-  if(el){
-
-    el.textContent =
-
-      message || "";
-
-  }
-
-}
-
-function setLoginBusy(busy){
-
-  loginBusy = busy;
-
-  var button =
-
-    document.getElementById(
-
-      "loginJoinButton"
-
-    );
-
-  if(button){
-
-    button.disabled =
-
-      busy;
-
-  }
-
-}
-
-function showLoginScreen(){
-
-  createLoginScreen();
-
-  var overlay =
-
-    document.getElementById(
-
-      "fastBingoLogin"
-
-    );
-
-  if(overlay){
-
-    overlay.style.display =
-
-      "flex";
-
-  }
-
-  loginReady = false;
-
-}
-
-function hideLoginScreen(){
-
-  var overlay =
-
-    document.getElementById(
-
-      "fastBingoLogin"
-
-    );
-
-  if(overlay){
-
-    overlay.style.display =
-
-      "none";
-
-  }
-
-  loginReady = true;
-
-}
-
-function registerFromLogin(){
-
-  refreshTelegramUser();
-
-  if(loginBusy){
-
-    return;
-
-  }
-
-  if(
-
-    !telegramUser ||
-
-    !telegramUser.id ||
-
-    String(telegramUser.id) === "guest"
-
-  ){
-
-    loginMessage(
-
-      "እባክዎ Fast Bingo ን በTelegram ውስጥ ይክፈቱ።"
-
-    );
-
-    return;
-
-  }
-
-  setLoginBusy(true);
-
-  /*
-
-   * Open Mini App immediately.
-
-   */
-
-  hideLoginScreen();
-
-  loginReady = true;
-
-  /*
-
-   * Start REAL GAME polling immediately.
-
-   *
-
-   * /do/game now also guarantees that the
-
-   * new user is registered and receives 20 ETB.
-
-   */
-
-  refreshGame();
-
-  loadBalance();
-
-  if(
-
-    !window.fastBingoPlayerPollingStarted
-
-  ){
-
-    window.fastBingoPlayerPollingStarted =
-
-      true;
-
-    setInterval(
-
-      function(){
-
-        if(loginReady){
-
-          refreshGame();
-
-        }
-
-      },
-
-      1000
-
-    );
-
-    setInterval(
-
-      function(){
-
-        if(loginReady){
-
-          loadBalance();
-
-        }
-
-      },
-
-      10000
-
-    );
-
-  }
-
-  /*
-
-   * Registration is also requested directly.
-
-   *
-
-   * The game does NOT wait for this request.
-
-   */
-
-  api(
-
-    "/api/auth/register",
-
-    {
-
-      method:"POST"
-
-    }
-
-  )
-
-  .then(function(result){
-
-    if(
-
-      result &&
-
-      result.ok &&
-
-      result.authenticated
-
-    ){
-
-      loadBalance();
-
-      loadMyCards();
-
-      refreshGame();
-
-      if(
-
-        Number(
-
-          result.firstRegistrationBonus || 0
-
-        ) > 0
-
-      ){
-
-        showToast(
-
-          "🎉 እንኳን ወደ Fast Bingo ቤተሰብ በደህና መጡ! 20 ብር ጉርሻ በመጫወቻ ሂሳብዎ ላይ ተጨምሯል።"
-
-        );
-
-      }
-
-    }
-
-  })
-
-  .catch(function(error){
-
-    /*
-
-     * Do not block the Mini App.
-
-     *
-
-     * /api/game and /api/balance already
-
-     * perform the same idempotent registration.
-
-     */
-
-    console.error(
-
-      "FAST BINGO REGISTRATION BACKGROUND ERROR:",
-
-      error
-
-    );
-
-  })
-
-  .finally(function(){
-
-    setLoginBusy(false);
-
-  });
-
-}
-
-function checkLoginStatus(){
-
-  showLoginScreen();
-
-  refreshTelegramUser();
-
-  if(
-
-    !telegramUser ||
-
-    !telegramUser.id ||
-
-    String(telegramUser.id) === "guest"
-
-  ){
-
-    loginMessage(
-
-      "Fast Bingo ን በTelegram ውስጥ ይክፈቱ።"
-
-    );
-
-    return Promise.resolve(false);
-
-  }
-
-  return api(
-
-    "/api/auth/status"
-
-  )
-
-  .then(function(result){
-
-    if(
-
-      result &&
-
-      result.ok &&
-
-      result.authenticated === true
-
-    ){
-
-      hideLoginScreen();
-
-      loginReady = true;
-
-      return true;
-
-    }
-
-    /*
-
-     * New Telegram user.
-
-     *
-
-     * Do not stop boot().
-
-     *
-
-     * Registration is handled by the
-
-     * "ይቀላቀሉ" button.
-
-     */
-
-    loginMessage(
-
-      "Fast Bingo ቤተሰብ ለመቀላቀል ከታች ያለውን ይቀላቀሉ የሚለውን ይጫኑ።"
-
-    );
-
-    return false;
-
-  })
-
-  .catch(function(error){
-
-    console.error(
-
-      "AUTH STATUS ERROR:",
-
-      error
-
-    );
-
-    loginMessage(
-
-      "Login server ጋር መገናኘት አልተቻለም።"
-
-    );
-
-    return false;
-
-  });
-
-} 
-
-  /* =======================================================
-
-     API
-
-     ======================================================= */
-
   function api(path, options){
 
     options = options || {};
 
     var headers =
 
-      options.headers
+      options.headers || {};
 
-        ? new Headers(options.headers)
+    headers["x-telegram-user"] =
 
-        : new Headers();
-
-    /*
-
-      IMPORTANT:
-
-      Send Telegram user to Durable Object.
-
-      Do NOT send ADMIN_KEY from Mini App.
-
-    */
-
-    headers.set(
-
-      "x-telegram-user",
-
-      userHeader
-
-    );
+      userHeader;
 
     if(
 
       options.body &&
 
-      !(options.body instanceof FormData) &&
-
-      !headers.has("content-type")
+      !headers["content-type"]
 
     ){
 
-      headers.set(
+      headers["content-type"] =
 
-        "content-type",
-
-        "application/json"
-
-      );
+        "application/json";
 
     }
 
     options.headers = headers;
 
-    var separator =
-
-      path.indexOf("?") >= 0
-
-        ? "&"
-
-        : "?";
-
     return fetch(
 
       path +
 
-      separator +
+      (
+
+        path.indexOf("?") >= 0
+
+          ? "&"
+
+          : "?"
+
+      ) +
 
       "_=" +
 
@@ -11971,35 +4798,11 @@ function checkLoginStatus(){
 
     ).then(function(response){
 
-      return response.text();
-
-    }).then(function(text){
-
-      try{
-
-        return JSON.parse(text);
-
-      }catch(error){
-
-        return {
-
-          ok:false,
-
-          error:"SERVER_RESPONSE"
-
-        };
-
-      }
+      return response.json();
 
     });
 
   }
-
-  /* =======================================================
-
-     TOAST
-
-     ======================================================= */
 
   function showToast(message){
 
@@ -12015,11 +4818,7 @@ function checkLoginStatus(){
 
       message;
 
-    toast.classList.add(
-
-      "show"
-
-    );
+    toast.classList.add("show");
 
     clearTimeout(
 
@@ -12037,15 +4836,9 @@ function checkLoginStatus(){
 
         );
 
-      },2600);
+      },2200);
 
   }
-
-  /* =======================================================
-
-     NAVIGATION
-
-     ======================================================= */
 
   function showSection(name){
 
@@ -12117,125 +4910,11 @@ function checkLoginStatus(){
 
     });
 
-  /* =======================================================
-
-     PAYMENT METHOD
-
-     ======================================================= */
-
-  document
-
-    .querySelectorAll(".payment-card")
-
-    .forEach(function (card) {
-
-      card.addEventListener("click", function () {
-
-        document
-
-          .querySelectorAll(".payment-card")
-
-          .forEach(function (item) {
-
-            item.classList.remove("active");
-
-            item.setAttribute("aria-pressed", "false");
-
-          });
-
-        card.classList.add("active");
-
-        card.setAttribute("aria-pressed", "true");
-
-        selectedPaymentMethod = card.dataset.method || "";
-
-        const details = document.getElementById("paymentMethodDetails");
-
-        const methodLabel = document.getElementById("paymentDetailsMethod");
-
-        const ownerLabel = document.getElementById("paymentDetailsOwner");
-
-        const numberLabel = document.getElementById("paymentDetailsNumber");
-
-        if (
-
-          !details ||
-
-          !methodLabel ||
-
-          !ownerLabel ||
-
-          !numberLabel
-
-        ) {
-
-          return;
-
-        }
-
-        const method = String(selectedPaymentMethod).toLowerCase();
-
-        const paymentDetails = {
-
-          telebirr: {
-
-            name: "Telebirr",
-
-            owner: "Hanza",
-
-            number: "0999960421"
-
-          },
-
-          ebirr: {
-
-            name: "eBirr",
-
-            owner: "Belay",
-
-            number: "0999960421"
-
-          }
-
-        };
-
-        const selectedDetails = paymentDetails[method];
-
-        if (!selectedDetails) {
-
-          details.style.display = "none";
-
-          return;
-
-        }
-
-        methodLabel.textContent = selectedDetails.name;
-
-        ownerLabel.textContent = "ስም / Name: " + selectedDetails.owner;
-
-        numberLabel.textContent = "ቁጥር / Number: " + selectedDetails.number;
-
-        details.style.display = "block";
-
-      });
-
-    });
-
-  /* =======================================================
-
-     SEEDED RANDOM
-
-     ======================================================= */
-
   function seededShuffle(arr, seed){
 
-    var a =
+    var a = arr.slice();
 
-      arr.slice();
-
-    var s =
-
-      seed >>> 0;
+    var s = seed >>> 0;
 
     for(
 
@@ -12249,13 +4928,9 @@ function checkLoginStatus(){
 
       s =
 
-        (
+        (s * 1664525 +
 
-          s * 1664525 +
-
-          1013904223
-
-        ) >>> 0;
+        1013904223) >>> 0;
 
       var j =
 
@@ -12275,19 +4950,7 @@ function checkLoginStatus(){
 
   }
 
-  /* =======================================================
-
-     CREATE UNIQUE BINGO CARDS
-
-     ======================================================= */
-
   function makeClientCard(number){
-
-    if(cardCache[number]){
-
-      return cardCache[number];
-
-    }
 
     var ranges = [
 
@@ -12303,201 +4966,117 @@ function checkLoginStatus(){
 
     ];
 
-    var attempt = 0;
-
-    while(true){
-
-      var columns = [];
-
-      for(
-
-        var c=0;
-
-        c<5;
-
-        c++
-
-      ){
-
-        var values=[];
-
-        for(
-
-          var n=ranges[c][0];
-
-          n<=ranges[c][1];
-
-          n++
-
-        ){
-
-          values.push(n);
-
-        }
-
-        columns.push(
-
-          seededShuffle(
-
-            values,
-
-            100000 +
-
-            number * 7919 +
-
-            attempt * 104729 +
-
-            c * 97
-
-          ).slice(0,5)
-
-        );
-
-      }
-
-      var grid=[];
-
-      for(
-
-        var r=0;
-
-        r<5;
-
-        r++
-
-      ){
-
-        grid[r]=[];
-
-        for(
-
-          var cc=0;
-
-          cc<5;
-
-          cc++
-
-        ){
-
-          grid[r][cc] =
-
-            columns[cc][r];
-
-        }
-
-      }
-
-      grid[2][2]="FREE";
-
-      var signature =
-
-        grid
-
-          .map(function(row){
-
-            return row.join(",");
-
-          })
-
-          .join("|");
-
-      if(
-
-        !cardSignatures[signature]
-
-      ){
-
-        cardSignatures[signature] =
-
-          number;
-
-        var card = {
-
-          number:number,
-
-          grid:grid
-
-        };
-
-        cardCache[number] =
-
-          card;
-
-        return card;
-
-      }
-
-      attempt++;
-
-    }
-
-  }
-
-  function prepareAllCards(){
+    var columns = [];
 
     for(
 
-      var i=1;
+      var c=0;
 
-      i<=400;
+      c<5;
 
-      i++
+      c++
 
     ){
 
-      makeClientCard(i);
+      var values=[];
+
+      for(
+
+        var n=ranges[c][0];
+
+        n<=ranges[c][1];
+
+        n++
+
+      ){
+
+        values.push(n);
+
+      }
+
+      columns.push(
+
+        seededShuffle(
+
+          values,
+
+          100000 +
+
+          number * 7919 +
+
+          c * 97
+
+        ).slice(0,5)
+
+      );
 
     }
 
+    var grid=[];
+
+    for(
+
+      var r=0;
+
+      r<5;
+
+      r++
+
+    ){
+
+      grid[r]=[];
+
+      for(
+
+        var cc=0;
+
+        cc<5;
+
+        cc++
+
+      ){
+
+        grid[r][cc] =
+
+          columns[cc][r];
+
+      }
+
+    }
+
+    grid[2][2]="FREE";
+
+    return {
+
+      number:number,
+
+      grid:grid
+
+    };
+
   }
 
-  /* =======================================================
-
-     RENDER BINGO CARD
-
-     ======================================================= */
-
   function renderBingoCard(card){
-
-    var letters = [
-
-      "B",
-
-      "I",
-
-      "N",
-
-      "G",
-
-      "O"
-
-    ];
 
     var html =
 
       '<div class="bingo-card">' +
 
+      '<div class="bingo-card-head">' +
+
+      '<div class="card-number-label">' +
+
+      'CARD #' +
+
+      card.number +
+
+      '</div>' +
+
+      '<div class="card-state">â</div>' +
+
+      '</div>' +
+
       '<div class="bingo-grid">';
-
-    for(
-
-      var h=0;
-
-      h<5;
-
-      h++
-
-    ){
-
-      html +=
-
-        '<div class="bingo-letter">' +
-
-        letters[h] +
-
-        '</div>';
-
-    }
 
     for(
 
@@ -12529,8 +5108,6 @@ function checkLoginStatus(){
 
           currentGame.calledBalls &&
 
-          value !== "FREE" &&
-
           currentGame.calledBalls.indexOf(
 
             value
@@ -12541,25 +5118,13 @@ function checkLoginStatus(){
 
           "bingo-cell";
 
-        if(
+        if(value === "FREE"){
 
-          value === "FREE"
+          classes += " free";
 
-        ){
+        }else if(called){
 
-          classes +=
-
-            " free";
-
-        }else if(
-
-          called
-
-        ){
-
-          classes +=
-
-            " called";
+          classes += " called";
 
         }
 
@@ -12573,7 +5138,7 @@ function checkLoginStatus(){
 
           value +
 
-          "</div>";
+          '</div>';
 
       }
 
@@ -12586,12 +5151,6 @@ function checkLoginStatus(){
     return html;
 
   }
-
-  /* =======================================================
-
-     RENDER 400 CARD SELECT BUTTONS
-
-     ======================================================= */
 
   function renderCards(){
 
@@ -12619,127 +5178,63 @@ function checkLoginStatus(){
 
         selected.indexOf(i) !== -1;
 
-      var isTaken =
-
-        takenCards.indexOf(i) !== -1;
-
-      var takenByOther =
-
-        isTaken &&
-
-        !isSelected;
-
-      var classes =
-
-        "card-select";
-
-      if(isSelected){
-
-        classes +=
-
-          " selected";
-
-      }
-
-      if(takenByOther){
-
-        classes +=
-
-          " taken";
-
-      }
-
       html +=
 
-        '<button ' +
+        '<button class="card-select' +
 
-        'type="button" ' +
+        (
 
-        'class="' +
+          isSelected
 
-        classes +
+            ? " selected"
 
-        '" ' +
+            : ""
 
-        'data-card="' +
+        ) +
+
+        '" data-card="' +
 
         i +
 
-        '"' +
+        '">' +
 
-        (
-
-          takenByOther
-
-            ? ' disabled title="ይህ ካርቴላ ተይዟል።"'
-
-            : ''
-
-        ) +
-
-        '>' +
-
-        (
-
-          takenByOther
-
-            ? "✓"
-
-            : i
-
-        ) +
+        i +
 
         "</button>";
 
     }
 
-    grid.innerHTML =
-
-      html;
+    grid.innerHTML=html;
 
     grid
 
-      .querySelectorAll(
+      .querySelectorAll(".card-select")
 
-        ".card-select"
+      .forEach(function(button){
 
-      )
+        button.addEventListener(
 
-      .forEach(
+          "click",
 
-        function(button){
+          function(){
 
-          button.addEventListener(
+            toggleCard(
 
-            "click",
+              Number(
 
-            function(){
+                button.dataset.card
 
-              toggleCard(
+              )
 
-                Number(
+            );
 
-                  button.dataset.card
+          }
 
-                )
+        );
 
-              );
-
-            }
-
-          );
-
-        }
-
-      );
+      });
 
   }
-
-  /* =======================================================
-
-     RENDER SELECTED CARDS
-
-     ======================================================= */
 
   function renderPreviews(){
 
@@ -12751,57 +5246,47 @@ function checkLoginStatus(){
 
       );
 
-    grid.className =
-
-      "preview-grid";
-
     if(!selected.length){
 
-      grid.innerHTML = "";
+      grid.innerHTML =
+
+        '<div style="grid-column:1/-1;color:#667184;font-size:10px;padding:8px 0">' +
+
+        (
+
+          language === "am"
+
+            ? "á«á­áµ á ááá¨á¡áá¢"
+
+            : "No cards selected."
+
+        ) +
+
+        "</div>";
 
       return;
 
     }
 
-    grid.classList.add(
+    var html="";
 
-      "count-" +
+    selected.forEach(
 
-      Math.min(
+      function(number){
 
-        selected.length,
+        html +=
 
-        4
+          renderBingoCard(
 
-      )
+            makeClientCard(number)
+
+          );
+
+      }
 
     );
 
-    var html = "";
-
-    selected
-
-      .slice(0,4)
-
-      .forEach(
-
-        function(number){
-
-          html +=
-
-            renderBingoCard(
-
-              makeClientCard(number)
-
-            );
-
-        }
-
-      );
-
-    grid.innerHTML =
-
-      html;
+    grid.innerHTML=html;
 
   }
 
@@ -12818,54 +5303,6 @@ function checkLoginStatus(){
       "/4";
 
   }
-
-  /* =======================================================
-
-     BALANCE CHECK
-
-     ======================================================= */
-
-  function hasEnoughBalance(){
-
-    /*
-
-      One card costs 10 ETB.
-
-      The game can use the player's play balance.
-
-      Main balance is also displayed and checked so
-
-      the user is warned when neither balance is sufficient.
-
-    */
-
-    if(
-
-      playBalance >= 10 ||
-
-      mainBalance >= 10
-
-    ){
-
-      return true;
-
-    }
-
-    showToast(
-
-      t("insufficient")
-
-    );
-
-    return false;
-
-  }
-
-  /* =======================================================
-
-     CARD SELECTION
-
-     ======================================================= */
 
   function toggleCard(number){
 
@@ -12887,223 +5324,19 @@ function checkLoginStatus(){
 
     }
 
-    if(
-
-      takenCards.indexOf(number) !== -1 &&
-
-      selected.indexOf(number) === -1
-
-    ){
-
-      showToast(
-
-        language === "am"
-
-          ? "❌ ይህ ካርቴላ ተይዟል።"
-
-          : "❌ This card is already taken."
-
-      );
-
-      return;
-
-    }
-
     var index =
 
-      selected.indexOf(
-
-        number
-
-      );
+      selected.indexOf(number);
 
     if(index >= 0){
 
-      /*
+      selected.splice(
 
-       * This card already belongs to this user.
+        index,
 
-       *
+        1
 
-       * Use the dedicated server-side unselect
-
-       * endpoint so the exact 10 ETB refund is
-
-       * performed atomically.
-
-       */
-
-      api(
-
-        "/api/select-cards",
-
-        {
-
-          method:"POST",
-
-          body:JSON.stringify({
-
-            action:"unselect",
-
-            card:number
-
-          })
-
-        }
-
-      ).then(function(data){
-
-        if(
-
-          data &&
-
-          data.ok
-
-        ){
-
-          selected =
-
-            Array.isArray(
-
-              data.selected
-
-            )
-
-              ? data.selected.map(
-
-                  Number
-
-                )
-
-              : [];
-
-          updateSelectionCount();
-
-          renderCards();
-
-          renderPreviews();
-
-          /*
-
-           * Apply the server's exact balances
-
-           * immediately.
-
-           */
-
-          if(
-
-            data.playBalance !== undefined
-
-          ){
-
-            playBalance =
-
-              Number(
-
-                data.playBalance
-
-              );
-
-          }
-
-          if(
-
-            data.mainBalance !== undefined
-
-          ){
-
-            mainBalance =
-
-              Number(
-
-                data.mainBalance
-
-              );
-
-          }
-
-          var formatted =
-
-            playBalance.toFixed(2) +
-
-            " ETB";
-
-          document.getElementById(
-
-            "topBalance"
-
-          ).textContent =
-
-            formatted;
-
-          document.getElementById(
-
-            "mainBalance"
-
-          ).textContent =
-
-            mainBalance.toFixed(2);
-
-          document.getElementById(
-
-            "walletBalance"
-
-          ).textContent =
-
-            formatted;
-
-          /*
-
-           * Jackpot is returned directly by
-
-           * the server after the refund.
-
-           */
-
-          if(
-
-            currentGame &&
-
-            data.jackpot !== undefined
-
-          ){
-
-            currentGame.jackpot =
-
-              Number(
-
-                data.jackpot
-
-              );
-
-            currentGame.selectedCount =
-
-              Number(
-
-                data.selectedCount || 0
-
-              );
-
-            updateGameUI();
-
-          }
-
-        }
-
-      }).catch(function(error){
-
-        console.error(
-
-          "FAST BINGO UNSELECT ERROR:",
-
-          error
-
-        );
-
-      });
-
-      return;
+      );
 
     }else{
 
@@ -13119,25 +5352,7 @@ function checkLoginStatus(){
 
       }
 
-      /*
-
-        Check balance before selecting
-
-        a new paid card.
-
-      */
-
-      if(!hasEnoughBalance()){
-
-        return;
-
-      }
-
-      selected.push(
-
-        number
-
-      );
+      selected.push(number);
 
       selected.sort(
 
@@ -13160,12 +5375,6 @@ function checkLoginStatus(){
     saveCardsSilently();
 
   }
-
-  /* =======================================================
-
-     SAVE SELECTED CARDS
-
-     ======================================================= */
 
   function saveCardsSilently(){
 
@@ -13201,285 +5410,45 @@ function checkLoginStatus(){
 
           selected =
 
-            data.selected.map(
-
-              Number
-
-            );
+            data.selected.map(Number);
 
         }
 
         updateSelectionCount();
-
-        renderCards();
-
-        renderPreviews();
-
-        loadBalance();
-
-        /*
-
-         * Jackpot is refreshed by
-
-         * the normal game refresh.
-
-         */
-
-      }else if(
-
-        data.error ===
-
-        "CARD_TAKEN"
-
-      ){
-
-        /*
-
-         * Restore the real server-side
-
-         * selection.
-
-         */
-
-        if(
-
-          Array.isArray(
-
-            data.selected
-
-          )
-
-        ){
-
-          selected =
-
-            data.selected.map(
-
-              Number
-
-            );
-
-        }
-
-        updateSelectionCount();
-
-        renderCards();
-
-        renderPreviews();
-
-        showToast(
-
-          language === "am"
-
-            ? "❌ ይህ ካርቴላ በሌላ user ተይዟል።"
-
-            : "❌ This card is already taken by another user."
-
-        );
-
-      }else if(
-
-        data.error ===
-
-        "INSUFFICIENT_BALANCE"
-
-      ){
-
-        /*
-
-         * Server is authoritative.
-
-         * Restore the previous selection.
-
-         */
-
-        if(
-
-          Array.isArray(
-
-            data.selected
-
-          )
-
-        ){
-
-          selected =
-
-            data.selected.map(
-
-              Number
-
-            );
-
-        }
-
-        updateSelectionCount();
-
-        renderCards();
-
-        renderPreviews();
-
-        loadBalance();
-
-        showToast(
-
-          t("insufficient")
-
-        );
 
       }
 
-    });
+    }).catch(function(){});
 
   }
 
-  /* =======================================================
+  function loadMyCards(){
 
-     GAME UI
+    return api(
 
-     ======================================================= */
+      "/api/user-cards"
 
-  function updateLobbyDeadline(){
+    ).then(function(data){
 
-    if(
+      selected =
 
-      !currentGame ||
+        Array.isArray(
 
-      currentGame.status !== "lobby"
-
-    ){
-
-      lobbyDeadline =
-
-        0;
-
-      return;
-
-    }
-
-    var remaining =
-
-      Number(
-
-        currentGame.lobbyRemaining || 0
-
-      );
-
-    /*
-
-      Convert server remaining seconds into
-
-      a local deadline so the number does not
-
-      remain frozen at 45s between requests.
-
-    */
-
-    lobbyDeadline =
-
-      Date.now() +
-
-      Math.max(
-
-        0,
-
-        remaining
-
-      ) * 1000;
-
-  }
-
-  function updateCountdownOnly(){
-
-    if(
-
-      !currentGame
-
-    ){
-
-      return;
-
-    }
-
-    if(
-
-      currentGame.status === "live"
-
-    ){
-
-      document.getElementById(
-
-        "countdown"
-
-      ).innerHTML =
-
-        '<strong>' +
-
-        Number(
-
-          currentGame.calledCount || 0
-
-        ) +
-
-        '</strong> / 75';
-
-      return;
-
-    }
-
-    var remaining =
-
-      Math.max(
-
-        0,
-
-        Math.ceil(
-
-          (
-
-            lobbyDeadline -
-
-            Date.now()
-
-          ) / 1000
+          data.selected
 
         )
 
-      );
+          ? data.selected.map(Number)
 
-    document.getElementById(
+          : [];
 
-      "countdown"
+      updateSelectionCount();
 
-    ).innerHTML =
+      renderCards();
 
-      '<strong>' +
+      renderPreviews();
 
-      remaining +
-
-      's</strong>';
-
-    /*
-
-      Once local countdown reaches zero,
-
-      immediately refresh from Durable Object.
-
-      The actual game start is controlled by
-
-      the Durable Object alarm, not card selection.
-
-    */
-
-    if(
-
-      remaining <= 0
-
-    ){
-
-      refreshGame();
-
-    }
+    });
 
   }
 
@@ -13561,39 +5530,7 @@ function checkLoginStatus(){
 
       live
 
-        ? (
-
-            selected.length > 0
-
-              ? (
-
-                  language === "am"
-
-                    ? "ጨዋታው ተጀምሯል • ደራሽ " +
-
-                      Number(
-
-                        currentGame.jackpot || 0
-
-                      ).toLocaleString() +
-
-                      " ETB"
-
-                    : "GAME STARTED • JACKPOT " +
-
-                      Number(
-
-                        currentGame.jackpot || 0
-
-                      ).toLocaleString() +
-
-                      " ETB"
-
-                )
-
-              : t("liveMessage")
-
-          )
+        ? t("liveMessage")
 
         : t("lobbyMessage");
 
@@ -13615,13 +5552,41 @@ function checkLoginStatus(){
 
       " ETB";
 
-    if(!live){
+    var countdown =
 
-      updateLobbyDeadline();
+      document.getElementById(
+
+        "countdown"
+
+      );
+
+    if(live){
+
+      countdown.innerHTML =
+
+        '<strong>' +
+
+        currentGame.calledCount +
+
+        '</strong> / 75';
+
+    }else{
+
+      countdown.innerHTML =
+
+        '<strong>' +
+
+        Math.max(
+
+          0,
+
+          currentGame.lobbyRemaining
+
+        ) +
+
+        's</strong>';
 
     }
-
-    updateCountdownOnly();
 
     var ball =
 
@@ -13643,7 +5608,7 @@ function checkLoginStatus(){
 
     ).textContent =
 
-      ball || "—";
+      ball || "â";
 
     document.getElementById(
 
@@ -13651,11 +5616,7 @@ function checkLoginStatus(){
 
     ).textContent =
 
-      Number(
-
-        currentGame.calledCount || 0
-
-      ) +
+      currentGame.calledCount +
 
       " / 75";
 
@@ -13671,29 +5632,17 @@ function checkLoginStatus(){
 
         : "block";
 
-    var selectedPreviewArea =
+    document.getElementById(
 
-      document.getElementById(
+      "selectedPreviewArea"
 
-        "selectedPreviewArea"
+    ).style.display =
 
-      );
-
-    selectedPreviewArea.style.display =
-
-      selected.length > 0
+      selected.length
 
         ? "block"
 
-        : "none";
-
-    selectedPreviewArea.classList.toggle(
-
-      "live-mode",
-
-      live
-
-    );
+        : "block";
 
     var recent =
 
@@ -13753,467 +5702,17 @@ function checkLoginStatus(){
 
   }
 
-  function showBingoResult(game){
-
-    var old =
-
-      document.getElementById(
-
-        "fastBingoResult"
-
-      );
-
-    if(old){
-
-      old.remove();
-
-    }
-
-    var myId =
-
-      telegramUser &&
-
-      telegramUser.id
-
-        ? String(
-
-            telegramUser.id
-
-          )
-
-        : "";
-
-    var winnerId =
-
-      game.winnerUserId
-
-        ? String(
-
-            game.winnerUserId
-
-          )
-
-        : "";
-
-    var isWinner =
-
-      myId !== "" &&
-
-      winnerId !== "" &&
-
-      myId === winnerId;
-
-    var card =
-
-      game.winnerCard ||
-
-      "—";
-
-    var name =
-
-      game.winnerName ||
-
-      "Player";
-
-    var amount =
-
-      Number(
-
-        game.winnerAmount || 0
-
-      );
-
-    var overlay =
-
-      document.createElement(
-
-        "div"
-
-      );
-
-    overlay.id =
-
-      "fastBingoResult";
-
-    overlay.innerHTML =
-
-      '<div class="fast-bingo-result-box">' +
-
-        '<div class="fast-bingo-result-title">' +
-
-          'BINGO' +
-
-        '</div>' +
-
-        '<div class="fast-bingo-result-message">' +
-
-          (
-
-            isWinner
-
-              ? '🎉 አሸንፈዋል!'
-
-              : 'BINGO — ጨዋታው አልቋል'
-
-          ) +
-
-        '</div>' +
-
-        '<div class="fast-bingo-result-card">' +
-
-          'CARD #' +
-
-          card +
-
-        '</div>' +
-
-        '<div class="fast-bingo-result-name">' +
-
-          name +
-
-        '</div>' +
-
-        '<div class="fast-bingo-result-money">' +
-
-          amount.toLocaleString() +
-
-          ' ETB' +
-
-        '</div>' +
-
-      '</div>';
-
-    document.body.appendChild(
-
-      overlay
-
-    );
-
-    setTimeout(
-
-      function(){
-
-        if(
-
-          overlay &&
-
-          overlay.parentNode
-
-        ){
-
-          overlay.remove();
-
-        }
-
-      },
-
-      3000
-
-    );
-
-  }
-
-  /* =======================================================
-
-  
-
-     GAME REFRESH
-
-  
-
-     ======================================================= */
-
   function refreshGame(){
 
     return api(
 
       "/api/game"
 
-    )
-
-    .then(function(data){
-
-      if(
-
-        data &&
-
-        data.status
-
-      ){
-
-        /*
-
-         * Save the previous game
-
-         * before replacing it.
-
-         */
-
-        var previousGame =
-
-          currentGame;
-
-        /*
-
-         * Detect a NEW result state.
-
-         *
-
-         * This prevents the BINGO
-
-         * screen from being created
-
-         * again on every refresh.
-
-         */
-
-        var isNewResult =
-
-          data &&
-
-          data.status === "result" &&
-
-          (
-
-            !previousGame ||
-
-            previousGame.status !==
-
-              "result" ||
-
-            previousGame.gameNumber !==
-
-              data.gameNumber
-
-          );
-
-        /*
-
-         * Save current server state.
-
-         */
-
-        currentGame =
-
-          data;
-
-        /*
-
-         * Speak every newly called Bingo number.
-
-         */
-
-        if(
-
-          data.status === "live" &&
-
-          data.currentBall
-
-        ){
-
-          speakBingoBall(
-
-            data.currentBall,
-
-            data.currentLetter
-
-          );
-
-        }
-
-        /*
-
-         * Speak when the Bingo game ends.
-
-         */
-
-        if(
-
-          isNewResult
-
-        ){
-
-          speakGameFinished();
-
-        }
-
-        /*
-
-         * Show BINGO result only once.
-
-         */
-
-        /*
-
-         * =================================================
-
-         * BINGO RESULT VISIBILITY
-
-         *
-
-         * ONLY users who selected a card in THIS browser
-
-         * during this game see the 3-second BINGO screen.
-
-         *
-
-         * Users who did NOT participate do NOT see BINGO.
-
-         * They continue directly to the next 45-second lobby.
-
-         * =================================================
-
-         */
-
-        if(
-
-          isNewResult &&
-
-          Array.isArray(selected) &&
-
-          selected.length > 0
-
-        ){
-
-          showBingoResult(
-
-            data
-
-          );
-
-        }
-
-        /*
-
-         * Load globally taken cards
-
-         * from the current game.
-
-         */
-
-        takenCards =
-
-          Array.isArray(
-
-            data.takenCards
-
-          )
-
-            ? data.takenCards.map(
-
-                Number
-
-              )
-
-            : [];
-
-        /*
-
-         * If this is a new game,
-
-         * reload this user's cards.
-
-         */
-
-        if(
-
-          previousGame &&
-
-          previousGame.gameNumber !==
-
-            data.gameNumber
-
-        ){
-
-          loadMyCards();
-
-        }
-
-        /*
-
-         * Refresh the 400 cards so
-
-         * cards selected by other users
-
-         * immediately show as taken.
-
-         */
-
-        renderCards();
-
-        /*
-
-         * Update the complete game UI.
-
-         */
-
-        updateGameUI();
-
-      }
-
-      return data;
-
-    })
-
-    .catch(function(){
-
-      return null;
-
-    });
-
-  }
-
-  /* =======================================================
-
-     LOAD MY SELECTED CARDS
-
-     ======================================================= */
-
-  function loadMyCards(){
-
-    return api(
-
-      "/api/user-cards"
-
     ).then(function(data){
 
-      if(
+      currentGame = data;
 
-        data &&
-
-        data.ok &&
-
-        Array.isArray(data.selected)
-
-      ){
-
-        selected =
-
-          data.selected.map(
-
-            Number
-
-          );
-
-        selected.sort(
-
-          function(a,b){
-
-            return a-b;
-
-          }
-
-        );
-
-        updateSelectionCount();
-
-        renderCards();
-
-        renderPreviews();
-
-      }
-
-      return data;
+      updateGameUI();
 
     }).catch(function(){
 
@@ -14223,12 +5722,6 @@ function checkLoginStatus(){
 
   }
 
-  /* =======================================================
-
-     BALANCE
-
-     ======================================================= */
-
   function loadBalance(){
 
     return api(
@@ -14237,37 +5730,17 @@ function checkLoginStatus(){
 
     ).then(function(data){
 
-      mainBalance =
+      var balance =
 
         Number(
 
-          data.mainBalance !== undefined
-
-            ? data.mainBalance
-
-            : 0
-
-        );
-
-      playBalance =
-
-        Number(
-
-          data.playBalance !== undefined
-
-            ? data.playBalance
-
-            : (
-
-                data.balance || 0
-
-              )
+          data.balance || 0
 
         );
 
       var formatted =
 
-        playBalance.toFixed(2) +
+        balance.toFixed(2) +
 
         " ETB";
 
@@ -14285,7 +5758,7 @@ function checkLoginStatus(){
 
       ).textContent =
 
-        mainBalance.toFixed(2);
+        balance.toFixed(2);
 
       document.getElementById(
 
@@ -14299,17 +5772,15 @@ function checkLoginStatus(){
 
   }
 
-  /* =======================================================
+  function setWalletType(type){
 
-     WALLET TYPE
+    walletType=type;
 
-     ======================================================= */
+    document.getElementById(
 
-  function setWalletType(type) {
+      "depositBtn"
 
-    walletType = type;
-
-    document.getElementById("depositBtn").classList.toggle(
+    ).classList.toggle(
 
       "active",
 
@@ -14317,7 +5788,11 @@ function checkLoginStatus(){
 
     );
 
-    document.getElementById("withdrawBtn").classList.toggle(
+    document.getElementById(
+
+      "withdrawBtn"
+
+    ).classList.toggle(
 
       "active",
 
@@ -14325,7 +5800,11 @@ function checkLoginStatus(){
 
     );
 
-    document.getElementById("walletSubmit").textContent =
+    document.getElementById(
+
+      "walletSubmit"
+
+    ).textContent =
 
       type === "deposit"
 
@@ -14333,45 +5812,41 @@ function checkLoginStatus(){
 
         : t("withdrawAction");
 
-    const transactionField = document.getElementById(
-
-      "walletTransactionLinkField"
-
-    );
-
-    if (transactionField) {
-
-      transactionField.style.display =
-
-        type === "deposit" ? "block" : "none";
-
-    }
-
   }
 
-  /* =======================================================
+  function walletRequest(){
 
-     WALLET REQUEST
+    var amount =
 
-     ======================================================= */
+      Number(
 
-  function walletRequest() {
+        document.getElementById(
 
-    const amount = Number(
+          "walletAmount"
 
-      document.getElementById("walletAmount").value
+        ).value
 
-    );
+      );
 
-    if (!Number.isFinite(amount) || amount < 50) {
+    var method =
+
+      document.getElementById(
+
+        "walletMethod"
+
+      ).value;
+
+    if(
+
+      !Number.isFinite(amount) ||
+
+      amount <= 0
+
+    ){
 
       showToast(
 
-        Number.isFinite(amount) && amount > 0
-
-          ? t("minimum")
-
-          : t("invalidAmount")
+        t("invalidAmount")
 
       );
 
@@ -14379,317 +5854,79 @@ function checkLoginStatus(){
 
     }
 
-    // Only Telebirr and eBirr are allowed.
+    api(
 
-    const normalizedMethod = String(
+      "/api/wallet",
 
-      selectedPaymentMethod || ""
+      {
 
-    ).trim().toLowerCase();
+        method:"POST",
 
-    if (
+        body:JSON.stringify({
 
-      normalizedMethod !== "telebirr" &&
+          method:method,
 
-      normalizedMethod !== "ebirr"
+          type:walletType,
 
-    ) {
+          amount:amount
+
+        })
+
+      }
+
+    ).then(function(data){
+
+      if(data.ok){
+
+        document.getElementById(
+
+          "walletAmount"
+
+        ).value="";
+
+        loadBalance();
+
+        showToast(
+
+          t("balanceUpdated")
+
+        );
+
+      }else if(
+
+        data.error ===
+
+        "INSUFFICIENT_BALANCE"
+
+      ){
+
+        showToast(
+
+          t("insufficient")
+
+        );
+
+      }else{
+
+        showToast("Error");
+
+      }
+
+    }).catch(function(){
 
       showToast(
 
-        language === "am"
-
-          ? "Telebirr ወይም eBirr ብቻ ይምረጡ።"
-
-          : "Please select Telebirr or eBirr."
+        "Connection error"
 
       );
 
-      return;
-
-    }
-
-    const method =
-
-      normalizedMethod === "telebirr"
-
-        ? "Telebirr"
-
-        : "eBirr";
-
-    const formData = new FormData();
-
-    formData.append("method", method);
-
-    formData.append("type", walletType);
-
-    formData.append("amount", String(amount));
-
-    if (walletType === "deposit") {
-
-      const linkInput = document.getElementById(
-
-        "walletTransactionLink"
-
-      );
-
-      const transactionLink = String(
-
-        linkInput ? linkInput.value : ""
-
-      ).trim();
-
-      if (!transactionLink) {
-
-        showToast(
-
-          language === "am"
-
-            ? "የክፍያ SMS Transaction Link ያስገቡ።"
-
-            : "Please enter your payment SMS transaction link."
-
-        );
-
-        return;
-
-      }
-
-      let parsedLink;
-
-      try {
-
-        parsedLink = new URL(transactionLink);
-
-      } catch (_) {
-
-        showToast(
-
-          language === "am"
-
-            ? "ትክክለኛ Link ያስገቡ።"
-
-            : "Please enter a valid link."
-
-        );
-
-        return;
-
-      }
-
-      if (
-
-        parsedLink.protocol !== "https:" &&
-
-        parsedLink.protocol !== "http:"
-
-      ) {
-
-        showToast(
-
-          language === "am"
-
-            ? "ትክክለኛ Link ያስገቡ።"
-
-            : "Please enter a valid link."
-
-        );
-
-        return;
-
-      }
-
-      formData.append("transactionLink", transactionLink);
-
-    }
-
-    const submitButton = document.getElementById("walletSubmit");
-
-    if (submitButton) {
-
-      submitButton.disabled = true;
-
-    }
-
-    api("/api/wallet", {
-
-      method: "POST",
-
-      body: formData
-
-    })
-
-      .then(function(data) {
-
-        if (data && data.ok) {
-
-          document.getElementById("walletAmount").value = "";
-
-          const linkInput = document.getElementById(
-
-            "walletTransactionLink"
-
-          );
-
-          if (linkInput) {
-
-            linkInput.value = "";
-
-          }
-
-          loadBalance();
-
-          showToast(
-
-            walletType === "deposit"
-
-              ? (
-
-                  language === "am"
-
-                    ? "✅ Deposit ጥያቄዎ ተሳክቷል።"
-
-                    : "✅ Deposit request Successfully."
-
-                )
-
-              : (
-
-                  language === "am"
-
-                    ? "Withdrawal ጥያቄ ተልኳል።"
-
-                    : "Withdrawal request submitted."
-
-                )
-
-          );
-
-          return;
-
-        }
-
-        if (data && data.error === "MINIMUM_AMOUNT") {
-
-          showToast(t("minimum"));
-
-        } else if (
-
-          data &&
-
-          data.error === "INSUFFICIENT_BALANCE"
-
-        ) {
-
-          showToast(t("insufficient"));
-
-        } else if (
-
-          data &&
-
-          data.error === "TRANSACTION_LINK_REQUIRED"
-
-        ) {
-
-          showToast(
-
-            language === "am"
-
-              ? "የክፍያ Transaction Link ያስገቡ።"
-
-              : "Transaction link is required."
-
-          );
-
-        } else if (
-
-          data &&
-
-          data.error === "INVALID_TRANSACTION_LINK"
-
-        ) {
-
-          showToast(
-
-            language === "am"
-
-              ? "ትክክለኛ Transaction Link ያስገቡ።"
-
-              : "Please enter a valid transaction link."
-
-          );
-
-        } else if (
-
-          data &&
-
-          data.error === "INVALID_PAYMENT_METHOD"
-
-        ) {
-
-          showToast(
-
-            language === "am"
-
-              ? "Telebirr ወይም eBirr ብቻ ይጠቀሙ።"
-
-              : "Only Telebirr and eBirr are supported."
-
-          );
-
-        } else {
-
-          showToast(
-
-            language === "am"
-
-              ? "✅ Deposit ተሳክቷል።"
-
-              : "✅ Deposit request successfully."
-
-          );
-
-        }
-
-      })
-
-      .catch(function() {
-
-        showToast(
-
-          language === "am"
-
-            ? "የConnection ችግር አለ።"
-
-            : "Connection error."
-
-        );
-
-      })
-
-      .finally(function() {
-
-        if (submitButton) {
-
-          submitButton.disabled = false;
-
-        }
-
-      });
+    });
 
   }
-
-  /* =======================================================
-
-     LANGUAGE
-
-     ======================================================= */
 
   function setLanguage(next){
 
-    language =
-
-      next;
+    language=next;
 
     document.documentElement.lang =
 
@@ -14877,6 +6114,22 @@ function checkLoginStatus(){
 
     document.getElementById(
 
+      "walletSub"
+
+    ).textContent =
+
+      x.walletSub;
+
+    document.getElementById(
+
+      "methodLabel"
+
+    ).textContent =
+
+      x.method;
+
+    document.getElementById(
+
       "amountLabel"
 
     ).textContent =
@@ -14926,6 +6179,14 @@ function checkLoginStatus(){
     ).textContent =
 
       x.languageSub;
+
+    document.getElementById(
+
+      "walletNote"
+
+    ).textContent =
+
+      x.walletNote;
 
     document.getElementById(
 
@@ -14980,12 +6241,6 @@ function checkLoginStatus(){
     updateGameUI();
 
   }
-
-  /* =======================================================
-
-     EVENTS
-
-     ======================================================= */
 
   document.getElementById(
 
@@ -15051,12 +6306,6 @@ function checkLoginStatus(){
 
       setLanguage("am");
 
-      setWalletType(
-
-        "deposit"
-
-      );
-
     }
 
   );
@@ -15121,101 +6370,23 @@ function checkLoginStatus(){
 
     "Guest";
 
-  /* =======================================================
-
-     LOCAL COUNTDOWN LOOP
-
-     ======================================================= */
-
-  setInterval(
-
-    function(){
-
-      if(
-
-        currentGame &&
-
-        currentGame.status === "lobby"
-
-      ){
-
-        updateCountdownOnly();
-
-      }
-
-    },
-
-    250
-
-  );
-
-  /* =======================================================
-
-     BOOT
-
-     ======================================================= */
-
   function boot(){
 
-  setLanguage("am");
+    setLanguage("am");
 
-  renderCards();
+    renderCards();
 
-  renderPreviews();
+    renderPreviews();
 
-  setWalletType("deposit");
+    Promise.all([
 
-  checkLoginStatus()
+      loadBalance(),
 
-    .then(function(authenticated){
+      loadMyCards(),
 
-      /*
+      refreshGame()
 
-       * Existing users:
-
-       * load everything immediately.
-
-       */
-
-      if(authenticated){
-
-        return Promise.all([
-
-          loadBalance(),
-
-          loadMyCards(),
-
-          refreshGame()
-
-        ]);
-
-      }
-
-      /*
-
-       * New users:
-
-       *
-
-       * The Join button will register the user.
-
-       * Do not start the normal authenticated
-
-       * polling until registration succeeds.
-
-       */
-
-      return Promise.resolve();
-
-    })
-
-    .then(function(){
-
-      if(!loginReady){
-
-        return;
-
-      }
+    ]).then(function(){
 
       setInterval(
 
@@ -15235,7 +6406,7 @@ function checkLoginStatus(){
 
     });
 
-}
+  }
 
   boot();
 
@@ -15243,17 +6414,13 @@ function checkLoginStatus(){
 
 </script>
 
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
 </body>
 
 </html>`;
 
 }
-
-/* =========================================================
-
-   PROXY TO GAME SCHEDULER
-
-   ========================================================= */
 
 async function proxyToGame(
 
@@ -15299,18 +6466,6 @@ async function proxyToGame(
 
     );
 
-  /*
-
-    Preserve Telegram user identity.
-
-    This is required so the Durable Object
-
-    does not treat every Mini App request
-
-    as Guest.
-
-  */
-
   const telegramUser =
 
     request.headers.get(
@@ -15339,13 +6494,9 @@ async function proxyToGame(
 
       {
 
-        method:
+        method:request.method,
 
-          request.method,
-
-        headers:
-
-          headers,
+        headers:headers,
 
         body:
 
@@ -15369,1776 +6520,6 @@ async function proxyToGame(
 
 }
 
-/* =========================================================
-
-   ADMIN DASHBOARD
-
-   ========================================================= */
-
-function adminHtml(){
-
-  return String.raw`<!DOCTYPE html>
-
-<html lang="en">
-
-<head>
-
-<meta charset="UTF-8">
-
-<meta name="viewport"
-
-      content="width=device-width,initial-scale=1.0">
-
-<meta name="theme-color"
-
-      content="#07090d">
-
-<title>Fast Bingo Admin</title>
-
-<style>
-
-:root{
-
-  --bg:#07090d;
-
-  --surface:#10141c;
-
-  --surface2:#151b25;
-
-  --line:#293243;
-
-  --text:#fff;
-
-  --muted:#8993a4;
-
-  --red:#e50914;
-
-  --green:#26d07c;
-
-  --gold:#ffc857;
-
-}
-
-*{
-
-  box-sizing:border-box;
-
-}
-
-body{
-
-  margin:0;
-
-  background:var(--bg);
-
-  color:var(--text);
-
-  font-family:-apple-system,BlinkMacSystemFont,
-
-  "Segoe UI",Roboto,Arial,sans-serif;
-
-}
-
-.app{
-
-  max-width:900px;
-
-  margin:auto;
-
-  padding:18px 14px 50px;
-
-}
-
-.header{
-
-  display:flex;
-
-  justify-content:space-between;
-
-  align-items:center;
-
-  gap:12px;
-
-  margin-bottom:15px;
-
-}
-
-.title{
-
-  font-size:22px;
-
-  font-weight:950;
-
-}
-
-.subtitle{
-
-  color:var(--muted);
-
-  font-size:10px;
-
-  margin-top:3px;
-
-}
-
-.panel{
-
-  background:var(--surface);
-
-  border:1px solid var(--line);
-
-  border-radius:15px;
-
-  padding:14px;
-
-  margin-bottom:12px;
-
-}
-
-.panel-title{
-
-  font-size:14px;
-
-  font-weight:900;
-
-  margin-bottom:10px;
-
-}
-
-input{
-
-  width:100%;
-
-  padding:12px;
-
-  border-radius:10px;
-
-  border:1px solid var(--line);
-
-  background:#0c1118;
-
-  color:#fff;
-
-  outline:none;
-
-}
-
-button{
-
-  border:0;
-
-  border-radius:10px;
-
-  padding:10px 13px;
-
-  font-weight:900;
-
-  cursor:pointer;
-
-}
-
-button:disabled{
-
-  opacity:.6;
-
-  cursor:not-allowed;
-
-}
-
-.primary{
-
-  background:var(--red);
-
-  color:#fff;
-
-}
-
-.green{
-
-  background:var(--green);
-
-  color:#06130c;
-
-}
-
-.dark{
-
-  background:var(--surface2);
-
-  border:1px solid var(--line);
-
-  color:#fff;
-
-}
-
-.danger{
-
-  background:#4a1116;
-
-  color:#fff;
-
-  border:1px solid #7b2028;
-
-}
-
-.login-row{
-
-  display:grid;
-
-  grid-template-columns:1fr auto;
-
-  gap:8px;
-
-}
-
-.grid{
-
-  display:grid;
-
-  grid-template-columns:repeat(4,1fr);
-
-  gap:8px;
-
-}
-
-.stat{
-
-  background:#0d1118;
-
-  border:1px solid var(--line);
-
-  border-radius:11px;
-
-  padding:12px;
-
-}
-
-.stat-label{
-
-  color:var(--muted);
-
-  font-size:9px;
-
-}
-
-.stat-value{
-
-  font-size:18px;
-
-  font-weight:950;
-
-  margin-top:4px;
-
-}
-
-.request{
-
-  background:#0d1118;
-
-  border:1px solid var(--line);
-
-  border-radius:12px;
-
-  padding:12px;
-
-  margin-top:8px;
-
-}
-
-.request-top{
-
-  display:flex;
-
-  justify-content:space-between;
-
-  gap:8px;
-
-}
-
-.badge{
-
-  display:inline-block;
-
-  padding:4px 7px;
-
-  border-radius:7px;
-
-  background:#242c38;
-
-  color:#fff;
-
-  font-size:9px;
-
-  font-weight:900;
-
-}
-
-.deposit{
-
-  color:var(--green);
-
-}
-
-.withdraw{
-
-  color:var(--gold);
-
-}
-
-.request-info{
-
-  color:#c5ccd7;
-
-  font-size:10px;
-
-  line-height:17px;
-
-  margin-top:7px;
-
-}
-
-.request-actions{
-
-  display:flex;
-
-  gap:7px;
-
-  margin-top:9px;
-
-}
-
-.request-actions button{
-
-  flex:1;
-
-}
-
-.screenshot{
-
-  display:block;
-
-  width:100%;
-
-  max-height:360px;
-
-  object-fit:contain;
-
-  background:#05070a;
-
-  border-radius:10px;
-
-  margin-top:10px;
-
-}
-
-.hidden{
-
-  display:none;
-
-}
-
-.toolbar{
-
-  display:flex;
-
-  gap:7px;
-
-  flex-wrap:wrap;
-
-}
-
-.status{
-
-  color:var(--muted);
-
-  font-size:10px;
-
-  margin-top:8px;
-
-}
-
-.error{
-
-  color:#ff7b84;
-
-}
-
-.success{
-
-  color:var(--green);
-
-}
-
-@media(max-width:600px){
-
-  .grid{
-
-    grid-template-columns:1fr 1fr;
-
-  }
-
-  .login-row{
-
-    grid-template-columns:1fr;
-
-  }
-
-}
-
-</style>
-
-</head>
-
-<body>
-
-<div class="app">
-
-  <div class="header">
-
-    <div>
-
-      <div class="title">
-
-        Fast Bingo Admin
-
-      </div>
-
-      <div class="subtitle">
-
-        Private administration dashboard
-
-      </div>
-
-    </div>
-
-    <button
-
-      class="dark"
-
-      type="button"
-
-      onclick="logout()">
-
-      Logout
-
-    </button>
-
-  </div>
-
-  <!-- =====================================================
-
-       LOGIN
-
-       ===================================================== -->
-
-  <div
-
-    class="panel"
-
-    id="loginPanel">
-
-    <div class="panel-title">
-
-      Admin Login
-
-    </div>
-
-    <div class="login-row">
-
-      <input
-
-        id="adminKey"
-
-        type="password"
-
-        placeholder="ADMIN_KEY"
-
-        autocomplete="current-password">
-
-      <button
-
-        class="primary"
-
-        type="button"
-
-        id="loginButton"
-
-        onclick="login()">
-
-        Login
-
-      </button>
-
-    </div>
-
-    <div
-
-      class="status"
-
-      id="loginStatus">
-
-    </div>
-
-  </div>
-
-  <!-- =====================================================
-
-       DASHBOARD
-
-       ===================================================== -->
-
-  <div
-
-    id="dashboard"
-
-    class="hidden">
-
-    <!-- ===================================================
-
-         OVERVIEW
-
-         =================================================== -->
-
-    <div class="panel">
-
-      <div class="panel-title">
-
-        Overview
-
-      </div>
-
-      <div
-
-        class="grid"
-
-        id="stats">
-
-      </div>
-
-    </div>
-
-    <!-- ===================================================
-
-         GAME CONTROL
-
-         =================================================== -->
-
-    <div class="panel">
-
-      <div class="panel-title">
-
-        Game Control
-
-      </div>
-
-      <div class="toolbar">
-
-        <button
-
-          class="green"
-
-          type="button"
-
-          onclick="gameControl('resume')">
-
-          Resume
-
-        </button>
-
-        <button
-
-          class="dark"
-
-          type="button"
-
-          onclick="gameControl('pause')">
-
-          Pause
-
-        </button>
-
-        <button
-
-          class="danger"
-
-          type="button"
-
-          onclick="gameControl('reset')">
-
-          Reset
-
-        </button>
-
-      </div>
-
-      <div
-
-        class="status"
-
-        id="gameStatus">
-
-      </div>
-
-    </div>
-
-    <!-- ===================================================
-
-         PENDING REQUESTS
-
-         =================================================== -->
-
-    <div class="panel">
-
-      <div class="panel-title">
-
-        Pending Requests
-
-      </div>
-
-      <div id="requests">
-
-      </div>
-
-    </div>
-
-    <!-- ===================================================
-
-         USERS
-
-         =================================================== -->
-
-    <div class="panel">
-
-      <div class="panel-title">
-
-        Users
-
-      </div>
-
-      <div id="users">
-
-      </div>
-
-    </div>
-
-  </div>
-
-</div>
-
-<script>
-
-/* =========================================================
-
-   ADMIN KEY
-
-   ========================================================= */
-
-var adminKey =
-
-  localStorage.getItem(
-
-    "fastBingoAdminKey"
-
-  ) || "";
-
-/* =========================================================
-
-   API HELPER
-
-   ========================================================= */
-
-function api(path, options){
-
-  options =
-
-    options || {};
-
-  var headers =
-
-    options.headers || {};
-
-  headers["x-admin-key"] =
-
-    adminKey;
-
-  options.headers =
-
-    headers;
-
-  return fetch(
-
-    path,
-
-    options
-
-  )
-
-  .then(function(response){
-
-    return response.text();
-
-  })
-
-  .then(function(text){
-
-    try{
-
-      return JSON.parse(text);
-
-    }catch(error){
-
-      return {
-
-        ok:false,
-
-        error:
-
-          "SERVER_RESPONSE: " +
-
-          text
-
-      };
-
-    }
-
-  });
-
-}
-
-/* =========================================================
-
-   LOGIN
-
-   ========================================================= */
-
-function login(){
-
-  var input =
-
-    document.getElementById(
-
-      "adminKey"
-
-    );
-
-  var status =
-
-    document.getElementById(
-
-      "loginStatus"
-
-    );
-
-  var button =
-
-    document.getElementById(
-
-      "loginButton"
-
-    );
-
-  var key =
-
-    input.value.trim();
-
-  if(!key){
-
-    status.className =
-
-      "status error";
-
-    status.textContent =
-
-      "Enter ADMIN_KEY.";
-
-    return;
-
-  }
-
-  adminKey =
-
-    key;
-
-  button.disabled =
-
-    true;
-
-  status.className =
-
-    "status";
-
-  status.textContent =
-
-    "Checking ADMIN_KEY...";
-
-  api(
-
-    "/do/admin/summary"
-
-  )
-
-  .then(function(data){
-
-    if(data && data.ok){
-
-      localStorage.setItem(
-
-        "fastBingoAdminKey",
-
-        adminKey
-
-      );
-
-      status.className =
-
-        "status success";
-
-      status.textContent =
-
-        "Login successful.";
-
-      showDashboard();
-
-      return;
-
-    }
-
-    adminKey = "";
-
-    button.disabled =
-
-      false;
-
-    status.className =
-
-      "status error";
-
-    status.textContent =
-
-      "Login failed: " +
-
-      (
-
-        data &&
-
-        data.error
-
-          ? data.error
-
-          : "Invalid ADMIN_KEY."
-
-      );
-
-  })
-
-  .catch(function(){
-
-    adminKey = "";
-
-    button.disabled =
-
-      false;
-
-    status.className =
-
-      "status error";
-
-    status.textContent =
-
-      "Connection error.";
-
-  });
-
-}
-
-/* =========================================================
-
-   SHOW DASHBOARD
-
-   ========================================================= */
-
-function showDashboard(){
-
-  document.getElementById(
-
-    "loginPanel"
-
-  ).classList.add(
-
-    "hidden"
-
-  );
-
-  document.getElementById(
-
-    "dashboard"
-
-  ).classList.remove(
-
-    "hidden"
-
-  );
-
-  loadAll();
-
-}
-
-/* =========================================================
-
-   LOGOUT
-
-   ========================================================= */
-
-function logout(){
-
-  adminKey =
-
-    "";
-
-  localStorage.removeItem(
-
-    "fastBingoAdminKey"
-
-  );
-
-  location.reload();
-
-}
-
-/* =========================================================
-
-   LOAD ALL
-
-   ========================================================= */
-
-function loadAll(){
-
-  loadSummary();
-
-  loadRequests();
-
-  loadUsers();
-
-}
-
-/* =========================================================
-
-   SUMMARY
-
-   ========================================================= */
-
-function loadSummary(){
-
-  api(
-
-    "/do/admin/summary"
-
-  )
-
-  .then(function(data){
-
-    if(!data || !data.ok){
-
-      logout();
-
-      return;
-
-    }
-
-    var game =
-
-      data.game || {};
-
-    var html =
-
-      "";
-
-    html += stat(
-
-      "Users",
-
-      data.users || 0
-
-    );
-
-    html += stat(
-
-      "Pending Deposits",
-
-      data.pendingDeposits || 0
-
-    );
-
-    html += stat(
-
-      "Pending Withdrawals",
-
-      data.pendingWithdrawals || 0
-
-    );
-
-    html += stat(
-
-      "Game",
-
-      game.gameNumber
-
-        ? "#" + game.gameNumber
-
-        : "-"
-
-    );
-
-    document.getElementById(
-
-      "stats"
-
-    ).innerHTML =
-
-      html;
-
-    document.getElementById(
-
-      "gameStatus"
-
-    ).textContent =
-
-      "Status: " +
-
-      (
-
-        game.status ||
-
-        "-"
-
-      );
-
-  })
-
-  .catch(function(){
-
-    document.getElementById(
-
-      "gameStatus"
-
-    ).textContent =
-
-      "Status: Connection error.";
-
-  });
-
-}
-
-/* =========================================================
-
-   STAT CARD
-
-   ========================================================= */
-
-function stat(
-
-  label,
-
-  value
-
-){
-
-  return (
-
-    '<div class="stat">' +
-
-      '<div class="stat-label">' +
-
-        escapeHtml(label) +
-
-      '</div>' +
-
-      '<div class="stat-value">' +
-
-        escapeHtml(value) +
-
-      '</div>' +
-
-    '</div>'
-
-  );
-
-}
-
-/* =========================================================
-
-   PENDING REQUESTS
-
-   ========================================================= */
-
-function loadRequests() {
-
-  var container = document.getElementById("requests");
-
-  api("/do/admin/requests")
-
-    .then(function(data) {
-
-      if (!data || !data.ok) {
-
-        container.innerHTML =
-
-          '<div class="status error">Failed to load requests.</div>';
-
-        return;
-
-      }
-
-      var list = data.requests || [];
-
-      var pending = list.filter(function(item) {
-
-        return item.status === "pending";
-
-      });
-
-      if (!pending.length) {
-
-        container.innerHTML =
-
-          '<div class="status">No pending requests.</div>';
-
-        return;
-
-      }
-
-      var output = "";
-
-      pending.forEach(function(item) {
-
-        var typeLabel =
-
-          item.type === "deposit" ? "DEPOSIT" : "WITHDRAWAL";
-
-        output +=
-
-          '<div class="request">' +
-
-            '<div class="request-top">' +
-
-              '<span class="badge">' + typeLabel + '</span>' +
-
-              '<strong>' +
-
-                Number(item.amount || 0).toFixed(2) +
-
-                ' ETB' +
-
-              '</strong>' +
-
-            '</div>' +
-
-            '<div class="request-info">' +
-
-              'User: ' + escapeHtml(item.userId || "-") + '<br>' +
-
-              'Name: ' + escapeHtml(
-
-                item.firstName || item.username || "-"
-
-              ) + '<br>' +
-
-              'Method: ' + escapeHtml(item.method || "-") + '<br>' +
-
-              'Status: ' + escapeHtml(item.status || "-") +
-
-            '</div>';
-
-        if (item.type === "deposit") {
-
-          var transactionUrl = "";
-
-          try {
-
-            var parsedUrl = new URL(item.transactionLink || "");
-
-            if (
-
-              parsedUrl.protocol === "https:" ||
-
-              parsedUrl.protocol === "http:"
-
-            ) {
-
-              transactionUrl = parsedUrl.href;
-
-            }
-
-          } catch (_) {}
-
-          if (transactionUrl) {
-
-            output +=
-
-              '<div class="request-info">' +
-
-                '<strong>Transaction Link:</strong><br>' +
-
-                '<a href="' + escapeHtml(transactionUrl) + '" ' +
-
-                'target="_blank" rel="noopener noreferrer" ' +
-
-                'style="color:#ffc857;overflow-wrap:anywhere;">' +
-
-                  'Open payment transaction' +
-
-                '</a>' +
-
-              '</div>';
-
-          } else {
-
-            output +=
-
-              '<div class="request-info">' +
-
-                'Transaction link is missing or invalid.' +
-
-              '</div>';
-
-          }
-
-        }
-
-        output +=
-
-          '<div class="request-actions">' +
-
-            '<button class="green" type="button" ' +
-
-              'onclick="requestAction(' + Number(item.id) + ', \'confirm\')">' +
-
-              'Confirm' +
-
-            '</button>' +
-
-            '<button class="danger" type="button" ' +
-
-              'onclick="requestAction(' + Number(item.id) + ', \'reject\')">' +
-
-              'Reject' +
-
-            '</button>' +
-
-          '</div>' +
-
-          '</div>';
-
-      });
-
-      container.innerHTML = output;
-
-    })
-
-    .catch(function() {
-
-      container.innerHTML =
-
-        '<div class="status error">Connection error loading requests.</div>';
-
-    });
-
-}
-
-/* =========================================================
-
-   REQUEST ACTION
-
-   ========================================================= */
-
-function requestAction(id, action) {
-
-  if (!confirm("Are you sure you want to " + action + " this request?")) {
-
-    return;
-
-  }
-
-  api("/do/admin/request-action", {
-
-    method: "POST",
-
-    headers: {
-
-      "content-type": "application/json"
-
-    },
-
-    body: JSON.stringify({
-
-      requestId: Number(id),
-
-      action: action
-
-    })
-
-  })
-
-    .then(function(data) {
-
-      if (data && data.ok) {
-
-        loadAll();
-
-      } else {
-
-        alert(
-
-          data && data.error
-
-            ? data.error
-
-            : "Action failed."
-
-        );
-
-      }
-
-    })
-
-    .catch(function() {
-
-      alert("Connection error.");
-
-    });
-
-}
-
-/* =========================================================
-
-   USERS
-
-   ========================================================= */
-
-function loadUsers(){
-
-  api(
-
-    "/do/admin/users"
-
-  )
-
-  .then(function(data){
-
-    if(!data || !data.ok){
-
-      return;
-
-    }
-
-    var list =
-
-      data.users ||
-
-      [];
-
-    if(!list.length){
-
-      document.getElementById(
-
-        "users"
-
-      ).innerHTML =
-
-        '<div class="status">' +
-
-        'No users.' +
-
-        '</div>';
-
-      return;
-
-    }
-
-    var html =
-
-      "";
-
-    list.forEach(
-
-      function(user){
-
-        var displayName =
-
-          user.firstName ||
-
-          user.username ||
-
-          user.userId ||
-
-          "-";
-
-        html +=
-
-          '<div class="request">' +
-
-            '<div class="request-info">' +
-
-              '<strong>' +
-
-                escapeHtml(
-
-                  displayName
-
-                ) +
-
-              '</strong>' +
-
-              '<br>' +
-
-              'User ID: ' +
-
-              escapeHtml(
-
-                user.userId ||
-
-                "-"
-
-              ) +
-
-              '<br>' +
-
-              'Username: ' +
-
-              escapeHtml(
-
-                user.username
-
-                  ? "@" +
-
-                    user.username
-
-                  : "-"
-
-              ) +
-
-              '<br>' +
-
-              'Main Balance: ' +
-
-              Number(
-
-                user.mainBalance || 0
-
-              ).toFixed(2) +
-
-              ' ETB' +
-
-              '<br>' +
-
-              'Play Balance: ' +
-
-              Number(
-
-                user.playBalance || 0
-
-              ).toFixed(2) +
-
-              ' ETB' +
-
-            '</div>' +
-
-          '</div>';
-
-      }
-
-    );
-
-    document.getElementById(
-
-      "users"
-
-    ).innerHTML =
-
-      html;
-
-  })
-
-  .catch(function(){
-
-    document.getElementById(
-
-      "users"
-
-    ).innerHTML =
-
-      '<div class="status error">' +
-
-      'Failed to load users.' +
-
-      '</div>';
-
-  });
-
-}
-
-/* =========================================================
-
-   GAME CONTROL
-
-   ========================================================= */
-
-function gameControl(
-
-  action
-
-){
-
-  if(
-
-    !confirm(
-
-      "Run game action: " +
-
-      action +
-
-      "?"
-
-    )
-
-  ){
-
-    return;
-
-  }
-
-  api(
-
-    "/do/admin/control",
-
-    {
-
-      method:"POST",
-
-      headers:{
-
-        "content-type":
-
-          "application/json"
-
-      },
-
-      body:
-
-        JSON.stringify({
-
-          action:action
-
-        })
-
-    }
-
-  )
-
-  .then(function(data){
-
-    if(data && data.ok){
-
-      loadAll();
-
-    }else{
-
-      alert(
-
-        data &&
-
-        data.error
-
-          ? data.error
-
-          : "Game control failed."
-
-      );
-
-    }
-
-  })
-
-  .catch(function(){
-
-    alert(
-
-      "Connection error."
-
-    );
-
-  });
-
-}
-
-/* =========================================================
-
-   HTML ESCAPE
-
-   ========================================================= */
-
-function escapeHtml(
-
-  value
-
-){
-
-  return String(
-
-    value == null
-
-      ? ""
-
-      : value
-
-  )
-
-  .replace(
-
-    /&/g,
-
-    "&amp;"
-
-  )
-
-  .replace(
-
-    /</g,
-
-    "&lt;"
-
-  )
-
-  .replace(
-
-    />/g,
-
-    "&gt;"
-
-  )
-
-  .replace(
-
-    /"/g,
-
-    "&quot;"
-
-  )
-
-  .replace(
-
-    /'/g,
-
-    "&#039;"
-
-  );
-
-}
-
-/* =========================================================
-
-   ENTER KEY LOGIN
-
-   ========================================================= */
-
-document
-
-  .getElementById(
-
-    "adminKey"
-
-  )
-
-  .addEventListener(
-
-    "keydown",
-
-    function(event){
-
-      if(
-
-        event.key ===
-
-        "Enter"
-
-      ){
-
-        login();
-
-      }
-
-    }
-
-  );
-
-/* =========================================================
-
-   RESTORE SAVED LOGIN
-
-   ========================================================= */
-
-if(adminKey){
-
-  api(
-
-    "/do/admin/summary"
-
-  )
-
-  .then(function(data){
-
-    if(
-
-      data &&
-
-      data.ok
-
-    ){
-
-      showDashboard();
-
-    }else{
-
-      adminKey = "";
-
-      localStorage.removeItem(
-
-        "fastBingoAdminKey"
-
-      );
-
-    }
-
-  })
-
-  .catch(function(){
-
-    adminKey = "";
-
-    localStorage.removeItem(
-
-      "fastBingoAdminKey"
-
-    );
-
-  });
-
-}
-
-</script>
-
-</body>
-
-</html>`;
-
-}
-
-/* =========================================================
-
-   MAIN WORKER
-
-   ========================================================= */
-
 export default {
 
   async fetch(
@@ -17152,34 +6533,6 @@ export default {
     const url =
 
       new URL(request.url);
-
-    /* =====================================================
-
-       ADMIN DASHBOARD
-
-       ===================================================== */
-
-    if(
-
-      url.pathname ===
-
-      "/admin"
-
-    ){
-
-      return html(
-
-        adminHtml()
-
-      );
-
-    }
-
-    /* =====================================================
-
-       HEALTH
-
-       ===================================================== */
 
     if(
 
@@ -17203,12 +6556,6 @@ export default {
 
     }
 
-    /* =====================================================
-
-       PLAYER API
-
-       ===================================================== */
-
     const apiRoutes = [
 
       "/api/game",
@@ -17223,16 +6570,8 @@ export default {
 
       "/api/wallet",
 
-      "/api/claim",
+      "/api/claim"
 
-      "/api/auth/status",
-
-      "/api/auth/register",
-
-      "/api/auth/request",
-
-      "/api/auth/verify"
-       
     ];
 
     if(
@@ -17256,12 +6595,6 @@ export default {
       );
 
     }
-
-    /* =====================================================
-
-       PLAYER DIRECT DO ROUTES
-
-       ===================================================== */
 
     const doRoutes = [
 
@@ -17301,11 +6634,7 @@ export default {
 
       const stub =
 
-        env.GAME_SCHEDULER.get(
-
-          id
-
-        );
+        env.GAME_SCHEDULER.get(id);
 
       return stub.fetch(
 
@@ -17314,68 +6643,6 @@ export default {
       );
 
     }
-
-    /* =====================================================
-
-       ADMIN API
-
-       ===================================================== */
-
-    const adminRoutes = [
-
-      "/do/admin/summary",
-
-      "/do/admin/users",
-
-      "/do/admin/requests",
-
-      "/do/admin/request-action",
-
-      "/do/admin/set-balance",
-
-      "/do/admin/control"
-
-    ];
-
-    if(
-
-      adminRoutes.includes(
-
-        url.pathname
-
-      )
-
-    ){
-
-      const id =
-
-        env.GAME_SCHEDULER.idFromName(
-
-          "main-game"
-
-        );
-
-      const stub =
-
-        env.GAME_SCHEDULER.get(
-
-          id
-
-        );
-
-      return stub.fetch(
-
-        request
-
-      );
-
-    }
-
-    /* =====================================================
-
-       FAVICON
-
-       ===================================================== */
 
     if(
 
@@ -17399,12 +6666,6 @@ export default {
 
     }
 
-    /* =====================================================
-
-       MINI APP
-
-       ===================================================== */
-
     return html(
 
       pageHtml()
@@ -17415,8 +6676,4 @@ export default {
 
 };
 
-export {
-
-  GameScheduler
-
-};
+export { GameScheduler };
